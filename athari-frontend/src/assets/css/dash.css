@@ -114,8 +114,8 @@ body {
 
 /* Active item visual */
 .sidebar-item.active {
-  background-color: #e7f1ff;
-  color: #0d6efd;
+  background-color: #1770ed;
+  color: #cdced0;
   font-weight: 600;
   box-shadow: inset 3px 0 0 rgba(13,110,253,0.12);
 }
@@ -181,8 +181,15 @@ body {
   background: linear-gradient(90deg, #0d6efd 0%, #3b82f6 100%);
   color: #fff;
   border-bottom: 1px solid rgba(255,255,255,0.08);
-  padding: 1rem 2rem;
+  padding: 0.5rem 1rem;
   box-shadow: 0 1px 6px rgba(13,110,253,0.12);
+  /* Make top-bar a fixed-height header so it doesn't expand */
+  height: 56px;
+  min-height: 56px;
+  line-height: 1;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
 }
 
 .search-box {
@@ -191,8 +198,11 @@ body {
   gap: 0.5rem;
   background-color: rgba(255,255,255,0.12);
   border-radius: 0.5rem;
-  padding: 0.35rem 0.75rem;
+  /* reduce vertical padding and set fixed container height to align items */
+  padding: 0.15rem 0.5rem;
   max-width: 420px;
+  height: 40px;
+  box-sizing: border-box;
 }
 
 .search-box input {
@@ -201,10 +211,38 @@ body {
   outline: none;
   flex: 1;
   color: #fff;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .search-box input::placeholder {
   color: rgba(255,255,255,0.85);
+}
+
+/* Ensure inputs and buttons inside the top-bar don't stretch the header */
+.top-bar .search-box input,
+.top-bar .search-box .form-control-sm {
+  height: 100%;
+  padding: 0 0.5rem;
+  line-height: 1;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+.top-bar .notification-btn,
+.top-bar .notification-btn.btn {
+  height: 32px;
+  padding: 0.25rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* If the dashboard layout uses flex column, ensure content area gets remaining space */
+.flex-fill.d-flex.flex-column > .p-4,
+.flex-fill.d-flex.flex-column > .dashboard-content {
+  flex: 1 1 auto;
+  overflow: auto;
 }
 
 .notification-btn {

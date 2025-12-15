@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import '../../assets/css/dash.css'
 import { BarChart3, TrendingUp, Users, Zap, Settings, Bell, Search } from 'lucide-react'
+import Sidebar from '../../components/layout/Sidebar'
+import TopBar from '../../components/layout/TopBar'
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -39,65 +41,22 @@ export default function App() {
   ]
 
   return (
-    <div className="d-flex vh-100 bg-light text-dark">
-      {/* Sidebar */}
-      <div className={`d-flex flex-column ${sidebarOpen ? 'col-2' : 'col-1'} bg-white text-dark border-end`} style={{transition: 'width .25s'}}>
-        <div className="p-3 border-bottom d-flex align-items-center justify-content-between sidebar-header">
-          {sidebarOpen && <h5 className="m-0">Dashboard</h5>}
-          <button className="btn btn-sm btn-outline-light sidebar-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} aria-expanded={sidebarOpen}>☰</button>
-        </div>
-
-        <nav className="flex-fill p-2 sidebar-nav">
-          {[
-            { id: 'overview', icon: BarChart3, label: 'tableau bord' },
-            { id: 'users', icon: Users, label: 'utilisateur' },
-           { id: 'accounts', icon: Users, label: 'comptes' },
-              { id: 'trans', icon: Users, label: 'transactions' },
-
-            { id: 'analytics', icon: TrendingUp, label: 'Analytics' },
-            { id: 'performance', icon: Zap, label: 'Performance' },
-          ].map((item) => (
-            <div
-              key={item.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => setActiveNav(item.id)}
-              className={`sidebar-item d-flex align-items-center gap-3 p-2 rounded ${activeNav === item.id ? 'active' : ''}`}
-              style={{cursor: 'pointer'}}
-            >
-              <item.icon size={18} />
-              {sidebarOpen && <span className="sidebar-label">{item.label}</span>}
-            </div>
-          ))}
-        </nav>
-
-        <div className="p-3 border-top">
-          <div className="d-flex align-items-center gap-2">
-            <Settings size={16} />
-            {sidebarOpen && <small>parametres</small>}
-          </div>
-        </div>
-      </div>
+    <div className={`dashboard-container d-flex vh-100 bg-light text-dark ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+      {/* Sidebar (composant) */}
+      <Sidebar
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        activeNav={activeNav}
+        setActiveNav={setActiveNav}
+      />
 
       {/* Main Content */}
-      <div className="flex-fill d-flex flex-column">
-        {/* Top Bar */}
-        <div className="top-bar d-flex align-items-center justify-content-between">
-          <div className="d-flex align-items-center gap-2 w-50 search-box">
-            <Search size={18} className="text-white-50" />
-            <input type="text" className="form-control form-control-sm" placeholder="Search..." />
-          </div>
-          <div className="d-flex align-items-center gap-3">
-            <button className="btn btn-light btn-sm position-relative">
-              <Bell size={16} />
-              <span className="position-absolute top-0 start-100 translate-middle p-1 bg-danger rounded-circle"></span>
-            </button>
-            <div className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style={{width:36,height:36}}>JD</div>
-          </div>
-        </div>
+      <div className="main-content flex-fill d-flex flex-column">
+        {/* Top Bar (composant) */}
+        <TopBar sidebarOpen={sidebarOpen} />
 
         {/* Dashboard Content */}
-        <div className="p-4 overflow-auto">
+        <div className="dashboard-content p-4 overflow-auto">
           <div className="mb-4">
             <h2 className="h3"> bienvenue</h2>
           </div>
