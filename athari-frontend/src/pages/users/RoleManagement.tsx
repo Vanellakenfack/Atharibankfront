@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Swal from 'sweetalert2';
 import { mockRoles, permissionCategories } from './data/mockData';
 import { FiShield, FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi';
+import TopBar from '../../components/layout/TopBar';
 
 const RoleManagement = () => {
   const [roles, setRoles] = useState(mockRoles);
@@ -106,7 +107,10 @@ const RoleManagement = () => {
   };
 
   return (
-    <div className="container mx-auto">
+    <>
+      {/* 2. Placer la TopBar en premier */}
+      <TopBar />
+      <div className="container mx-auto">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Gestion des Rôles et Permissions</h1>
@@ -302,7 +306,9 @@ const RoleManagement = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
+    
   );
 };
 

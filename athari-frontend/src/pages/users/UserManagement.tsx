@@ -44,6 +44,7 @@ import {
   VisibilityOff as VisibilityOffIcon,
 } from '@mui/icons-material';
 import ApiClient from '../../services/api/ApiClient';
+import TopBar from '../../components/layout/TopBar';
 
 
 
@@ -319,306 +320,311 @@ const UserManagement = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* En-tête */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h5" component="h1" sx={{ fontWeight: 'bold' }}>
-              Gestion des Utilisateurs
-            </Typography>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<PersonAddIcon />}
-              onClick={handleOpenAddDialog}
-            >
-              Nouvel Utilisateur
-            </Button>
-          </Box>
+    <>
+      {/* 2. Placer la TopBar en premier */}
+      <TopBar />
+      <Box sx={{ p: 3 }}>
+        {/* En-tête */}
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h5" component="h1" sx={{ fontWeight: 'bold' }}>
+                Gestion des Utilisateurs
+              </Typography>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<PersonAddIcon />}
+                onClick={handleOpenAddDialog}
+              >
+                Nouvel Utilisateur
+              </Button>
+            </Box>
+            
+            <Divider sx={{ my: 2 }} />
+            
+            {/* Filtres */}
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={5}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Rechercher par nom ou email..."
+                  value={search}
+                  onChange={handleSearchChange}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Filtrer par rôle</InputLabel>
+                  <Select
+                    value={filterRole}
+                    label="Filtrer par rôle"
+                    onChange={(e) => {
+                      setFilterRole(e.target.value);
+                      setPage(0);
+                    }}
+                  >
+                    <MenuItem value="">Tous les rôles</MenuItem>
+                    {roles.map((role) => (
+                      <MenuItem key={role.id} value={role.name}>
+                        {role.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  onClick={fetchUsers}
+                >
+                  Actualiser
+                </Button>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+
+        {/* Tableau des utilisateurs */}
+        <Paper elevation={2}>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: 'primary.main' }}>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>ID</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Nom</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Email</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Rôle</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Date de création</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                      <CircularProgress />
+                      <Typography variant="body2" sx={{ mt: 2 }}>
+                        Chargement des utilisateurs...
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : users.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                      <Typography variant="body1" color="textSecondary">
+                        Aucun utilisateur trouvé
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  users.map((user) => (
+                    <TableRow key={user.id} hover>
+                      <TableCell>{user.id}</TableCell>
+                      <TableCell>{user.name}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={user.role || 'Aucun rôle'}
+                          color={roleColors[user.role] || 'default'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {new Date(user.created_at).toLocaleDateString('fr-FR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Tooltip title="Modifier">
+                          <IconButton
+                            color="primary"
+                            onClick={() => handleOpenEditDialog(user)}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Supprimer">
+                          <IconButton
+                            color="error"
+                            onClick={() => handleOpenDeleteDialog(user)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
           
-          <Divider sx={{ my: 2 }} />
-          
-          {/* Filtres */}
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={5}>
+          {/* Pagination */}
+          <TablePagination
+            component="div"
+            count={totalUsers}
+            page={page}
+            onPageChange={handleChangePage}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+            labelRowsPerPage="Lignes par page:"
+            labelDisplayedRows={({ from, to, count }) =>
+              `${from}-${to} sur ${count !== -1 ? count : `plus de ${to}`}`
+            }
+          />
+        </Paper>
+
+        {/* Dialogue Ajout/Modification */}
+        <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+          <DialogTitle>
+            {dialogMode === 'add' ? 'Ajouter un utilisateur' : 'Modifier l\'utilisateur'}
+          </DialogTitle>
+          <DialogContent dividers>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
               <TextField
+                label="Nom complet"
+                name="name"
+                value={formData.name}
+                onChange={handleFormChange}
+                error={Boolean(formErrors.name)}
+                helperText={formErrors.name}
                 fullWidth
-                size="small"
-                placeholder="Rechercher par nom ou email..."
-                value={search}
-                onChange={handleSearchChange}
+                required
+              />
+              
+              <TextField
+                label="Adresse email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleFormChange}
+                error={Boolean(formErrors.email)}
+                helperText={formErrors.email}
+                fullWidth
+                required
+              />
+              
+              <TextField
+                label={dialogMode === 'add' ? 'Mot de passe' : 'Nouveau mot de passe (laisser vide pour ne pas changer)'}
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                value={formData.password}
+                onChange={handleFormChange}
+                error={Boolean(formErrors.password)}
+                helperText={formErrors.password}
+                fullWidth
+                required={dialogMode === 'add'}
                 InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon color="action" />
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowPassword(!showPassword)}
+                        edge="end"
+                      >
+                        {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                      </IconButton>
                     </InputAdornment>
                   ),
                 }}
               />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Filtrer par rôle</InputLabel>
+              
+              <TextField
+                label="Confirmer le mot de passe"
+                name="password_confirmation"
+                type={showPassword ? 'text' : 'password'}
+                value={formData.password_confirmation}
+                onChange={handleFormChange}
+                error={Boolean(formErrors.password_confirmation)}
+                helperText={formErrors.password_confirmation}
+                fullWidth
+                required={dialogMode === 'add' || formData.password}
+              />
+              
+              <FormControl fullWidth error={Boolean(formErrors.role)} required>
+                <InputLabel>Rôle</InputLabel>
                 <Select
-                  value={filterRole}
-                  label="Filtrer par rôle"
-                  onChange={(e) => {
-                    setFilterRole(e.target.value);
-                    setPage(0);
-                  }}
+                  name="role"
+                  value={formData.role}
+                  label="Rôle"
+                  onChange={handleFormChange}
                 >
-                  <MenuItem value="">Tous les rôles</MenuItem>
                   {roles.map((role) => (
                     <MenuItem key={role.id} value={role.name}>
                       {role.name}
                     </MenuItem>
                   ))}
                 </Select>
+                {formErrors.role && <FormHelperText>{formErrors.role}</FormHelperText>}
               </FormControl>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Button
-                fullWidth
-                variant="outlined"
-                startIcon={<RefreshIcon />}
-                onClick={fetchUsers}
-              >
-                Actualiser
-              </Button>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2 }}>
+            <Button onClick={handleCloseDialog} color="inherit">
+              Annuler
+            </Button>
+            <Button onClick={handleSubmit} variant="contained" color="primary">
+              {dialogMode === 'add' ? 'Créer' : 'Enregistrer'}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
-      {/* Tableau des utilisateurs */}
-      <Paper elevation={2}>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: 'primary.main' }}>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>ID</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Nom</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Email</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Rôle</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Date de création</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
-                    <CircularProgress />
-                    <Typography variant="body2" sx={{ mt: 2 }}>
-                      Chargement des utilisateurs...
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : users.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
-                    <Typography variant="body1" color="textSecondary">
-                      Aucun utilisateur trouvé
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                users.map((user) => (
-                  <TableRow key={user.id} hover>
-                    <TableCell>{user.id}</TableCell>
-                    <TableCell>{user.name}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={user.role || 'Aucun rôle'}
-                        color={roleColors[user.role] || 'default'}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {new Date(user.created_at).toLocaleDateString('fr-FR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </TableCell>
-                    <TableCell align="center">
-                      <Tooltip title="Modifier">
-                        <IconButton
-                          color="primary"
-                          onClick={() => handleOpenEditDialog(user)}
-                        >
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Supprimer">
-                        <IconButton
-                          color="error"
-                          onClick={() => handleOpenDeleteDialog(user)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        
-        {/* Pagination */}
-        <TablePagination
-          component="div"
-          count={totalUsers}
-          page={page}
-          onPageChange={handleChangePage}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-          rowsPerPageOptions={[5, 10, 25, 50]}
-          labelRowsPerPage="Lignes par page:"
-          labelDisplayedRows={({ from, to, count }) =>
-            `${from}-${to} sur ${count !== -1 ? count : `plus de ${to}`}`
-          }
-        />
-      </Paper>
+        {/* Dialogue de suppression */}
+        <Dialog open={deleteDialog} onClose={() => setDeleteDialog(false)}>
+          <DialogTitle>Confirmer la suppression</DialogTitle>
+          <DialogContent>
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              Cette action est irréversible !
+            </Alert>
+            <Typography>
+              Êtes-vous sûr de vouloir supprimer l'utilisateur{' '}
+              <strong>{userToDelete?.name}</strong> ({userToDelete?.email}) ?
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2 }}>
+            <Button onClick={() => setDeleteDialog(false)} color="inherit">
+              Annuler
+            </Button>
+            <Button onClick={handleConfirmDelete} variant="contained" color="error">
+              Supprimer
+            </Button>
+          </DialogActions>
+        </Dialog>
 
-      {/* Dialogue Ajout/Modification */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {dialogMode === 'add' ? 'Ajouter un utilisateur' : 'Modifier l\'utilisateur'}
-        </DialogTitle>
-        <DialogContent dividers>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-            <TextField
-              label="Nom complet"
-              name="name"
-              value={formData.name}
-              onChange={handleFormChange}
-              error={Boolean(formErrors.name)}
-              helperText={formErrors.name}
-              fullWidth
-              required
-            />
-            
-            <TextField
-              label="Adresse email"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleFormChange}
-              error={Boolean(formErrors.email)}
-              helperText={formErrors.email}
-              fullWidth
-              required
-            />
-            
-            <TextField
-              label={dialogMode === 'add' ? 'Mot de passe' : 'Nouveau mot de passe (laisser vide pour ne pas changer)'}
-              name="password"
-              type={showPassword ? 'text' : 'password'}
-              value={formData.password}
-              onChange={handleFormChange}
-              error={Boolean(formErrors.password)}
-              helperText={formErrors.password}
-              fullWidth
-              required={dialogMode === 'add'}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() => setShowPassword(!showPassword)}
-                      edge="end"
-                    >
-                      {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-            
-            <TextField
-              label="Confirmer le mot de passe"
-              name="password_confirmation"
-              type={showPassword ? 'text' : 'password'}
-              value={formData.password_confirmation}
-              onChange={handleFormChange}
-              error={Boolean(formErrors.password_confirmation)}
-              helperText={formErrors.password_confirmation}
-              fullWidth
-              required={dialogMode === 'add' || formData.password}
-            />
-            
-            <FormControl fullWidth error={Boolean(formErrors.role)} required>
-              <InputLabel>Rôle</InputLabel>
-              <Select
-                name="role"
-                value={formData.role}
-                label="Rôle"
-                onChange={handleFormChange}
-              >
-                {roles.map((role) => (
-                  <MenuItem key={role.id} value={role.name}>
-                    {role.name}
-                  </MenuItem>
-                ))}
-              </Select>
-              {formErrors.role && <FormHelperText>{formErrors.role}</FormHelperText>}
-            </FormControl>
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={handleCloseDialog} color="inherit">
-            Annuler
-          </Button>
-          <Button onClick={handleSubmit} variant="contained" color="primary">
-            {dialogMode === 'add' ? 'Créer' : 'Enregistrer'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Dialogue de suppression */}
-      <Dialog open={deleteDialog} onClose={() => setDeleteDialog(false)}>
-        <DialogTitle>Confirmer la suppression</DialogTitle>
-        <DialogContent>
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            Cette action est irréversible !
-          </Alert>
-          <Typography>
-            Êtes-vous sûr de vouloir supprimer l'utilisateur{' '}
-            <strong>{userToDelete?.name}</strong> ({userToDelete?.email}) ?
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setDeleteDialog(false)} color="inherit">
-            Annuler
-          </Button>
-          <Button onClick={handleConfirmDelete} variant="contained" color="error">
-            Supprimer
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Snackbar pour les notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={5000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert
+        {/* Snackbar pour les notifications */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={5000}
           onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-          variant="filled"
-          sx={{ width: '100%' }}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
+          <Alert
+            onClose={handleCloseSnackbar}
+            severity={snackbar.severity}
+            variant="filled"
+            sx={{ width: '100%' }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </Box>
+    </>
+    
   );
 };
 
