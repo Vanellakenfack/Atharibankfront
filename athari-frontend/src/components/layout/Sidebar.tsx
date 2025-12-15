@@ -13,10 +13,12 @@ interface SidebarProps {
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen, activeNav, setActiveNav }: SidebarProps) {
   const items = [
-    { id: 'overview', icon: BarChart3, label: 'Tableau de bord' },
-    { id: 'users', icon: Users, label: ' Utilisateur'},
+    { id: 'overview', icon: BarChart3, label: 'Tableau de bord',path: '/dashoard' },
+    { id: 'users', icon: Users, label: ' Utilisateur',path: '/users/management'},
     { id: 'analytics', icon: TrendingUp, label: 'Analyses' },
     { id: 'performance', icon: Zap, label: 'Performance' },
+        { id: 'performance', icon: Zap, label: 'Performance',path:'logs' },
+
   ]
 
   return (
