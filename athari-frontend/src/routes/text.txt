@@ -1,0 +1,20 @@
+{/* Protected */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/users/roles" element={<RoleManagement />} />
+        <Route path="/users/management" element={<UserManagement />} />
+
+        <Route path="/accounts" element={<AccountsPage />} />
+        <Route path="/accounts/create" element={<AccountCreatePage />} />
+        <Route path="/accounts/:id" element={<AccountDetailPage />} />
+        <Route path="/accounts/:id/edit" element={<AccountEditPage />} />
+
+        <Route path="/client" element={<ListeClient />} />
+        <Route path="/client/creer" element={<FormClient />} />
+        <Route path="/client/:id/edit" element={<FormClient />} />
+
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Route>
+
+      {/* 404 */}
+      <Route path="*" element={<div>Page Non Trouvée (404)</div>} />
+    </Routes>
