@@ -21,17 +21,21 @@ const AppRoutes = () => {
           path="/login" 
           element={<Login />} 
         />
-        <Route
-          path="/users/roles"
-          element={<RoleManagement />}
-        />
-        <Route
-          path="/users/management"
-          element={<UserManagement />}
-        />
 
       {/* Page d'Accueil (URL: /) */}
       <Route path="/" element={<Home />} />
+      
+        <Route
+          path="/users/roles"
+          element={<ProtectedRoute> <RoleManagement /> </ProtectedRoute>}
+        />
+
+        <Route
+          path="/users/management"
+          element={<ProtectedRoute> <UserManagement /> </ProtectedRoute>}
+        />
+
+
       
       {/* Routes Comptes */}
       <Route path="/accounts" element={<AccountsPage />} />
