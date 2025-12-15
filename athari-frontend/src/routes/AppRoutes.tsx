@@ -24,32 +24,26 @@ const AppRoutes = () => {
 
       {/* Page d'Accueil (URL: /) */}
       <Route path="/" element={<Home />} />
-      
-        <Route
-          path="/users/roles"
-          element={<ProtectedRoute> <RoleManagement /> </ProtectedRoute>}
-        />
-
-        <Route
-          path="/users/management"
-          element={<ProtectedRoute> <UserManagement /> </ProtectedRoute>}
-        />
 
 
       
-      {/* Routes Comptes */}
+      {/* Routes proteger */}
+    <Route element={<ProtectedRoute />}>
+      <Route path="/users/roles" element={<RoleManagement />}/>
+
+      <Route path="/users/management" element={ <UserManagement />}/>
+
       <Route path="/accounts" element={<AccountsPage />} />
       <Route path="/accounts/create" element={<AccountCreatePage />} />
       <Route path="/accounts/:id" element={<AccountDetailPage />} />
       <Route path="/accounts/:id/edit" element={<AccountEditPage />} />
         
 
-        <Route path='/client' element= {<ListeClient/>} /> 
-           
-        <Route path='/client/creer' element= {<FormClient/>} /> 
-        <Route path='/client/:id/edit' element= {<FormClient/>} />
-         <Route path='Dashboard' element= {<Dashboard/>} /> 
-
+      <Route path='/client' element= {<ListeClient/>} /> 
+      <Route path='/client/creer' element= {<FormClient/>} /> 
+      <Route path='/client/:id/edit' element= {<FormClient/>} />
+      <Route path='Dashboard' element= {<Dashboard/>} /> 
+    </Route>
 
       
 

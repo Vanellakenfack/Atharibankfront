@@ -16,11 +16,13 @@ import {
 import EmailIcon from "@mui/icons-material/Email";
 import LockIcon from "@mui/icons-material/Lock";
 import logo from "../assets/img/logo.png";
+import { useAuth } from "../context/AuthContext";
 // Correction: Suppression de l'import non utilisé de Redux (setLoading)
 // import { setLoading } from "../store/compte/compteSlice"; 
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   // Correction: Initialisation à vide pour éviter les erreurs de lecture
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -55,6 +57,8 @@ export default function Login() {
         device_name: deviceName
       });
 
+      login(response.data.authToken, response.data.user);
+
       // Stockage du token
       localStorage.setItem('authToken', response.data.token);
 
@@ -62,7 +66,7 @@ export default function Login() {
       localStorage.setItem('user', JSON.stringify(response.data.user));
       
       // Redirection après succès
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
 
     } catch (err) {
       const errorData = err.response?.data;
