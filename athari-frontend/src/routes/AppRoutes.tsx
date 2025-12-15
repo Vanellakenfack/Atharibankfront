@@ -4,7 +4,7 @@ import AccountsPage from '../pages/compte/ComptePage';
 import AccountCreatePage from '../pages/compte/CreationCompte';
 import AccountEditPage from '../pages/compte/EditionPage';
 import AccountDetailPage from '../pages/compte/DetailCompte';
-import Formclient from '../pages/client/FormClient';
+import FormClient from '../pages/client/FormClient';
 //import Home from '../pages/Home';
 import Login from '../pages/Login'; 
 import Home from '../pages/Home';
@@ -12,7 +12,7 @@ import ListeClient from '../pages/client/ListeClient';
 import RoleManagement from "../pages/users/RoleManagement";
 import UserManagement from "../pages/users/UserManagement";
 import ProtectedRoute from "../components/users/ProtectedRoute";
-
+import Dashboard from '../pages/dashboard/Dashboard';
 const AppRoutes = () => {
   return (
     <Routes>
@@ -42,9 +42,10 @@ const AppRoutes = () => {
 
         <Route path='/client' element= {<ListeClient/>} /> 
            
-        <Route path='/client/creer' element= {<Formclient/>} /> 
-        <Route path='/client/:id/edit' element= {<Formclient/>} />
-   
+        <Route path='/client/creer' element= {<FormClient/>} /> 
+        <Route path='/client/:id/edit' element= {<FormClient/>} />
+         <Route path='Dashboard' element= {<Dashboard/>} /> 
+
 
       
 

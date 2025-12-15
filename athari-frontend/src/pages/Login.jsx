@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 // Assurez-vous que le chemin est correct (par exemple, "../api/ApiClient")
-import ApiClient from "../ApiClient"; 
+import ApiClient from "../services/api/ApiClient"; 
 import {
   Box,
   Card,

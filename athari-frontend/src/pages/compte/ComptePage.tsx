@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import Header from '../../components/layout/Header';
+import Header from '../../components/layout/TopBar.jsx';
 import Sidebar from '../../components/layout/Sidebar.tsx';
 import {
   Box,

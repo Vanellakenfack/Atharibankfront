@@ -1,7 +1,7 @@
 import React from 'react'
 import { BrowserRouter as Router } from 'react-router-dom'
 import Sidebar from './components/layout/Sidebar.tsx'
-import Header from './components/layout/Header'
+import Header from './components/layout/TopBar.jsx'
 import AppRoutes from './routes/AppRoutes'
 
 function App() {
