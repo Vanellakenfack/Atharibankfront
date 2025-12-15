@@ -177,6 +177,7 @@ body {
 }
 
 /* Top Bar */
+/* Top Bar */
 .top-bar {
   background: linear-gradient(90deg, #0d6efd 0%, #3b82f6 100%);
   color: #fff;
@@ -184,8 +185,8 @@ body {
   padding: 0.5rem 1rem;
   box-shadow: 0 1px 6px rgba(13,110,253,0.12);
   /* Make top-bar a fixed-height header so it doesn't expand */
-  height: 56px;
-  min-height: 56px;
+  height: 60px;
+  min-height: 60px;
   line-height: 1;
   flex: 0 0 auto;
   display: flex;
@@ -198,11 +199,19 @@ body {
   gap: 0.5rem;
   background-color: rgba(255,255,255,0.12);
   border-radius: 0.5rem;
-  /* reduce vertical padding and set fixed container height to align items */
+  /* La hauteur est fixée à 40px */
+
+  box-sizing: border-box;
+  
+  /* C'est la ligne clé pour empêcher le débordement horizontal */
+  flex: 0 1 auto;
   padding: 0.15rem 0.5rem;
   max-width: 420px;
   height: 40px;
   box-sizing: border-box;
+  
+  /* NOUVEAU : Empêche l'élément de recherche de prendre trop de place */
+  flex: 0 1 auto; 
 }
 
 .search-box input {
@@ -211,7 +220,8 @@ body {
   outline: none;
   flex: 1;
   color: #fff;
-  height: 100%;
+  /* Utilise la hauteur du parent (40px) */
+  height: 100%; 
   box-sizing: border-box;
 }
 
@@ -219,15 +229,37 @@ body {
   color: rgba(255,255,255,0.85);
 }
 
-/* Ensure inputs and buttons inside the top-bar don't stretch the header */
+/* --- SECTION DE CORRECTION CRITIQUE --- */
+
+/* Ajustements pour les inputs et boutons à l'intérieur de la top-bar */
 .top-bar .search-box input,
 .top-bar .search-box .form-control-sm {
   height: 100%;
-  padding: 0 0.5rem;
-  line-height: 1;
+  
+  /* Retirer le padding vertical standard de Bootstrap */
+  padding-top: 0;
+  padding-bottom: 0;
+  
+  /* Ajustement horizontal */
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  
+  /* CLÉ DE L'ALIGNEMENT : Forcer la hauteur de ligne à la hauteur du conteneur (40px) */
+  line-height: 40px; 
+  
   font-size: 0.95rem;
   box-sizing: border-box;
 }
+
+/* S'assurer que l'icône de recherche est bien centrée également */
+.search-box > svg {
+  margin: 0;
+  padding: 0;
+  /* Rendre l'icône "block" pour garantir qu'elle ne soit pas traitée comme du texte */
+  display: block; 
+}
+
+/* --- FIN SECTION DE CORRECTION CRITIQUE --- */
 
 .top-bar .notification-btn,
 .top-bar .notification-btn.btn {
@@ -256,20 +288,9 @@ body {
   color: rgba(255,255,255,0.95);
 }
 
-.notification-btn {
-  background: none;
-  border: none;
-  color: #212529;
-  cursor: pointer;
-}
-
-.notification-btn:hover {
-  color: #0d6efd;
-}
-
 .avatar {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   background: linear-gradient(135deg, #0d6efd, #0dcaf0);
   color: #fff;
   border-radius: 50%;

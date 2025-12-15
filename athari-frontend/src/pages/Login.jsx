@@ -62,7 +62,7 @@ export default function Login() {
       localStorage.setItem('user', JSON.stringify(response.data.user));
       
       // Redirection après succès
-      navigate('/users/management');
+      navigate('/dashboard');
 
     } catch (err) {
       const errorData = err.response?.data;
