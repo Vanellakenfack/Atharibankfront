@@ -436,11 +436,11 @@ body {
   margin-top: 1rem;
 }
 
-.bar-item:hover {
+/*.bar-item:hover {
   background: linear-gradient(to top, #0b5cdb, #0b5cdb) !important;
   box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
 }
-
+*/
 /* Progress Bars */
 .progress {
   height: 0.5rem;
@@ -535,4 +535,98 @@ body {
     background-color: #e9ecef !important;
     color: #0d6efd !important;
     transform: scale(1.05) !important; /* Légère emphase plutôt que décalage */
+}
+
+/* Reset des boutons Bootstrap pour éviter les conflits avec le CSS personnalisé */
+.btn-primary, .btn-secondary, .btn-danger {
+    background-image: none !important; /* Supprime le dégradé parasite */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease-in-out;
+}
+
+/* On s'assure que le survol reste celui de Bootstrap */
+.btn-primary:hover {
+    background-color: #0b5cdb !important; /* Un bleu uni propre */
+    background-image: none !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(13, 110, 253, 0.2) !important;
+}
+
+/* Si l'effet persiste dans le modal */
+.modal-footer .btn {
+    background-image: none !important;
+}
+
+/* --- PROTECTION GLOBALE DES BOUTONS (RESET) --- */
+
+/* 1. On neutralise les héritages de Sidebar sur les boutons */
+.btn, 
+button.btn,
+.modal-content .btn {
+    position: relative !important;
+    overflow: hidden !important;
+    background-image: none !important; /* Supprime le dégradé */
+    transform: none !important;        /* Supprime le décalage */
+    opacity: 1 !important;
+    transition: all 0.2s ease !important;
+    border-radius: 8px !important;    /* Force les coins arrondis */
+}
+
+/* 2. On TUE les pseudo-éléments (les carrés bleus sur tes images) */
+.btn::after, 
+.btn::before,
+.modal-footer .btn::after,
+.modal-footer .btn::before {
+    display: none !important;
+    content: none !important;
+    width: 0 !important;
+}
+
+/* 3. On redéfinit le style propre de l'agence Athari pour le bouton Primaire */
+.btn-primary {
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+    color: white !important;
+}
+
+.btn-primary:hover {
+    background-color: #0b5cdb !important;
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* 4. Fix spécifique pour le bouton "Annuler" du modal */
+.btn-light {
+    background-color: #f8f9fa !important;
+    border: 1px solid #dee2e6 !important;
+    color: #212529 !important;
+}
+
+/* --- BOUTONS PRO STYLE --- */
+
+/* Taille globale plus fine pour les boutons */
+.btn {
+    padding: 0.5rem 1rem !important;
+    font-size: 0.875rem !important; /* Standard pour les tableaux de bord */
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+}
+
+/* Bouton spécifique pour les petites actions */
+.btn-sm {
+    padding: 0.25rem 0.75rem !important;
+    font-size: 0.75rem !important;
+}
+
+/* Alignement parfait icône + texte */
+.btn svg {
+    margin-bottom: 1px;
+}
+
+/* Style spécifique pour les boutons dans le Modal footer */
+.modal-footer .btn {
+    padding: 0.4rem 1.2rem !important;
+    min-width: 100px;
 }

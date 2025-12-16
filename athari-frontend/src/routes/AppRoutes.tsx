@@ -13,6 +13,7 @@ import UserManagement from "../pages/users/UserManagement";
 import ProtectedRoute from './ProtectedRoute';
 import Dashboard from '../pages/dashboard/Dashboard';
 import AuditLogView from '../pages/AuditLogView';
+import Agence from '../pages/agences/Agence';
 // Ajoute "Link" dans l'importation existante
 
 
@@ -51,6 +52,9 @@ const AppRoutes = () => {
 
         {/* Logs d'Audit */}
         <Route path='/log' element={<AuditLogView />} />
+
+        {/* gestion de s agences */}
+        <Route path='/agence' element={<Agence />} />
 
       </Route>
 
