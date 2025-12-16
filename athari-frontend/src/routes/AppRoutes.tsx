@@ -28,7 +28,7 @@ const AppRoutes = () => {
 
       
       {/* Routes proteger */}
-    <Route element={<ProtectedRoute />}>
+    <Route element={<ProtectedRoute/>}>
       <Route path="/users/roles" element={<RoleManagement />}/>
 
       <Route path="/users/management" element={ <UserManagement />}/>

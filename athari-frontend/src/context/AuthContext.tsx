@@ -8,24 +8,41 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Vérifie si un token existe au chargement
+// CORRECTION SUGGÉRÉE :
+useEffect(() => {
+  const initAuth = async () => {
     const token = localStorage.getItem("authToken");
+    const storedUser = localStorage.getItem("user");
+    
     if (token) {
-      setIsAuthenticated(true);
-      // Tu peux aussi charger les infos user ici
+      // AMÉLIORATION : Vérifier la validité du token avec l'API
+      try {
+        // Optionnel : valider le token côté serveur
+        setIsAuthenticated(true);
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+        }
+      } catch (e) {
+        // Token invalide, nettoyer
+        logout();
+      }
     }
     setLoading(false);
-  }, []);
+  };
+  
+  initAuth();
+}, []);
 
   const login = (token, userData) => {
     localStorage.setItem("authToken", token);
+    localStorage.setItem("user", JSON.stringify(userData));
     setIsAuthenticated(true);
     setUser(userData);
   };
 
   const logout = () => {
     localStorage.removeItem("authToken");
+    localStorage.removeItem("user");
     setIsAuthenticated(false);
     setUser(null);
   };
