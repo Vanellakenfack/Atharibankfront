@@ -13,6 +13,7 @@ import RoleManagement from "../pages/users/RoleManagement";
 import UserManagement from "../pages/users/UserManagement";
 import ProtectedRoute from "../components/users/ProtectedRoute";
 import Dashboard from '../pages/dashboard/Dashboard';
+import AuditLogView from '../pages/AuditLogView'
 const AppRoutes = () => {
   return (
     <Routes>
@@ -44,6 +45,7 @@ const AppRoutes = () => {
       <Route path='/client/:id/edit' element= {<FormClient/>} />
       <Route path='Dashboard' element= {<Dashboard/>} /> 
     </Route>
+           <Route path='/log' element= {<AuditLogView/>} /> 
 
       
 
