@@ -13,23 +13,20 @@ import {
 } from 'lucide-react';
 import { useAuth } from "../../context/AuthContext";
 
-interface SidebarProps {
-  sidebarOpen: boolean;
-  setSidebarOpen: (open: boolean) => void;
-}
-
-export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
+export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
   // Définition des liens de navigation
   const items = [
-    { id: 'overview', icon: BarChart3, label: 'Tableau de bord', path: '/' },
+    { id: 'overview', icon: BarChart3, label: 'Tableau de bord', path: '/dashboard' },
     { id: 'users', icon: Users, label: 'Utilisateurs', path: '/users/management' },
-    { id: 'logs', icon: ShieldCheck, label: 'Logs d\'audit', path: '/audit-logs' },
+    { id: 'logs', icon: ShieldCheck, label: 'Logs d\'audit', path: '/log' }, // Mis à jour selon votre AppRoutes
     { id: 'analytics', icon: TrendingUp, label: 'Analyses', path: '/analytics' },
-    { id: 'performance', icon: Zap, label: 'Performance', path: '/performance' },
+    { id: 'Performance', icon: Zap, label: 'Performance', path: '/performance' },
+        { id: 'Clients', icon: Users, label: 'client', path: '/client' },
+
   ];
 
   // Fonction pour gérer la déconnexion avec redirection
@@ -44,14 +41,15 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
     <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
       {/* HEADER DE LA SIDEBAR */}
       <div className="sidebar-header d-flex align-items-center justify-content-between p-3">
-        {sidebarOpen && <h5 className="sidebar-title m-0 text-primary fw-bold">Athari Admin</h5>}
-        <button
-          className="btn btn-sm btn-light border"
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          title={sidebarOpen ? "Réduire" : "Agrandir"}
-        >
-          ☰
-        </button>
+        {sidebarOpen && <h5 className="sidebar-title m-0 text-primary fw-bold">AthariBank</h5>}
+           <button
+            className="btn btn-sm btn-light border-0 rounded-circle d-flex align-items-center justify-content-center"
+            style={{ width: '32px', height: '32px', transition: 'all 0.2s' }}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            title={sidebarOpen ? "Réduire" : "Agrandir"}
+          >
+            <span style={{ fontSize: '1.2rem', lineHeight: '1' }}>☰</span>
+          </button>
       </div>
 
       {/* INFOS UTILISATEUR CONNECTÉ */}
@@ -62,7 +60,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
           </small>
           <div className="d-flex align-items-center gap-2 mt-1">
             <div className="bg-primary rounded-circle text-white d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.8rem' }}>
-              {user.name?.charAt(0)}
+              {user.name ? user.name.charAt(0) : 'U'}
             </div>
             <strong className="text-dark" style={{ fontSize: '0.9rem' }}>{user.name}</strong>
           </div>
@@ -104,6 +102,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
           role="button"
           onClick={handleLogout}
           className="d-flex align-items-center gap-3 p-2 text-danger rounded cursor-pointer sidebar-logout-btn transition-all"
+          style={{ cursor: 'pointer' }}
         >
           <LogOut size={20} />
           {sidebarOpen && <span className="fw-bold">Déconnexion</span>}

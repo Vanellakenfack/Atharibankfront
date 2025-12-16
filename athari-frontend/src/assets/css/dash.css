@@ -514,3 +514,25 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #999;
 }
+/* Désactiver spécifiquement l'animation sur le bouton de toggle du header */
+.sidebar-header .btn {
+    position: relative;
+    overflow: visible !important; /* Empêche les effets de rognage */
+    transform: none !important;  /* Annule le translateX(-6px) */
+    opacity: 1 !important;       /* Annule l'opacité 0.92 */
+}
+
+/* Supprimer le "carré" ou la "ligne" bleue au survol */
+.sidebar-header .btn::after, 
+.sidebar-header .btn::before {
+    display: none !important;
+    content: none !important;
+    width: 0 !important;
+}
+
+/* Style propre pour le bouton toggle au survol */
+.sidebar-header .btn:hover {
+    background-color: #e9ecef !important;
+    color: #0d6efd !important;
+    transform: scale(1.05) !important; /* Légère emphase plutôt que décalage */
+}

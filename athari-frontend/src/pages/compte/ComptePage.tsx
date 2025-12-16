@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Header from '../../components/layout/TopBar.jsx';
-import Sidebar from '../../components/layout/Sidebar.tsx';
+//import Sidebar from '../../components/layout/Sidebar.jsx';
 import {
   Box,
   Typography,

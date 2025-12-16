@@ -12,7 +12,6 @@ export default function TopBar({ sidebarOpen }) {
          <button className="notification-btn btn btn-transparent">
           <Bell size={16} />
         </button>
-                <div className="avatar rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" >JD</div>
 
       </div>
 
