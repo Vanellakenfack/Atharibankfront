@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import { CircularProgress, Box } from "@mui/material"; // Ajout
 
 export default function ProtectedRoute() {

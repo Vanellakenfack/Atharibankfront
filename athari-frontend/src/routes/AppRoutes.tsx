@@ -11,7 +11,7 @@ import Home from '../pages/Home';
 import ListeClient from '../pages/client/ListeClient';
 import RoleManagement from "../pages/users/RoleManagement";
 import UserManagement from "../pages/users/UserManagement";
-import ProtectedRoute from "../components/users/ProtectedRoute";
+import ProtectedRoute from "./ProtectedRoute";
 import Dashboard from '../pages/dashboard/Dashboard';
 import AuditLogView from '../pages/AuditLogView'
 const AppRoutes = () => {
@@ -29,7 +29,7 @@ const AppRoutes = () => {
 
       
       {/* Routes proteger */}
-    <Route element={<ProtectedRoute/>}>
+
       <Route path="/users/roles" element={<RoleManagement />}/>
 
       <Route path="/users/management" element={ <UserManagement />}/>
@@ -44,10 +44,8 @@ const AppRoutes = () => {
       <Route path='/client/creer' element= {<FormClient/>} /> 
       <Route path='/client/:id/edit' element= {<FormClient/>} />
       <Route path='Dashboard' element= {<Dashboard/>} /> 
-    </Route>
-           <Route path='/log' element= {<AuditLogView/>} /> 
-
-      
+    
+      <Route path='/log' element= {<AuditLogView/>} /> 
 
       {/* Route Catch-all (URL inexistante / 404) */}
       <Route path="*" element={<div>Page Non Trouvée (404)</div>} />
