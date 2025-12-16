@@ -11,7 +11,6 @@ import Home from '../pages/Home';
 import ListeClient from '../pages/client/ListeClient';
 import RoleManagement from "../pages/users/RoleManagement";
 import UserManagement from "../pages/users/UserManagement";
-import ProtectedRoute from "../components/users/ProtectedRoute";
 import Dashboard from '../pages/dashboard/Dashboard';
 import AuditLogView from '../pages/AuditLogView'
 const AppRoutes = () => {
@@ -29,7 +28,7 @@ const AppRoutes = () => {
 
       
       {/* Routes proteger */}
-    <Route element={<ProtectedRoute />}>
+    <Route >
       <Route path="/users/roles" element={<RoleManagement />}/>
 
       <Route path="/users/management" element={ <UserManagement />}/>
@@ -45,7 +44,9 @@ const AppRoutes = () => {
       <Route path='/client/:id/edit' element= {<FormClient/>} />
       <Route path='Dashboard' element= {<Dashboard/>} /> 
     </Route>
-           <Route path='/log' element= {<AuditLogView/>} /> 
+
+    {/* Audit Log Route */}
+      <Route path='/log' element= {<AuditLogView/>} /> 
 
       
 

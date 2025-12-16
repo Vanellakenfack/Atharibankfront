@@ -4,28 +4,37 @@ import { createContext, useContext, useState, useEffect } from "react";
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
+  // Initialisation directe depuis le localStorage pour éviter un flash d'état
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem("authToken"));
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem("authUser");
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Vérifie si un token existe au chargement
     const token = localStorage.getItem("authToken");
     if (token) {
       setIsAuthenticated(true);
-      // Tu peux aussi charger les infos user ici
+      // Optionnel : Tu pourrais ici appeler ApiClient.get('/user') 
+      // pour vérifier si le token est toujours valide côté serveur
+    } else {
+      setIsAuthenticated(false);
+      setUser(null);
     }
     setLoading(false);
   }, []);
 
   const login = (token, userData) => {
     localStorage.setItem("authToken", token);
+    localStorage.setItem("authUser", JSON.stringify(userData)); // Sauvegarde l'user
     setIsAuthenticated(true);
     setUser(userData);
   };
 
   const logout = () => {
     localStorage.removeItem("authToken");
+    localStorage.removeItem("authUser");
     setIsAuthenticated(false);
     setUser(null);
   };
