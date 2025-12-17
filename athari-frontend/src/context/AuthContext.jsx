@@ -25,6 +25,10 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+  const hasPermission = (permissionName) => {
+    return permissions.includes(permissionName) || permissions.includes('gerer utilisateurs');
+  };
+
   const login = (token, userData) => {
     localStorage.setItem("authToken", token);
     localStorage.setItem("authUser", JSON.stringify(userData)); // Sauvegarde l'user
