@@ -70,7 +70,7 @@ const AuditLogView = () => {
 
             <div className="p-4">
                 {/* Header avec dégradé subtil */}
-                <div className="mb-4 d-flex justify-content-between align-items-end">
+                <div className="mb-4 d-flex justify-content-between align-items-end"> 
                     <div>
                         <h2 className="fw-bold text-dark mb-1">Journal d'Audit</h2>
                         <p className="text-muted mb-0">Traçabilité complète des actions du système</p>
