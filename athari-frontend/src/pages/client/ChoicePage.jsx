@@ -2,12 +2,13 @@
 import { Container, Grid, Paper, Typography, Box, Button, useTheme } from "@mui/material";
 import { Person, Business, ArrowForward } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-import TopBar from "../../components/layout/TopBar";
+import Layout from "../../components/layout/Layout";
 export default function ChoicePage() {
   const navigate = useNavigate();
   const theme = useTheme();
 
   return (
+    <Layout>
     
           <Box
         
@@ -17,7 +18,7 @@ export default function ChoicePage() {
             pb: 10
             
         }}
-        > <TopBar/>
+        > 
            
               
       <Container maxWidth="md">
@@ -145,5 +146,6 @@ export default function ChoicePage() {
         </Grid>
       </Container>
     </Box>
+    </Layout>
   );
 }

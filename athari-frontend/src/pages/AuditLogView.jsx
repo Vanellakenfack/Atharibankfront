@@ -1,12 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-// Importation du client Axios configuré
-import ApiClient from '../services/api/ApiClient' ;
-import TopBar from '../components/layout/TopBar';
+import ApiClient from '../services/api/ApiClient';
+import { Clock, User, Target, Info, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import Layout from '../components/layout/Layout';
 
-/**
- * Composant de Conteneur et de Présentation pour les Logs d'Audit.
- * Récupère les données via ApiClient et utilise les classes CSS de Bootstrap pour l'affichage.
- */
 const AuditLogView = () => {
     const [logs, setLogs] = useState([]);
     const [pagination, setPagination] = useState({});
@@ -14,215 +10,183 @@ const AuditLogView = () => {
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [perPage, setPerPage] = useState(15);
-    // Les états pour les filtres (recherche, date, utilisateur) pourraient être ajoutés ici
 
-    // --- Fonctions d'Aide pour le Rendu ---
+    // --- Fonctions d'Aide ---
 
-    /** Formatte la chaîne de date UTC en date et heure locale française. */
     const formatDate = (dateString) => {
         const options = { 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric', 
-            hour: '2-digit', 
-            minute: '2-digit', 
-            second: '2-digit' 
+            day: '2-digit', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit' 
         };
         return new Date(dateString).toLocaleDateString('fr-FR', options);
     };
 
-    /** Détermine la classe de badge Bootstrap en fonction du log_name. */
-    const getLogColor = (logName) => {
-        if (logName.includes('auth.login')) return 'bg-success';
-        if (logName.includes('failed')) return 'bg-danger';
-        if (logName.includes('deleted')) return 'bg-danger';
-        if (logName.includes('created')) return 'bg-primary';
-        if (logName.includes('updated')) return 'bg-warning';
-        return 'bg-secondary';
+    /** Couleurs de badges modernes (Subtle) */
+    const getLogBadgeStyle = (logName) => {
+        const name = logName.toLowerCase();
+        if (name.includes('login') || name.includes('created')) 
+            return { bg: '#dcfce7', text: '#15803d', label: 'Succès / Création' };
+        if (name.includes('failed') || name.includes('deleted')) 
+            return { bg: '#fee2e2', text: '#b91c1c', label: 'Alerte / Suppr.' };
+        if (name.includes('updated')) 
+            return { bg: '#fef9c3', text: '#854d0e', label: 'Modification' };
+        return { bg: '#f1f5f9', text: '#475569', label: 'Info' };
     };
-
-    // --- Logique de Récupération des Données ---
 
     const loadLogs = useCallback(async (page, pageSize) => {
         setLoading(true);
         setError(null);
         try {
-            // L'appel se fait vers BASE_URL/api/audit/logs
             const response = await ApiClient.get('/audit/logs', { 
-                params: {
-                    page: page, 
-                    per_page: pageSize,
-                }
+                params: { page, per_page: pageSize }
             });
-
-            const responseData = response.data;
-            
-            setLogs(responseData.data || []);
-            setPagination(responseData.pagination || {});
-            
+            setLogs(response.data.data || []);
+            setPagination(response.data.pagination || {});
         } catch (err) {
-            console.error("Erreur lors de la récupération des logs:", err);
-            
-            let errorMessage = "Échec du chargement des logs. Le serveur est-il accessible ?";
-            
-            if (err.response) {
-                if (err.response.status === 403) {
-                    errorMessage = "Accès refusé (403). Vérifiez vos permissions.";
-                } else if (err.response.status === 401) {
-                    errorMessage = "Session expirée (401). Veuillez vous reconnecter.";
-                } else {
-                    errorMessage = `Erreur API ${err.response.status}: ${err.response.data.message || 'Problème serveur'}`;
-                }
-            } else if (err.request) {
-                errorMessage = "Erreur réseau : Le serveur ne répond pas (Vérifiez la connexion).";
-            } else {
-                errorMessage = `Erreur : ${err.message}`;
-            }
-
-            setError(errorMessage);
+            setError("Impossible de charger les journaux d'audit.");
         } finally {
             setLoading(false);
         }
-    }, []); 
+    }, []);
 
-    // Déclencher le chargement initial et lors des changements de page
     useEffect(() => {
         loadLogs(currentPage, perPage);
     }, [loadLogs, currentPage, perPage]);
 
-    // Gérer les changements de page
-    const handlePageChange = (newPage) => {
-        setCurrentPage(newPage);
-    };
-
-    // --- Rendu des États (Chargement/Erreur) ---
-
     if (loading) {
         return (
-            
-    
-            <div className="container text-center py-5">
-                      <div>        <TopBar/></div>
-                <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Chargement...</span>
+            <div className="main-content flex-fill bg-light">
+                <div className="d-flex flex-column align-items-center justify-content-center vh-100">
+                    <div className="spinner-border text-primary" role="status"></div>
+                    <p className="mt-3 text-muted fw-medium">Analyse des journaux en cours...</p>
                 </div>
-                <p className="mt-2 text-muted">Chargement des journaux d'audit en cours...</p>
             </div>
         );
     }
 
-    if (error) {
-        return <div className="alert alert-danger m-3" role="alert">{error}</div>;
-    }
-
-    // --- Rendu du Tableau et de la Pagination ---
     return (
-        <div className="container-fluid my-4">
-            <h2 className="mb-4">Journal d'Audit des Activités ({pagination.total || 0} entrées)</h2>
-            
-            <div className="card shadow-sm">
-                <div className="card-body">
-                    <table className="table table-responsive table-hover table-striped align-middle">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Action / Description</th>
-                                <th>Acteur (Causer)</th>
-                                <th>Cible (Subject)</th>
-                                <th>Détails Techniques</th>
-                                <th>Horodatage</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {logs.length > 0 ? (
-                                logs.map((log) => (
-                                    <tr key={log.id}>
-                                        <td>{log.id}</td>
-                                        <td>
-                                            <strong>{log.description}</strong>
-                                            <br />
-                                            <span className={`badge ${getLogColor(log.log_name)} mt-1`}>
-                                                {log.log_name}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            {log.causer ? `${log.causer.name}` : 'Système'}
-                                            <br/><small className="text-muted">{log.causer ? log.causer.email : 'N/A'}</small>
-                                        </td>
-                                        <td>
-                                            {log.subject ? log.subject.name || log.subject.id : 'N/A'}
-                                            <br/><small className="text-muted">{log.subject ? log.subject_type.split('\\').pop() : ''}</small>
-                                        </td>
-                                        <td style={{ maxWidth: '250px', fontSize: '0.85rem' }}>
-                                            {Object.entries(log.properties).map(([key, value]) => (
-                                                <div key={key}>
-                                                    <strong className="text-primary">{key}:</strong> {value}
-                                                </div>
-                                            ))}
-                                        </td>
-                                        <td>{formatDate(log.created_at)}</td>
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan="6" className="text-center text-muted">Aucun log d'activité trouvé.</td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+        <Layout>
+        <div className="main-content flex-fill bg-light min-vh-100">
 
-            {/* Pagination Interactive */}
-            {pagination.last_page > 1 && (
-                <div className="d-flex justify-content-center mt-3">
-                    <ul className="pagination">
-                        {/* Flèche Début */}
-                        <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                            <button className="page-link" onClick={() => handlePageChange(1)} disabled={currentPage === 1}>
-                                &laquo;
-                            </button>
-                        </li>
-                        {/* Flèche Précédent */}
-                        <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                            <button className="page-link" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>
-                                &lsaquo;
-                            </button>
-                        </li>
-                        
-                        {/* Page Actuelle */}
-                        <li className="page-item active">
-                            <span className="page-link">{currentPage}</span>
-                        </li>
-                        
-                        {/* Ellipsis et Dernière Page */}
-                        {pagination.last_page > 1 && currentPage !== pagination.last_page && (
-                            <>
-                                <li className="page-item disabled"><span className="page-link">...</span></li>
-                                <li className="page-item">
-                                    <button className="page-link" onClick={() => handlePageChange(pagination.last_page)}>
-                                        {pagination.last_page}
+            <div className="p-4">
+                {/* Header avec dégradé subtil */}
+                <div className="mb-4 d-flex justify-content-between align-items-end">
+                    <div>
+                        <h2 className="fw-bold text-dark mb-1">Journal d'Audit</h2>
+                        <p className="text-muted mb-0">Traçabilité complète des actions du système</p>
+                    </div>
+                    <div className="badge bg-primary px-3 py-2 rounded-3 shadow-sm">
+                        {pagination.total || 0} Activités enregistrées
+                    </div>
+                </div>
+
+                {error && <div className="alert alert-danger border-0 shadow-sm">{error}</div>}
+
+                {/* Table Card */}
+                <div className="card border-0 shadow-sm rounded-4 overflow-hidden">
+                    <div className="card-body p-0">
+                        <div className="table-responsive">
+                            <table className="table table-hover align-middle mb-0">
+                                <thead className="bg-white border-bottom">
+                                    <tr>
+                                        <th className="ps-4 py-3 text-muted small fw-bold uppercase">Action</th>
+                                        <th className="py-3 text-muted small fw-bold uppercase">Utilisateur</th>
+                                        <th className="py-3 text-muted small fw-bold uppercase">Cible</th>
+                                        <th className="py-3 text-muted small fw-bold uppercase">Propriétés</th>
+                                        <th className="py-3 text-muted small fw-bold uppercase text-end pe-4">Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {logs.map((log) => {
+                                        const style = getLogBadgeStyle(log.log_name);
+                                        return (
+                                            <tr key={log.id}>
+                                                <td className="ps-4 py-3">
+                                                    <div className="fw-bold text-dark">{log.description}</div>
+                                                    <span className="badge mt-1" style={{ backgroundColor: style.bg, color: style.text }}>
+                                                        {log.log_name}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div className="d-flex align-items-center">
+                                                        <div className="bg-light rounded-circle p-2 me-2">
+                                                            <User size={16} className="text-primary" />
+                                                        </div>
+                                                        <div>
+                                                            <div className="small fw-bold">{log.causer?.name || 'Système'}</div>
+                                                            <div className="text-muted small" style={{fontSize: '0.7rem'}}>{log.causer?.email || 'Automatique'}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className="d-flex align-items-center">
+                                                        <Target size={14} className="text-muted me-2" />
+                                                        <span className="small">{log.subject?.name || log.subject?.id || 'N/A'}</span>
+                                                    </div>
+                                                </td>
+                                                <td style={{ maxWidth: '300px' }}>
+                                                    <div className="d-flex flex-wrap gap-1">
+                                                        {Object.entries(log.properties).slice(0, 3).map(([key, value]) => (
+                                                            <span key={key} className="badge bg-light text-dark border fw-normal small">
+                                                                <span className="text-primary fw-bold">{key}:</span> {JSON.stringify(value)}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                                <td className="text-end pe-4">
+                                                    <div className="d-flex align-items-center justify-content-end text-muted small">
+                                                        <Clock size={14} className="me-1" />
+                                                        {formatDate(log.created_at)}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Pagination Modernisée */}
+                {pagination.last_page > 1 && (
+                    <div className="d-flex justify-content-between align-items-center mt-4 bg-white p-3 rounded-4 shadow-sm">
+                        <div className="text-muted small">
+                            Page <strong>{currentPage}</strong> sur {pagination.last_page}
+                        </div>
+                        <nav>
+                            <ul className="pagination pagination-sm mb-0 gap-1">
+                                <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                                    <button className="page-link rounded-3 border-0 bg-light" onClick={() => setCurrentPage(1)}>
+                                        <ChevronsLeft size={18} />
                                     </button>
                                 </li>
-                            </>
-                        )}
-
-                        {/* Flèche Suivant */}
-                        <li className={`page-item ${currentPage === pagination.last_page ? 'disabled' : ''}`}>
-                            <button className="page-link" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === pagination.last_page}>
-                                &rsaquo;
-                            </button>
-                        </li>
-                        {/* Flèche Fin */}
-                        <li className={`page-item ${currentPage === pagination.last_page ? 'disabled' : ''}`}>
-                            <button className="page-link" onClick={() => handlePageChange(pagination.last_page)} disabled={currentPage === pagination.last_page}>
-                                &raquo;
-                            </button>
-                        </li>
-                    </ul>
-                </div>
-            )}
+                                <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                                    <button className="page-link rounded-3 border-0 bg-light" onClick={() => setCurrentPage(currentPage - 1)}>
+                                        <ChevronLeft size={18} />
+                                    </button>
+                                </li>
+                                <li className="page-item active">
+                                    <span className="page-link rounded-3 border-0 px-3 fw-bold">{currentPage}</span>
+                                </li>
+                                <li className={`page-item ${currentPage === pagination.last_page ? 'disabled' : ''}`}>
+                                    <button className="page-link rounded-3 border-0 bg-light" onClick={() => setCurrentPage(currentPage + 1)}>
+                                        <ChevronRight size={18} />
+                                    </button>
+                                </li>
+                                <li className={`page-item ${currentPage === pagination.last_page ? 'disabled' : ''}`}>
+                                    <button className="page-link rounded-3 border-0 bg-light" onClick={() => setCurrentPage(pagination.last_page)}>
+                                        <ChevronsRight size={18} />
+                                    </button>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                )}
+            </div>
         </div>
+        </Layout>
+
     );
 };
 

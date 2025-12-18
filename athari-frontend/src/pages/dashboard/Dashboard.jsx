@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import '../../assets/css/dash.css'
-import { BarChart3, TrendingUp, Users, Zap, Settings, Bell, Search } from 'lucide-react'
+import { BarChart3, TrendingUp, Users, Zap, ArrowUpRight, ArrowDownRight, Wallet, PlusCircle } from 'lucide-react'
 import Sidebar from '../../components/layout/Sidebar'
 import TopBar from '../../components/layout/TopBar'
 
@@ -9,109 +9,97 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeNav, setActiveNav] = useState('overview')
 
+  // Stats avec des dégradés raffinés
   const stats = [
-    { icon: Users, label: 'Total utilisateur', value: '12,543', change: '+12.5%', color: 'primary' },
-    { icon: TrendingUp, label: 'nombre compte', value: '$45,231', change: '+8.2%', color: 'success' },
-    { icon: Zap, label: 'Active Now', value: '3,421', change: '+23.1%', color: 'warning' },
-    { icon: BarChart3, label: 'Performance', value: '98.5%', change: '+2.3%', color: 'danger' },
-  ]
-
-  const recentActivity = [
-    { id: 1, user: 'ad bobo', action: 'a rejoint', time: '2 minutes ago' },
-    { id: 2, user: 'Jane Smith', action: 'Completed task', time: '15 minutes ago' },
-    { id: 3, user: 'Mike Johnson', action: 'modifier profil', time: '1 hour ago' },
-    { id: 4, user: 'Sarah Williams', action: 'partage document', time: '3 hours ago' },
-  ]
-
-  // Three small colored cards
-  const smallCards = [
-    { id: 'c1', title: "Dépôts du jour", value: '125,000', color: 'primary' },
-    { id: 'c2', title: 'Retraits du jour', value: '65,400', color: 'danger' },
-    { id: 'c3', title: 'Nouveaux comptes', value: '24', color: 'success' },
-        { id: 'c3', title: 'Nouveaux comptes', value: '24', color: 'primary' },
-
+    { 
+      icon: Users, label: 'Total Utilisateurs', value: '12,543', change: '+12.5%', 
+      gradient: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', trend: 'up' 
+    },
+    { 
+      icon: Wallet, label: 'Nombre Comptes', value: '45,231', change: '+8.2%', 
+      gradient: 'linear-gradient(135deg, #3b82f6 0%, #2dd4bf 100%)', trend: 'up' 
+    },
+    { 
+      icon: Zap, label: 'Actifs en direct', value: '3,421', change: '+23.1%', 
+      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', trend: 'up' 
+    },
+    { 
+      icon: TrendingUp, label: 'Performance', value: '98.5%', change: '+2.3%', 
+      gradient: 'linear-gradient(135deg, #ec4899 0%, #ef4444 100%)', trend: 'up' 
+    },
   ]
 
   const recentTransactions = [
-    { id: 101, client: 'Dupont Jean', amount: 150000, type: 'Dépôt', date: '2025-01-13 14:32', status: 'Validé' },
-    { id: 102, client: 'Martin Sophie', amount: 75000, type: 'Retrait', date: '2025-01-13 13:15', status: 'Validé' },
-    { id: 103, client: 'Bernard Pierre', amount: 250000, type: 'Dépôt', date: '2025-01-13 11:45', status: 'En attente' },
-    { id: 104, client: 'Leclerc Marie', amount: 125000, type: 'Retrait', date: '2025-01-13 10:20', status: 'Validé' },
-    { id: 105, client: 'Moreau Claude', amount: 300000, type: 'Dépôt', date: '2025-01-13 09:50', status: 'Validé' },
+    { id: 101, client: 'Dupont Jean', amount: 150000, type: 'Dépôt', date: '13 Jan, 14:32', status: 'Validé' },
+    { id: 102, client: 'Martin Sophie', amount: 75000, type: 'Retrait', date: '13 Jan, 13:15', status: 'Validé' },
+    { id: 103, client: 'Bernard Pierre', amount: 250000, type: 'Dépôt', date: '13 Jan, 11:45', status: 'En attente' },
+    { id: 104, client: 'Leclerc Marie', amount: 125000, type: 'Retrait', date: '13 Jan, 10:20', status: 'Validé' },
   ]
 
   return (
-    <div className={`dashboard-container d-flex vh-100 bg-light text-dark ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
-      {/* Sidebar (composant) */}
-      <Sidebar
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
-        activeNav={activeNav}
-        setActiveNav={setActiveNav}
-      />
+    <div className={`dashboard-container d-flex vh-100 bg-white text-dark ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} activeNav={activeNav} setActiveNav={setActiveNav} />
 
-      {/* Main Content */}
-      <div className="main-content flex-fill d-flex flex-column">
-        {/* Top Bar (composant) */}
+      <div className="main-content flex-fill d-flex flex-column bg-light">
         <TopBar sidebarOpen={sidebarOpen} />
 
-        {/* Dashboard Content */}
         <div className="dashboard-content p-4 overflow-auto">
-          <div className="mb-4">
-            <h2 className="h3"> bienvenue</h2>
+          {/* Header avec action rapide */}
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <div>
+              <h2 className="fw-bold mb-0">Tableau de bord</h2>
+              <p className="text-muted small">Aperçu de votre activité aujourd'hui</p>
+            </div>
+            <button className="btn btn-primary d-flex align-items-center gap-2 rounded-3 shadow-sm px-3">
+              <PlusCircle size={18} /> Nouvelle opération
+            </button>
           </div>
 
-          {/* Stats */}
+          {/* Stats Cards avec Dégradés */}
           <div className="row g-3 mb-4">
             {stats.map((stat, i) => (
               <div key={i} className="col-12 col-md-6 col-lg-3">
-                      <div className={`card bg-${stat.color} shadow-sm ${stat.color === 'warning' ? 'text-dark' : 'text-white'}`}> 
-                        <div className={`card-body d-flex align-items-center`}> 
-                          <div className="me-3">
-                            <stat.icon size={28} />
-                          </div>
-                          <div>
-                            <h6 className="mb-0">{stat.label}</h6>
-                            <p className="mb-0 fw-bold">{stat.value}</p>
-                            <small className={`${stat.color === 'warning' ? 'text-dark' : 'text-white'}`}>{stat.change}</small>
-                          </div>
-                        </div>
+                <div className="card border-0 shadow-sm text-white h-100" style={{ background: stat.gradient, borderRadius: '16px' }}>
+                  <div className="card-body p-4">
+                    <div className="d-flex justify-content-between align-items-start mb-3">
+                      <div className="bg-white bg-opacity-25 rounded-3 p-2">
+                        <stat.icon size={24} />
                       </div>
-              </div>
-            ))}
-          </div>
-
-              {/* Small colored cards */}
-          <div className="row g-3 mb-4">
-            {smallCards.map((c) => (
-              <div key={c.id} className="col-12 col-md-6 col-lg-3">
-                <div className={`card card text-white bg-${c.color} border-0`}> 
-                  <div className="card-body d-flex justify-content-between align-items-center">
-                    <div>
-                      <div className="small-card-title">{c.title}</div>
-                      <div className="small-card-value h5 mb-0">{c.value}</div>
+                      <span className="badge bg-white bg-opacity-25 rounded-pill small">
+                        {stat.trend === 'up' ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />} {stat.change}
+                      </span>
                     </div>
-                    <div className="small-card-icon">
-                      <BarChart3 size={28} />
-                    </div>
+                    <h6 className="mb-1 text-white text-opacity-75 small fw-bold">{stat.label}</h6>
+                    <h3 className="mb-0 fw-bold font-monospace">{stat.value}</h3>
                   </div>
                 </div>
               </div>
             ))}
           </div>
 
-
-          {/* Main panels */}
-          <div className="row g-3 mb-4">
+          <div className="row g-4">
+            {/* Graphique modernisé */}
             <div className="col-12 col-lg-8">
-              <div className="card shadow-sm">
-                <div className="card-body">
-                  <h5 className="card-title">Revenue Trend</h5>
-                  <div className="bg-light rounded p-3" style={{height:220}}>
-                    <div className="h-100 d-flex align-items-end gap-2">
+              <div className="card border-0 shadow-sm rounded-4">
+                <div className="card-body p-4">
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h5 className="fw-bold mb-0">Flux de trésorerie</h5>
+                    <select className="form-select form-select-sm w-auto border-0 bg-light">
+                      <option>7 derniers jours</option>
+                    </select>
+                  </div>
+                  <div className="bg-light rounded-4 p-4" style={{ height: 250 }}>
+                    <div className="h-100 d-flex align-items-end gap-3">
                       {[40, 60, 45, 70, 55, 80, 65, 90].map((h, idx) => (
-                        <div key={idx} style={{flex:1}}>
-                          <div style={{height: `${h}%`, background: 'linear-gradient(180deg,#0d6efd,#3b82f6)', borderTopLeftRadius:8, borderTopRightRadius:8}} title={`${h}%`}></div>
+                        <div key={idx} className="flex-fill position-relative group">
+                          <div 
+                            className="w-100 rounded-top-3 transition-all" 
+                            style={{ 
+                              height: `${h}%`, 
+                              background: 'linear-gradient(180deg, #6366f1 0%, #e0e7ff 100%)',
+                              cursor: 'pointer'
+                            }}
+                          ></div>
                         </div>
                       ))}
                     </div>
@@ -119,59 +107,28 @@ export default function App() {
                 </div>
               </div>
             </div>
-            
 
+            {/* Transactions épurées */}
             <div className="col-12 col-lg-4">
-              <div className="card shadow-sm">
-                <div className="card-body">
-                  <h5 className="card-title">Activites recentes</h5>
-                  <ul className="list-unstyled mb-0">
-                    {recentActivity.map(a => (
-                      <li key={a.id} className="mb-3 border-start ps-3">
-                        <div className="fw-semibold">{a.user}</div>
-                        <div className="small text-muted">{a.action} · {a.time}</div>
-                      </li>
-                    ))}
-                  </ul>
+              <div className="card border-0 shadow-sm rounded-4 h-100">
+                <div className="card-body p-4">
+                  <h5 className="fw-bold mb-4">Derniers mouvements</h5>
+                  {recentTransactions.map(tx => (
+                    <div key={tx.id} className="d-flex align-items-center mb-3 pb-3 border-bottom border-light">
+                      <div className={`rounded-circle p-2 me-3 ${tx.type === 'Dépôt' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'}`}>
+                        {tx.type === 'Dépôt' ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />}
+                      </div>
+                      <div className="flex-fill">
+                        <div className="fw-bold small">{tx.client}</div>
+                        <div className="text-muted small-xs">{tx.date}</div>
+                      </div>
+                      <div className={`fw-bold small ${tx.type === 'Dépôt' ? 'text-success' : 'text-danger'}`}>
+                        {tx.type === 'Dépôt' ? '+' : '-'}{tx.amount.toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                  <button className="btn btn-light w-100 btn-sm rounded-3 mt-2 text-primary fw-bold">Voir tout</button>
                 </div>
-              </div>
-            </div>
-          </div>
-
-         
-          {/* Recent Transactions section */}
-          <div className="card shadow-sm mb-4">
-            <div className="card-body">
-              <h5 className="card-title">Transactions Récentes</h5>
-              <div className="table-responsive mt-3">
-                <table className="table table-borderless transactions-table align-middle mb-0">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Client</th>
-                      <th>Montant</th>
-                      <th>Type</th>
-                      <th>Date</th>
-                      <th>Statut</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentTransactions.map(tx => (
-                      <tr key={tx.id}>
-                        <td>#{tx.id}</td>
-                        <td>{tx.client}</td>
-                        <td className="fw-bold">{Number(tx.amount).toLocaleString()} FCFA</td>
-                        <td>
-                          <span className={`badge bg-${tx.type === 'Dépôt' ? 'success' : 'danger'}`}>{tx.type}</span>
-                        </td>
-                        <td className="text-muted small">{tx.date}</td>
-                        <td>
-                          <span className={`badge ${tx.status === 'Validé' ? 'bg-primary' : 'bg-warning text-dark'}`}>{tx.status}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
             </div>
           </div>

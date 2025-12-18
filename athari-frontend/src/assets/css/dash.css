@@ -25,6 +25,7 @@ body {
   flex-direction: column;
   transition: width 0.3s ease;
   overflow: hidden;
+  font-weight: bold;
 }
 
 .sidebar-open .sidebar {
@@ -399,7 +400,7 @@ body {
 
 .card-title {
   color: #212529;
-  font-weight: 700;
+  font-weight: bold;
 }
 
 /* Activity List */
@@ -630,3 +631,4 @@ button.btn,
     padding: 0.4rem 1.2rem !important;
     min-width: 100px;
 }
+

@@ -13,8 +13,8 @@ import {
     Public as PublicIcon,
     Info as InfoIcon
 } from '@mui/icons-material';
-import Header from '../../components/layout/TopBar';
 import apiClient from '../../services/api/ApiClient';
+import Layout from '../../components/layout/Layout';
 
 export default function DetailsClient() {
     const { id } = useParams();
@@ -44,8 +44,9 @@ export default function DetailsClient() {
     const name = isPhysique ? detail?.nom_prenoms : detail?.raison_sociale;
 
     return (
+        <Layout>
+        
         <Box sx={{ minHeight: '100vh', bgcolor: '#F4F7FE', pb: 5 }}>
-            <Header />
             
             <Box sx={{ px: { xs: 2, md: 6 }, py: 3 }}>
                 {/* Header d'action */}
@@ -165,6 +166,7 @@ export default function DetailsClient() {
                 </Grid>
             </Box>
         </Box>
+        </Layout>
     );
 }
 
