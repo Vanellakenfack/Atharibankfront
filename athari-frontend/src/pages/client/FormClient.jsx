@@ -1,5 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
-import Header from "../../components/layout/TopBar";
+import React, { useEffect, useMemo, useState,useRef } from "react";
 import {
   ThemeProvider, createTheme, CssBaseline, Container, Box, Grid, TextField,
   Button, Stepper, Step, StepLabel, Select, MenuItem, InputLabel, 
@@ -12,6 +11,7 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import * as Yup from "yup";
 import { useNavigate } from "react-router-dom";
 import ApiClient from "../../services/api/ApiClient"; 
+import Layout from "../../components/layout/Layout";
 
 const muiTheme = createTheme({
   palette: {
@@ -49,6 +49,7 @@ const CITY_DATA = {
 };
 
 export default function FormClient() {
+  const fileInputRef = useRef(null);
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(0);
   const [agencies, setAgencies] = useState([]);
@@ -70,7 +71,7 @@ export default function FormClient() {
       date_naissance: "", lieu_naissance: "", nom_mere: "", nom_pere: "",
       profession: "", employeur: "", situation_familiale: "", regime_matrimonial: "",
       nom_epoux: "", date_naissance_epoux: "", lieu_naissance_epoux: "",
-      fonction_epoux: "", adresse_epoux: "", numero_epoux: "",
+      fonction_epoux: "", adresse_epoux: "", numero_epoux: "",photo: "", // <--- Ajoutez ceci
       nationalite: "Camerounaise", pays_residence: "Cameroun",
       Qualite: "", gestionnaire: "", profil: "", autre_preciser: "",
       client_checkbox: true, signataire: false, mantaire: false,
@@ -136,6 +137,13 @@ const onSubmit = async (data) => {
    formData.append("salaire_conjoint", data.salaire_epoux || "");
 
     formData.append("tel_conjoint", data.tel_epoux || "");
+    const file = fileInputRef.current?.files[0]; 
+    if (file) {
+      formData.append("photo", file);
+      console.log("Photo récupérée via Ref et ajoutée au FormData:", file.name);
+    } else {
+      console.log("Aucun fichier sélectionné dans l'input.");
+    }
     // --- 5. BOOLÉENS (CHECKBOXES) ---
     // Laravel reçoit les FormData comme des strings, on envoie 1 ou 0
     
@@ -166,8 +174,9 @@ const onSubmit = async (data) => {
 };
 
 return (
+  <Layout>
   <ThemeProvider theme={muiTheme}>
-    <Header /><CssBaseline />
+    <CssBaseline />
     <Box sx={{ minHeight: "100vh", bgcolor: blueGrey[50], py: 5 }}>
       <Container maxWidth="lg">
         <Paper elevation={4} sx={{ p: 4, borderRadius: 3 }}>
@@ -220,17 +229,20 @@ return (
                   {/* AJOUT CHAMP PHOTO DANS ÉTAPE 0 */}
                   <Grid item xs={12} md={12}>
                     <Box sx={{ p: 2, border: '1px dashed #ccc', borderRadius: 2, bgcolor: '#fafafa' }}>
-                      <Typography variant="subtitle2" sx={{ mb: 1, color: indigo[700] }}>Photo du client (Optionnel)</Typography>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files[0];
-                          setValue("photo", file); 
-                        }}
-                      />
-                      <Typography variant="caption" color="textSecondary" display="block">Formats acceptés: JPG, PNG. Max 2Mo.</Typography>
-                    </Box>
+                    <Typography variant="subtitle2" sx={{ mb: 1, color: indigo[700], fontWeight: 'bold' }}>
+      Photo du client (Méthode Ref)
+                    </Typography>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      ref={fileInputRef} // <--- On attache la référence ici
+                      style={{ display: 'block', margin: '10px auto' }}
+                    />
+                                  
+                  <Typography variant="caption" display="block" color="textSecondary">
+                    Le fichier sera envoyé lors de la validation finale.
+                  </Typography>
+                                  </Box>
                   </Grid>
                 </Grid>
               </Box>
@@ -355,14 +367,12 @@ return (
               )}
             </Box>
 
-            <Box sx={{ mt: 3, p: 2, bgcolor: "#eee", borderRadius: 2 }}>
-              <Typography variant="caption" display="block">JSON Live Preview :</Typography>
-              <pre style={{ fontSize: "10px" }}>{JSON.stringify(watch(), (key, value) => value instanceof File ? value.name : value, 2)}</pre>
-            </Box>
+           
           </form>
         </Paper>
       </Container>
     </Box>
   </ThemeProvider>
+  </Layout>
 );
 }
