@@ -15,6 +15,9 @@ import Dashboard from '../pages/dashboard/Dashboard';
 import AuditLogView from '../pages/AuditLogView';
 import Agence from '../pages/agences/Agence';
 import FormClientMorale from '../pages/client/FormClientMorale';
+import ChoicePage from '../pages/client/ChoicePage';
+import DetailsClient from '../pages/client/DetailsClient';
+import ModifierClient from '../pages/client/ModifierClient';
 // Ajoute "Link" dans l'importation existante
 
 
@@ -48,16 +51,19 @@ const AppRoutes = () => {
 
         {/* Clients */}
         <Route path='/client' element={<ListeClient />} /> 
+        <Route path="/client/choix" element={<ChoicePage />} />
         <Route path='/client/creer' element={<FormClient />} /> 
           <Route path='/client/creermorale' element={<FormClientMorale />} /> 
-
-        <Route path='/client/:id/edit' element={<FormClient />} />
-
+        <Route path="/clients/:id" element={<DetailsClient />} />
+        <Route path='/client/:id/edit' element={<ModifierClient />} />
+          
         {/* Logs d'Audit */}
         <Route path='/log' element={<AuditLogView />} />
 
         {/* gestion de s agences */}
         <Route path='/agence' element={<Agence />} />
+
+
 
       </Route>
 

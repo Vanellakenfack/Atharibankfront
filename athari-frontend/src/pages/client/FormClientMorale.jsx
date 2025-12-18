@@ -3,31 +3,31 @@ import Header from "../../components/layout/TopBar";
 import {
   ThemeProvider, createTheme, CssBaseline, Container, Box, Grid, TextField,
   Button, Stepper, Step, StepLabel, Select, MenuItem, InputLabel, 
-  FormControl, Avatar, Typography, Checkbox, FormGroup, FormLabel, 
-  Divider, Paper,
+  FormControl, Typography, Checkbox, FormGroup, FormControlLabel, 
+  Divider, Paper, FormHelperText
 } from "@mui/material";
 import { indigo, blueGrey, cyan } from "@mui/material/colors";
-import axios from "axios";
 import { useForm, Controller } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as Yup from "yup";
+import { useNavigate } from "react-router-dom";
+import ApiClient from "../../services/api/ApiClient"; 
 
 const muiTheme = createTheme({
   palette: {
     mode: "light",
-    primary: { main: indigo[700], light: indigo[500], dark: indigo[900], contrastText: "#fff" },
+    primary: { main: indigo[700] },
     secondary: { main: cyan.A700 },
-    background: { default: blueGrey[50], paper: "#ffffff" },
+    background: { default: blueGrey[50] },
   },
-  typography: { fontFamily: "Inter, Roboto, Arial" },
   shape: { borderRadius: 12 },
 });
 
 const STEPS = ["Identité Entreprise", "Siège & Contact", "Documents Légaux", "Gérance & Fiscalité"];
 
-const schema = [
+const schemas = [
   Yup.object({
-    num_agence: Yup.string().required("Agence requise"),
+    num_agence: Yup.string().required("L'agence est obligatoire"),
     raison_sociale: Yup.string().required("Raison sociale requise"),
     forme_juridique: Yup.string().required("Forme juridique requise"),
   }),
@@ -46,194 +46,190 @@ const schema = [
 ];
 
 export default function FormClientMorale() {
+  const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(0);
-  const [logoPreview, setLogoPreview] = useState(null);
+  const [agencies, setAgencies] = useState([]); // État pour les agences de la BD
 
-  const { control, handleSubmit, trigger, watch, setValue, formState: { errors } } = useForm({
+  // CHARGEMENT DES AGENCES (Inspiré de Personne Physique)
+  useEffect(() => {
+    ApiClient.get("/agencies")
+      .then((res) => {
+        // On s'adapte à la structure de votre API
+        const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        setAgencies(list);
+      })
+      .catch((err) => console.error("Erreur lors du chargement des agences:", err));
+  }, []);
+
+  const { control, handleSubmit, trigger, watch, formState: { errors } } = useForm({
     defaultValues: {
       type_client: "morale",
       num_agence: "",
-      idclient: "",
       raison_sociale: "",
       sigle: "",
       forme_juridique: "",
       adresse_ville: "",
       adresse_quartier: "",
-      adresse_precision: "",
       bp: "",
       tel_bureau: "",
       email: "",
       rccm: "",
       nui: "",
-      date_creation: "",
       nom_gerant: "",
       fonction_gerant: "",
-      regime_fiscal: "",
       taxable: false,
-      signataire: false,
-      logo: null,
     },
-    resolver: yupResolver(schema[activeStep]),
+    resolver: yupResolver(schemas[activeStep]),
     mode: "onTouched",
   });
 
-  const handleLogoChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setValue("logo", file);
-      setLogoPreview(URL.createObjectURL(file));
-    }
-  };
-
-  const handleNext = async () => (await trigger()) && setActiveStep((s) => s + 1);
-  const handleBack = () => setActiveStep((s) => s - 1);
-
   const onSubmit = async (data) => {
-    console.log("Données Entreprise :", data);
-    alert("Entreprise enregistrée avec succès !");
-  };
+    try {
+      // Préparation du payload pour ClientController.php
+      const payload = {
+        agency_id: data.num_agence, // Utilisé par le service de génération de numéro
+        type_client: "morale",
+        telephone: data.tel_bureau,
+        email: data.email || "",
+        adresse_ville: data.adresse_ville,
+        adresse_quartier: data.adresse_quartier,
+        bp: data.bp || "",
+        pays_residence: "Cameroun",
+        taxable: data.taxable ? 1 : 0,
+        interdit_chequier: 0,
+        // Champs pour StoreMoraleClientRequest
+        raison_sociale: data.raison_sociale,
+        sigle: data.sigle || "",
+        forme_juridique: data.forme_juridique,
+        rccm: data.rccm,
+        nui: data.nui,
+        nom_gerant: data.nom_gerant,
+        fonction_gerant: data.fonction_gerant || ""
+      };
 
-  const renderFields = () => {
-    switch (activeStep) {
-      case 0:
-        return (
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
-              <Controller name="num_agence" control={control} render={({ field }) => (
-                <FormControl fullWidth size="small" error={!!errors.num_agence}>
-                  <InputLabel>Agence</InputLabel>
-                  <Select {...field} label="Agence">
-                    <MenuItem value="001">001 - Ekounou</MenuItem>
-                    <MenuItem value="002">002 - Essos</MenuItem>
-                  </Select>
-                </FormControl>
-              )} />
-            </Grid>
-            <Grid item xs={12} md={8}>
-              <Controller name="raison_sociale" control={control} render={({ field }) => (
-                <TextField {...field} fullWidth size="small" label="Raison Sociale" error={!!errors.raison_sociale} />
-              )} />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Controller name="sigle" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="Sigle / Nom commercial" />} />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Controller name="forme_juridique" control={control} render={({ field }) => (
-                <FormControl fullWidth size="small">
-                  <InputLabel>Forme Juridique</InputLabel>
-                  <Select {...field} label="Forme Juridique">
-                    <MenuItem value="SARL">SARL</MenuItem>
-                    <MenuItem value="SA">SA</MenuItem>
-                    <MenuItem value="ETS">ETS (Ets)</MenuItem>
-                    <MenuItem value="GIE">GIE</MenuItem>
-                  </Select>
-                </FormControl>
-              )} />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Box className="flex flex-col items-center border-2 border-dashed border-indigo-300 p-2 rounded-xl bg-indigo-50/50" onClick={() => document.getElementById("logo-in").click()} sx={{ cursor: "pointer" }}>
-                <input id="logo-in" type="file" hidden onChange={handleLogoChange} />
-                <Avatar src={logoPreview} sx={{ width: 50, height: 50, border: `2px solid ${indigo[500]}` }} variant="rounded" />
-                <Typography variant="caption" sx={{ mt: 0.5 }}>Logo Entreprise</Typography>
-              </Box>
-            </Grid>
-          </Grid>
-        );
-      case 1:
-        return (
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <Controller name="adresse_ville" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="Ville du siège" error={!!errors.adresse_ville}/>} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Controller name="adresse_quartier" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="Quartier" error={!!errors.adresse_quartier}/>} />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Controller name="tel_bureau" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="Téléphone Bureau" error={!!errors.tel_bureau}/>} />
-            </Grid>
-            <Grid item xs={12} md={8}>
-              <Controller name="email" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="Email Entreprise" />} />
-            </Grid>
-            <Grid item xs={12}>
-              <Controller name="adresse_precision" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="Localisation précise (Rue, Immeuble...)" multiline rows={2} />} />
-            </Grid>
-          </Grid>
-        );
-      case 2:
-        return (
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <Controller name="rccm" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="N° RCCM" error={!!errors.rccm}/>} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Controller name="nui" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="N° Identifiant Unique (NUI)" error={!!errors.nui}/>} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Controller name="date_creation" control={control} render={({ field }) => <TextField {...field} type="date" fullWidth size="small" label="Date de création" InputLabelProps={{shrink:true}} />} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Controller name="bp" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="Boîte Postale" />} />
-            </Grid>
-          </Grid>
-        );
-      case 3:
-        return (
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <Controller name="nom_gerant" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="Nom du Gérant / Représentant" error={!!errors.nom_gerant}/>} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Controller name="fonction_gerant" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="Fonction (DG, PCA...)" />} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Controller name="regime_fiscal" control={control} render={({ field }) => (
-                <FormControl fullWidth size="small">
-                  <InputLabel>Régime Fiscal</InputLabel>
-                  <Select {...field} label="Régime Fiscal">
-                    <MenuItem value="Réel">Réel</MenuItem>
-                    <MenuItem value="Simplifié">Simplifié</MenuItem>
-                    <MenuItem value="Libératoire">Libératoire</MenuItem>
-                  </Select>
-                </FormControl>
-              )} />
-            </Grid>
-            <Grid item xs={12}>
-              <Divider sx={{ my: 1 }} />
-              <FormGroup row>
-                <Controller name="taxable" control={control} render={({ field }) => <FormControlLabel control={<Checkbox {...field} checked={!!field.value} />} label="Assujetti TVA" />} />
-                <Controller name="signataire" control={control} render={({ field }) => <FormControlLabel control={<Checkbox {...field} checked={!!field.value} />} label="Pouvoir de signature" />} />
-              </FormGroup>
-            </Grid>
-          </Grid>
-        );
-      default: return null;
+      const response = await ApiClient.post("/clients/morale", payload);
+
+      if (response.data.success) {
+        alert(`Entreprise enregistrée ! Numéro Client : ${response.data.num_client}`);
+        navigate("/client");
+      }
+    } catch (error) {
+      console.error("Erreur API:", error.response?.data);
+      alert("Erreur: " + (error.response?.data?.message || "Échec de l'enregistrement"));
     }
   };
 
   return (
     <ThemeProvider theme={muiTheme}>
       <Header /><CssBaseline />
-      <Container maxWidth="lg" sx={{ py: 6, minHeight: '100vh' }}>
-        <Paper elevation={3} sx={{ p: { xs: 3, md: 5 }, borderRadius: 3 }}>
-          <Typography variant="h4" sx={{ color: blueGrey[800], fontWeight: 'bold', mb: 1 }}>Fiche Personne Morale</Typography>
-          <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 4 }}>Enregistrement des entreprises et entités juridiques.</Typography>
-          
-          <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
-            {STEPS.map((label) => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}
+      <Container maxWidth="lg" sx={{ py: 5 }}>
+        <Paper elevation={4} sx={{ p: 4, borderRadius: 3 }}>
+          <Typography variant="h4" align="center" sx={{ fontWeight: 700, mb: 4, color: indigo[900] }}>
+            Fiche Personne Morale
+          </Typography>
+
+          <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 5 }}>
+            {STEPS.map((label) => (<Step key={label}><StepLabel>{label}</StepLabel></Step>))}
           </Stepper>
 
-          <Box sx={{ width: '100%', bgcolor: blueGrey[200], borderRadius: 1, height: 10, mb: 4, overflow: 'hidden' }}>
-            <Box sx={{ height: 10, bgcolor: indigo[500], transition: 'width 300ms', width: `${((activeStep + 1) / STEPS.length) * 100}%` }} />
-          </Box>
+          <form onSubmit={handleSubmit(onSubmit)} onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}>
+            <Box sx={{ minHeight: "400px" }}>
+              
+              {/* ÉTAPE 0 : IDENTITÉ & AGENCE */}
+              {activeStep === 0 && (
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={4}>
+                    <Controller name="num_agence" control={control} render={({ field }) => (
+                      <FormControl fullWidth size="small" error={!!errors.num_agence}>
+                        <InputLabel>Agence *</InputLabel>
+                        <Select {...field} label="Agence *">
+                          {agencies.map((a) => (
+                            <MenuItem key={a.id} value={a.id}>{a.code} - {a.agency_name}</MenuItem>
+                          ))}
+                        </Select>
+                        {errors.num_agence && <FormHelperText>{errors.num_agence.message}</FormHelperText>}
+                      </FormControl>
+                    )} />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <TextField fullWidth size="small" label="ID Client" value="AUTO-GÉNÉRÉ" disabled variant="filled" />
+                  </Grid>
+                  <Grid item xs={12} md={8}>
+                    <Controller name="raison_sociale" control={control} render={({ field }) => (
+                      <TextField {...field} fullWidth size="small" label="Raison Sociale *" error={!!errors.raison_sociale} helperText={errors.raison_sociale?.message} />
+                    )} />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Controller name="forme_juridique" control={control} render={({ field }) => (
+                      <FormControl fullWidth size="small" error={!!errors.forme_juridique}>
+                        <InputLabel>Forme Juridique *</InputLabel>
+                        <Select {...field} label="Forme Juridique *">
+                          <MenuItem value="SARL">SARL</MenuItem>
+                          <MenuItem value="SA">SA</MenuItem>
+                          <MenuItem value="ETS">ETS</MenuItem>
+                          <MenuItem value="GIE">GIE</MenuItem>
+                        </Select>
+                      </FormControl>
+                    )} />
+                  </Grid>
+                </Grid>
+              )}
 
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <Box sx={{ minHeight: "350px" }}>{renderFields()}</Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', pt: 4, borderTop: `1px solid ${blueGrey[200]}` }}>
-              <Button variant="outlined" onClick={handleBack} disabled={activeStep === 0} sx={{ minWidth: 120 }}>Précédent</Button>
-              {activeStep < STEPS.length - 1 ? (
-                <Button variant="contained" onClick={handleNext} sx={{ minWidth: 120 }}>Suivant</Button>
+              {/* ÉTAPE 1 : SIÈGE (Les autres étapes suivent le même pattern) */}
+              {activeStep === 1 && (
+                <Grid container spacing={3}>
+                   <Grid item xs={12} md={6}><Controller name="adresse_ville" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="Ville du siège *" error={!!errors.adresse_ville}/>} /></Grid>
+                   <Grid item xs={12} md={6}><Controller name="adresse_quartier" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="Quartier *" error={!!errors.adresse_quartier}/>} /></Grid>
+                   <Grid item xs={12} md={6}><Controller name="tel_bureau" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="Téléphone Bureau *" error={!!errors.tel_bureau}/>} /></Grid>
+                   <Grid item xs={12} md={6}><Controller name="email" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="Email" />} /></Grid>
+                </Grid>
+              )}
+
+              {/* ÉTAPE 2 : DOCUMENTS */}
+              {activeStep === 2 && (
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}><Controller name="rccm" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="N° RCCM *" error={!!errors.rccm}/>} /></Grid>
+                  <Grid item xs={12} md={6}><Controller name="nui" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="N° NUI *" error={!!errors.nui}/>} /></Grid>
+                </Grid>
+              )}
+
+              {/* ÉTAPE 3 : GÉRANCE */}
+              {activeStep === 3 && (
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}><Controller name="nom_gerant" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="Nom du Gérant *" error={!!errors.nom_gerant}/>} /></Grid>
+                  <Grid item xs={12} md={6}><Controller name="fonction_gerant" control={control} render={({ field }) => <TextField {...field} fullWidth size="small" label="Fonction" />} /></Grid>
+                  <Grid item xs={12}>
+                    <FormControlLabel control={<Controller name="taxable" control={control} render={({ field }) => <Checkbox {...field} checked={field.value} />} />} label="Assujetti TVA" />
+                  </Grid>
+                </Grid>
+              )}
+
+            </Box>
+
+            <Divider sx={{ my: 3 }} />
+
+            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+              <Button 
+                type="button" 
+                variant="outlined" 
+                disabled={activeStep === 0} 
+                onClick={() => setActiveStep(s => s - 1)}
+              >
+                Précédent
+              </Button>
+
+              {activeStep === STEPS.length - 1 ? (
+                <Button variant="contained" color="secondary" type="submit" sx={{ px: 4 }}>
+                  Enregistrer l'Entreprise
+                </Button>
               ) : (
-                <Button type="submit" variant="contained" color="secondary" sx={{ minWidth: 180 }}>✅ Enregistrer l'Entreprise</Button>
+                <Button 
+                  type="button" 
+                  variant="contained" 
+                  onClick={async () => (await trigger()) && setActiveStep(s => s + 1)}
+                >
+                  Suivant
+                </Button>
               )}
             </Box>
           </form>
