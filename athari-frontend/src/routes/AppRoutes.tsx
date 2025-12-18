@@ -1,9 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate,Link } from "react-router-dom";
-import AccountsPage from '../pages/compte/ComptePage';
-import AccountCreatePage from '../pages/compte/CreationCompte';
-import AccountEditPage from '../pages/compte/EditionPage';
-import AccountDetailPage from '../pages/compte/DetailCompte';
+import AccountManagement  from '../pages/compte/Compte';
 import FormClient from '../pages/client/FormClient';
 import Login from '../pages/Login'; 
 import Home from '../pages/Home';
@@ -44,10 +41,10 @@ const AppRoutes = () => {
         <Route path="/users/management" element={<UserManagement />} />
 
         {/* Comptes bancaires */}
-        <Route path="/accounts" element={<AccountsPage />} />
-        <Route path="/accounts/create" element={<AccountCreatePage />} />
-        <Route path="/accounts/:id" element={<AccountDetailPage />} />
-        <Route path="/accounts/:id/edit" element={<AccountEditPage />} />
+        <Route path="/accounts" element={<AccountManagement  />} />
+        <Route path="accounts/create" element={<AccountManagement />} />
+        <Route path="accounts/:id" element={<AccountManagement />} />
+        <Route path="accounts/:id/edit" element={<AccountManagement />} />
 
         {/* Clients */}
         <Route path='/client' element={<ListeClient />} /> 
