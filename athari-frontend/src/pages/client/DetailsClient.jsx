@@ -86,7 +86,8 @@ export default function DetailsClient() {
                         <Grid item>
                             <Box sx={{ position: 'relative' }}>
                                 <Avatar 
-                                    src={client.photo_url || ""} 
+                                    // On cherche l'URL dans l'objet physique pour un client physique
+                                    src={isPhysique ? client.physique?.photo_url : ""} 
                                     sx={{ width: 120, height: 120, border: '4px solid #F1F5F9', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}
                                 >
                                     {isPhysique ? <PersonIcon fontSize="large" /> : <BusinessIcon fontSize="large" />}
@@ -158,6 +159,8 @@ export default function DetailsClient() {
                                 <DataField label="Père" value={detail?.nom_pere} />
                                 <DataField label="Mère" value={detail?.nom_mere} />
                                 <DataField label="Situation Fam." value={detail?.situation_familiale} />
+                                 <DataField label="regime matrimonial" value={detail?.regime_matrimonial} />
+                               
                             </Grid>
 
                             <SectionTitle icon={<WorkIcon />} title="Professionnel" />
@@ -173,6 +176,19 @@ export default function DetailsClient() {
                                 <DataField label="Ville" value={client?.adresse_ville} />
                                 <DataField label="Quartier" value={client?.adresse_quartier} />
                                 <DataField label="Boîte Postale" value={client?.bp} />
+                            </Grid>
+                             <SectionTitle icon={<LocationIcon />} title="information du conjoint" />
+                            <Grid container spacing={2}>
+                                <DataField label="nom Conjoint" value={client?.nom_conjoint} />
+                                <DataField label="cni conjoint" value={client?.cni_conjoint} />
+                                <DataField label="date naissance  conjoint" value={client?.date_naissance_conjoint} />
+
+                                <DataField label=" profession conjoint " value={client?.profession_conjoint} />
+                                 <DataField label="salaire conjoint" value={client?.salaire} />
+
+                                 <DataField label="telephone conjoint" value={client?.tel_conjoint} />
+
+                                
                             </Grid>
                         </Paper>
                     </Grid>
