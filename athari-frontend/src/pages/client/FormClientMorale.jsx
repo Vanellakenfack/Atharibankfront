@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import Header from "../../components/layout/TopBar";
+import Layout from "../../components/layout/Layout";
 import {
   ThemeProvider, createTheme, CssBaseline, Container, Box, Grid, TextField,
   Button, Stepper, Step, StepLabel, Select, MenuItem, InputLabel, 
@@ -120,8 +120,10 @@ export default function FormClientMorale() {
   };
 
   return (
+
+    <Layout>
     <ThemeProvider theme={muiTheme}>
-      <Header /><CssBaseline />
+    <CssBaseline />
       <Container maxWidth="lg" sx={{ py: 5 }}>
         <Paper elevation={4} sx={{ p: 4, borderRadius: 3 }}>
           <Typography variant="h4" align="center" sx={{ fontWeight: 700, mb: 4, color: indigo[900] }}>
@@ -236,5 +238,6 @@ export default function FormClientMorale() {
         </Paper>
       </Container>
     </ThemeProvider>
+    </Layout>
   );
 }

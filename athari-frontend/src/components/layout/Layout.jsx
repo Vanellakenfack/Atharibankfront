@@ -9,6 +9,7 @@ export default function Layout({ children }) {
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#F8FAFC' }}>
       {/* Sidebar fixe */}
+      
       <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
       {/* Zone de droite (TopBar + Page) */}

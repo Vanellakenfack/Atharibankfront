@@ -15,6 +15,7 @@ import FormClientMorale from '../pages/client/FormClientMorale';
 import ChoicePage from '../pages/client/ChoicePage';
 import DetailsClient from '../pages/client/DetailsClient';
 import ModifierClient from '../pages/client/ModifierClient';
+import PlanComptableList from '../pages/plancomptable/PlanComptableList';
 // Ajoute "Link" dans l'importation existante
 
 
@@ -59,6 +60,10 @@ const AppRoutes = () => {
 
         {/* gestion de s agences */}
         <Route path='/agence' element={<Agence />} />
+
+
+        {/* Plan Comptable */}     
+           <Route path='/plan-comptable' element={<PlanComptableList />} />
 
 
 
