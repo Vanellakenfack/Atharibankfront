@@ -16,6 +16,7 @@ import ChoicePage from '../pages/client/ChoicePage';
 import DetailsClient from '../pages/client/DetailsClient';
 import ModifierClient from '../pages/client/ModifierClient';
 import PlanComptableList from '../pages/plancomptable/PlanComptableList';
+import CategoryManager from '../pages/plancomptable/CategoryManager.jsx';
 // Ajoute "Link" dans l'importation existante
 
 
@@ -64,6 +65,8 @@ const AppRoutes = () => {
 
         {/* Plan Comptable */}     
            <Route path='/plan-comptable' element={<PlanComptableList />} />
+           <Route path='/categories' element={<CategoryManager/>} />
+
 
 
 
