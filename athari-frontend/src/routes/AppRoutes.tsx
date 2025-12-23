@@ -7,6 +7,7 @@ import Home from '../pages/Home';
 import ListeClient from '../pages/client/ListeClient';
 import RoleManagement from "../pages/users/RoleManagement";
 import UserManagement from "../pages/users/UserManagement";
+import Formulaire from '../pages/compte/Formulaire';
 import ProtectedRoute from './ProtectedRoute';
 import Dashboard from '../pages/dashboard/Dashboard';
 import AuditLogView from '../pages/AuditLogView';
@@ -15,6 +16,9 @@ import FormClientMorale from '../pages/client/FormClientMorale';
 import ChoicePage from '../pages/client/ChoicePage';
 import DetailsClient from '../pages/client/DetailsClient';
 import ModifierClient from '../pages/client/ModifierClient';
+import TypeCompteForm from '../pages/compte/TypeCompteForm';
+import TypeCompteList from '../pages/compte/TypeCompteList';
+import ListeComptes from '../pages/compte/ListeComptes';
 // Ajoute "Link" dans l'importation existante
 
 
@@ -45,6 +49,10 @@ const AppRoutes = () => {
         <Route path="accounts/create" element={<AccountManagement />} />
         <Route path="accounts/:id" element={<AccountManagement />} />
         <Route path="accounts/:id/edit" element={<AccountManagement />} />
+        
+        {/* Types de comptes */}
+        <Route path="/ajout-type-de-compte" element={<TypeCompteForm />} />
+        <Route path="/Liste-type-de-compte" element={<TypeCompteList />} />
 
         {/* Clients */}
         <Route path='/client' element={<ListeClient />} /> 
@@ -59,6 +67,10 @@ const AppRoutes = () => {
 
         {/* gestion de s agences */}
         <Route path='/agence' element={<Agence />} />
+
+        {/* gestion des comptes clients */}
+        <Route path='/compte' element={<Formulaire />} />
+        <Route path='/liste-des-comptes' element={<ListeComptes />} />
 
 
 

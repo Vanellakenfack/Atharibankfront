@@ -127,6 +127,13 @@ const Step4Documents = ({ documents, engagementAccepted, clientSignature, onChan
                   <Button
                     component="label"
                     variant="outlined"
+                    sx={{
+                      background: 'linear-gradient(135deg, #62bfc6ff 0%, #2e787d69 100%)',
+                      boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
+                      border: 'none',
+                      padding: '10px 16px',
+                      color:' #ffff'
+                    }}
                     startIcon={<CloudUploadIcon />}
                     fullWidth
                   >
@@ -155,8 +162,15 @@ const Step4Documents = ({ documents, engagementAccepted, clientSignature, onChan
               <Button
                 component="label"
                 variant="outlined"
+                  sx={{
+                     mb: 2,
+                    background: 'linear-gradient(135deg, #62bfc6ff 0%, #2e787d69 100%)',
+                    boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
+                    border: 'none',
+                    padding: '10px 16px',
+                    color:' #ffff'
+                  }}
                 startIcon={<CloudUploadIcon />}
-                sx={{ mb: 2 }}
               >
                 Ajouter un document
                 <VisuallyHiddenInput
@@ -203,6 +217,13 @@ const Step4Documents = ({ documents, engagementAccepted, clientSignature, onChan
               <Button
                 component="label"
                 variant="outlined"
+                sx={{ 
+                    background: 'linear-gradient(135deg, #62bfc6ff 0%, #2e787d69 100%)',
+                    boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
+                    border: 'none',
+                    padding: '10px 16px',
+                    color:' #ffff'
+                  }}
                 startIcon={<CloudUploadIcon />}
               >
                 Télécharger la signature

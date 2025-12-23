@@ -1,126 +1,425 @@
+// src/pages/compte/etape/Step1ClientInfo.tsx
 import React, { useState, useEffect } from 'react';
 import {
   TextField,
-  Autocomplete,
   Grid,
   Card,
   CardContent,
   Typography,
-  Alert
+  Alert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  TableSortLabel,
+  Checkbox,
+  InputAdornment,
+  Box,
+  CircularProgress,
+  Pagination,
+  Select,
+  MenuItem
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import { clientService } from '../../../services/api/clientApi';
 
-const Step1ClientInfo = ({ clients, selectedClient, onClientSelect, accountNumber }) => {
+type Client = {
+  id: number;
+  num_client: string;
+  type_client: 'physique' | 'morale';
+  telephone: string;
+  email: string;
+  adresse_ville: string;
+  adresse_quartier: string;
+  physique?: {
+    nom_prenoms: string;
+    sexe: 'M' | 'F';
+    date_naissance: string;
+    // Ajoutez d'autres champs selon votre modèle
+  };
+  // Ajoutez d'autres champs selon votre modèle
+};
+
+interface Step1ClientInfoProps {
+  selectedClient: Client | null;
+  onClientSelect: (client: Client) => void;
+}
+
+const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({ 
+  selectedClient, 
+  onClientSelect 
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredClients, setFilteredClients] = useState(clients);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [orderBy, setOrderBy] = useState<keyof Client>('num_client');
+  const [order, setOrder] = useState<'asc' | 'desc'>('asc');
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  // Charger les clients depuis l'API
   useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        setLoading(true);
+        const data = await clientService.getAllClients();
+        setClients(data);
+        setError(null);
+      } catch (err) {
+        console.error('Erreur:', err);
+        setError('Impossible de charger les clients. Veuillez réessayer plus tard.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClients();
+  }, []);
+
+  // Filtrer et trier les clients
+  const filteredClients = React.useMemo(() => {
+    let result = [...clients];
+
+    // Filtrage
     if (searchTerm) {
-      const filtered = clients.filter(client =>
-        client.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.cni.includes(searchTerm)
+      const term = searchTerm.toLowerCase();
+      result = result.filter(client => 
+        (client.physique?.nom_prenoms?.toLowerCase().includes(term)) ||
+        (client.num_client?.toLowerCase().includes(term)) ||
+        (client.telephone?.includes(term)) ||
+        (client.email?.toLowerCase().includes(term))
       );
-      setFilteredClients(filtered);
-    } else {
-      setFilteredClients(clients);
     }
-  }, [searchTerm, clients]);
 
-  const generateAccountNumber = (clientId) => {
-    if (!clientId) return '';
-    const paddedId = clientId.toString().padStart(9, '0');
-    const randomDigits = Math.floor(1000 + Math.random() * 9000);
-    return `${paddedId}${randomDigits}`;
+    // Tri
+    result.sort((a, b) => {
+      const aValue = a[orderBy] || '';
+      const bValue = b[orderBy] || '';
+      
+      if (aValue < bValue) return order === 'asc' ? -1 : 1;
+      if (aValue > bValue) return order === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [clients, searchTerm, orderBy, order]);
+
+  const handleRequestSort = (property: keyof Client) => {
+    const isAsc = orderBy === property && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
   };
 
-  const handleClientSelect = (client) => {
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const handleSelectClient = (client: Client) => {
     onClientSelect(client);
-    // Générer automatiquement le numéro de compte
-    const generatedNumber = generateAccountNumber(client.id);
-    // Vous pourriez vouloir passer ce numéro au parent
   };
+
+  // Pagination
+  const emptyRows = page > 0 ? Math.max(0, (1 + page) * rowsPerPage - filteredClients.length) : 0;
+  const currentClients = filteredClients.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
 
   return (
     <div>
-      <Typography variant="h6" gutterBottom>
-        Étape 1: Sélection du Client
-      </Typography>
-      
-      <Alert severity="info" sx={{ mb: 3 }}>
-        Sélectionnez un client existant. Le numéro de compte sera généré automatiquement (9 chiffres client + 4 chiffres = 13 chiffres).
-      </Alert>
+      <Box mb={3}>
+        <Typography variant="h6" gutterBottom>
+          Étape 1: Sélection du Client
+        </Typography>
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Sélectionnez un client dans le tableau.
+        </Alert>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <Box sx={{ width: '40%', minWidth: 300 }}>
+            <TextField
+              fullWidth
+              variant="outlined"
+              size="small"
+              placeholder="Rechercher un client..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPage(0);
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Box>
+        </Box>
+      </Box>
 
-      <Grid container spacing={3}>
+      <Grid container spacing={2}>
         <Grid item xs={12}>
-          <Autocomplete
-            options={filteredClients}
-            getOptionLabel={(client) => 
-              `${client.nom} ${client.prenom} - CNI: ${client.cni} - Tél: ${client.telephone}`
-            }
-            value={selectedClient}
-            onChange={(event, newValue) => handleClientSelect(newValue)}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Rechercher un client"
-                placeholder="Nom, prénom ou CNI"
-                variant="outlined"
-                fullWidth
-                InputProps={{
-                  ...params.InputProps,
-                  startAdornment: <SearchIcon sx={{ mr: 1 }} />
-                }}
-              />
-            )}
-          />
-        </Grid>
-
-        {selectedClient && (
-          <Grid item xs={12}>
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Informations du Client
+          <Paper sx={{ width: '100%', overflow: 'hidden', margin: 0, maxWidth: 'none'}}>
+            <TableContainer sx={{ 
+                      maxHeight: 440,
+                      '& .MuiTable-root': {  // Cible le tableau directement
+                        minWidth: '100%',  // Forcement de la largeur minimale à 100%
+                        tableLayout: 'fixed'  // Pour forcer le respect des largeurs de colonnes
+                      }
+                    }}
+            >
+              <Table stickyHeader aria-label="Liste des clients" size="small">
+                <TableHead>
+                  <TableRow sx={{ '& .MuiTableCell-head': { backgroundColor: 'primary.main', color: 'white' } }}>
+                    <TableCell padding="checkbox" sx={{ backgroundColor: 'primary.main' }}></TableCell>
+                    <TableCell sx={{ backgroundColor: 'primary.main' }}>
+                      <TableSortLabel
+                        active={orderBy === 'num_client'}
+                        direction={orderBy === 'num_client' ? order : 'asc'}
+                        onClick={() => handleRequestSort('num_client')}
+                        sx={{ color: 'white !important', '&:hover': { color: 'rgba(255, 255, 255, 0.8) !important' } }}
+                      >
+                        N° Client
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell sx={{ backgroundColor: 'primary.main' }}>
+                      <TableSortLabel
+                        active={orderBy === 'physique.nom_prenoms'}
+                        direction={orderBy === 'physique.nom_prenoms' ? order : 'asc'}
+                        onClick={() => handleRequestSort('physique.nom_prenoms')}
+                        sx={{ color: 'white !important', '&:hover': { color: 'rgba(255, 255, 255, 0.8) !important' } }}
+                      >
+                        Nom & Prénoms
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white' }}>Téléphone</TableCell>
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white' }}>Email</TableCell>
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white' }}>Ville</TableCell>
+                    <TableCell sx={{ backgroundColor: 'primary.main', color: 'white' }}>Type</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
+                        <CircularProgress />
+                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                          Chargement des clients...
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : error ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'error.main' }}>
+                        {error}
+                      </TableCell>
+                    </TableRow>
+                  ) : currentClients.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
+                        <Typography variant="body2" color="textSecondary">
+                          {searchTerm ? 'Aucun client ne correspond à votre recherche' : 'Aucun client trouvé'}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    currentClients.map((client) => (
+                      <TableRow 
+                        hover 
+                        key={client.id} 
+                        selected={selectedClient?.id === client.id}
+                        onClick={() => handleSelectClient(client)}
+                        sx={{ cursor: 'pointer' }}
+                      >
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            checked={selectedClient?.id === client.id}
+                            color="primary"
+                          />
+                        </TableCell>
+                        <TableCell>{client.num_client}</TableCell>
+                        <TableCell>{client.physique?.nom_prenoms || 'N/A'}</TableCell>
+                        <TableCell>{client.telephone}</TableCell>
+                        <TableCell>{client.email || 'N/A'}</TableCell>
+                        <TableCell>{client.adresse_ville}</TableCell>
+                        <TableCell>
+                          {client.type_client === 'physique' ? 'Physique' : 'Morale'}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                  {!loading && emptyRows > 0 && (
+                    <TableRow style={{ height: 53 * emptyRows }}>
+                      <TableCell colSpan={7} />
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              p: 1.5,
+              borderTop: '1px solid',
+              borderColor: 'divider',
+              flexWrap: 'wrap',
+              gap: 2
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  {`${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, filteredClients.length)} sur ${filteredClients.length}`}
                 </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <Typography><strong>Nom:</strong> {selectedClient.nom}</Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography><strong>Prénom:</strong> {selectedClient.prenom}</Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography><strong>CNI:</strong> {selectedClient.cni}</Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography><strong>Téléphone:</strong> {selectedClient.telephone}</Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography><strong>Email:</strong> {selectedClient.email}</Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography><strong>Adresse:</strong> {selectedClient.adresse}</Typography>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant="h6" sx={{ mt: 2 }}>
-                      <strong>Numéro de compte généré:</strong> {generateAccountNumber(selectedClient.id)}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
-        )}
-
-        {!selectedClient && (
-          <Grid item xs={12}>
-            <Alert severity="warning">
-              Aucun client sélectionné. Veuillez rechercher et sélectionner un client.
-            </Alert>
-          </Grid>
-        )}
+              </Box>
+              
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Pagination 
+                  count={Math.ceil(filteredClients.length / rowsPerPage)} 
+                  page={page + 1} 
+                  onChange={(event, value) => setPage(value - 1)} 
+                  color="primary" 
+                  shape="rounded"
+                  size="small"
+                />
+                
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Lignes:
+                  </Typography>
+                  <Select
+                    value={rowsPerPage}
+                    onChange={(e) => {
+                      setRowsPerPage(Number(e.target.value));
+                      setPage(0);
+                    }}
+                    size="small"
+                    sx={{
+                      '& .MuiSelect-select': {
+                        py: 0.5,
+                        px: 1,
+                        fontSize: '0.875rem',
+                      },
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'divider',
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'text.secondary',
+                      },
+                    }}
+                  >
+                    {[5, 10, 25, 50].map((size) => (
+                      <MenuItem key={size} value={size}>
+                        {size}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </Box>
+              </Box>
+            </Box>
+          </Paper>
+        </Grid>
       </Grid>
+
+      {selectedClient && (
+        <Grid item xs={12} sx={{ mt: 2 }}>
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="h6" gutterBottom>Client sélectionné</Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Nom complet"
+                    value={selectedClient.physique?.nom_prenoms || 'N/A'}
+                    variant="outlined"
+                    size="small"
+                    margin="normal"
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="N° Client"
+                    value={selectedClient.num_client}
+                    variant="outlined"
+                    size="small"
+                    margin="normal"
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Téléphone"
+                    value={selectedClient.telephone}
+                    variant="outlined"
+                    size="small"
+                    margin="normal"
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Email"
+                    value={selectedClient.email || 'N/A'}
+                    variant="outlined"
+                    size="small"
+                    margin="normal"
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Ville"
+                    value={selectedClient.adresse_ville}
+                    variant="outlined"
+                    size="small"
+                    margin="normal"
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Type de client"
+                    value={selectedClient.type_client === 'physique' ? 'Physique' : 'Morale'}
+                    variant="outlined"
+                    size="small"
+                    margin="normal"
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                  />
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
+      )}
     </div>
   );
 };

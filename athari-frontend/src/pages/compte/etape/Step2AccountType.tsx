@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { planComptableService } from '../../../services/api/clientApi';
+import { typeCompteService } from '../../../services/api/typeCompteApi';
 import {
   FormControl,
-  FormLabel,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
   Grid,
   TextField,
   Select,
@@ -14,209 +12,488 @@ import {
   CardContent,
   Typography,
   Box,
-  Alert
+  Alert,
+  Divider,
+  CircularProgress,
+  Autocomplete,
+  InputAdornment
 } from '@mui/material';
+import { Search as SearchIcon } from '@mui/icons-material';
+import type { SelectChangeEvent } from '@mui/material/Select';
 
-const ACCOUNT_TYPES = {
-  'Courant': {
-    label: 'Compte Courant',
-    subTypes: [],
-    fees: {
-      opening: 3500,
-      monthly: 2000,
-      sms: 200
-    }
-  },
-  'Épargne': {
-    label: 'Compte d\'Épargne',
-    subTypes: ['Classique', 'Family', 'Logement', 'Participative', 'Garantie'],
-    fees: {
-      opening: 500,
-      monthly: 0,
-      sms: 0
-    }
-  },
-  'Mata Boost': {
-    label: 'Compte Mata Boost',
-    subTypes: ['Mata Boost à vue', 'Mata Boost Bloqué'],
-    fees: {
-      opening: 500,
-      monthly: '300/1000',
-      withdrawal: 200,
-      sms: 200
-    }
-  },
-  'Collecte': {
-    label: 'Compte de Collecte',
-    subTypes: ['Journalière', 'Bloquée'],
-    fees: {
-      opening: 0,
-      monthly: 1000,
-      unblocking: 1000
-    }
-  }
-};
+// Types pour les données
+interface CategorieComptable {
+  id: string;
+  code: string;
+  libelle: string;
+}
 
-const Step2AccountType = ({ accountType, accountSubType, options, onChange }) => {
-  const [selectedType, setSelectedType] = useState(accountType);
-  const [selectedSubType, setSelectedSubType] = useState(accountSubType);
+interface ChapitreComptable {
+  id: string;
+  code: string;
+  libelle: string;
+  nature_solde: string;
+  est_actif: boolean;
+}
 
-  const handleTypeChange = (event) => {
-    const type = event.target.value;
-    setSelectedType(type);
-    setSelectedSubType('');
-    onChange('accountType', type);
-    onChange('accountSubType', '');
-    onChange('options', ACCOUNT_TYPES[type]?.fees || {});
-  };
+interface TypeCompte {
+  id: number;
+  code: string;
+  libelle: string;
+  description?: string;
+  est_mata: boolean;
+  necessite_duree: boolean;
+  est_islamique: boolean;
+  actif: boolean;
+}
 
-  const handleSubTypeChange = (event) => {
-    const subType = event.target.value;
-    setSelectedSubType(subType);
-    onChange('accountSubType', subType);
-  };
+interface FormOptions {
+  montant: string;
+  duree: string;
+  module: string;
+  categorie_id?: string;
+  chapitre_id?: string;
+}
 
-  const getFeeDetails = () => {
-    if (!selectedType) return null;
+interface Step2AccountTypeProps {
+  accountType: string;
+  accountSubType: string;
+  options: FormOptions;
+  onChange: (field: string, value: unknown) => void;
+}
+
+const MODULES = [
+  "FONDS AFFECTÉS DE FINANCEMENT DES PARTICIPATIONS",
+  "FONDS DE GARANTIE",
+  "FONDS D'INVESTISSEMENT",
+  "FONDS ISLAMIQUE"
+];
+
+const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
+  accountType,
+  accountSubType,
+  options,
+  onChange,
+}) => {
+  // États
+  const [loading, setLoading] = useState<boolean>(true);
+  const [loadingTypes, setLoadingTypes] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<string>(accountSubType || '');
+  const [typesComptes, setTypesComptes] = useState<TypeCompte[]>([]);
+  
+  // États pour les chapitres
+  const [chapitres, setChapitres] = useState<ChapitreComptable[]>([]);
+  const [selectedChapitre, setSelectedChapitre] = useState<ChapitreComptable | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [loadingChapitres, setLoadingChapitres] = useState<boolean>(false);
+
+  // Charger les types de comptes
+  useEffect(() => {
+    const fetchTypesComptes = async () => {
+      console.log('Début du chargement des types de comptes...');
+      try {
+        const data = await typeCompteService.getTypesComptes();
+        console.log('Types de comptes chargés:', data);
+        setTypesComptes(data);
+        setLoading(false); // S'assurer que le chargement est terminé
+      } catch (err) {
+        console.error('Erreur lors du chargement des types de comptes:', err);
+        setError('Impossible de charger les types de comptes. Veuillez réessayer plus tard.');
+      } finally {
+        console.log('Chargement des types terminé');
+        setLoadingTypes(false);
+      }
+    };
+
+    fetchTypesComptes();
+  }, []);
+
+  // Mettre à jour les données du formulaire
+  const updateFormData = useCallback((updates: Partial<FormOptions>) => {
+    const newFormData = { ...options, ...updates };
+    onChange('options', newFormData);
+  }, [onChange, options]);
+
+  // Charger tous les chapitres
+  useEffect(() => {
+    const loadAllChapitres = async () => {
+      console.log('Chargement de tous les chapitres...');
+      try {
+        setLoadingChapitres(true);
+        // Appel avec null comme premier paramètre pour récupérer tous les chapitres
+        const data = await planComptableService.getChapitres(null, '');
+        console.log('Tous les chapitres chargés:', data);
+        setChapitres(data);
+        
+        // Si un chapitre est déjà sélectionné dans les options, on le restaure
+        if (options.chapitre_id) {
+          console.log('Restauration du chapitre sélectionné:', options.chapitre_id);
+          const chapitre = data.find(c => c.id === options.chapitre_id);
+          if (chapitre) {
+            setSelectedChapitre(chapitre);
+          }
+        }
+      } catch (err) {
+        console.error('Erreur lors du chargement des chapitres:', err);
+        setError('Impossible de charger les chapitres. Veuillez réessayer plus tard.');
+      } finally {
+        console.log('Fin du chargement des chapitres');
+        setLoadingChapitres(false);
+        setLoading(false);
+      }
+    };
+
+    loadAllChapitres();
+  }, [options.chapitre_id]);
+
+  // Mettre à jour la liste des chapitres filtrés lors de la saisie de recherche
+  useEffect(() => {
+    const filterChapitres = async () => {
+      if (!searchTerm) {
+        // Si le terme de recherche est vide, recharger tous les chapitres
+        try {
+          setLoadingChapitres(true);
+          const data = await planComptableService.getChapitres(null, '');
+          console.log('Chargement de tous les chapitres:', data);
+          setChapitres(data);
+        } catch (err) {
+          console.error('Erreur lors du chargement des chapitres:', err);
+          setError('Erreur lors du chargement des chapitres. Veuillez réessayer.');
+        } finally {
+          setLoadingChapitres(false);
+        }
+        return;
+      }
+      
+      console.log('Recherche de chapitres avec le terme:', searchTerm);
+      try {
+        setLoadingChapitres(true);
+        const data = await planComptableService.getChapitres(null, searchTerm);
+        console.log('Résultats de la recherche:', data);
+        setChapitres(data);
+      } catch (err) {
+        console.error('Erreur lors de la recherche des chapitres:', err);
+        setError('Erreur lors de la recherche des chapitres. Veuillez réessayer.');
+      } finally {
+        setLoadingChapitres(false);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      filterChapitres();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Gestion du changement de chapitre
+  const handleChapitreChange = (event: React.SyntheticEvent, newValue: ChapitreComptable | null) => {
+    console.log('Chapitre sélectionné:', newValue);
+    setSelectedChapitre(newValue);
     
-    const fees = ACCOUNT_TYPES[selectedType].fees;
-    return (
-      <Box sx={{ mt: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Frais associés:
-        </Typography>
-        <Grid container spacing={1}>
-          {Object.entries(fees).map(([key, value]) => (
-            <Grid item xs={12} sm={6} key={key}>
-              <Typography>
-                <strong>{key.replace(/([A-Z])/g, ' $1').toUpperCase()}:</strong> {value} FCFA
-              </Typography>
-            </Grid>
-          ))}
-        </Grid>
-      </Box>
-    );
+    const updates: Partial<FormOptions> = {
+      chapitre_id: newValue?.id || '',
+      categorie_id: newValue?.categorie_id || ''
+    };
+    
+    // S'assurer que le montant est défini s'il est requis
+    if (!options.montant) {
+      updates.montant = '0';
+    }
+    
+    updateFormData(updates);
+    setError(null); // Effacer l'erreur si un chapitre est sélectionné
   };
+
+  // Gestion de la recherche de chapitres
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setSearchTerm(event.target.value);
+  };
+
+  // Options de filtre pour l'Autocomplete des chapitres (filtrage côté client en plus de l'API)
+  const filteredChapitres = useMemo(() => {
+    if (!searchTerm) return chapitres;
+    const lowercasedSearch = searchTerm.toLowerCase();
+    return chapitres.filter(
+      chapitre => 
+        (chapitre.code && chapitre.code.toLowerCase().includes(lowercasedSearch)) ||
+        (chapitre.libelle && chapitre.libelle.toLowerCase().includes(lowercasedSearch))
+    );
+  }, [chapitres, searchTerm]);
+
+  // Gestion du changement de type de compte
+  const handleTypeChange = useCallback((event: SelectChangeEvent<string>) => {
+    const typeCode = event.target.value;
+    const selected = typesComptes.find(t => t.code === typeCode);
+    
+    if (selected) {
+      setSelectedType(typeCode);
+      // Mettre à jour à la fois accountSubType et accountType
+      onChange('accountSubType', typeCode);
+      onChange('accountType', 'COMPTE_EPARGNE'); // ou une autre valeur appropriée
+      
+      // Mettre à jour les options supplémentaires en fonction du type de compte
+      const updates: Partial<FormOptions> = {};
+      
+      if (selected.necessite_duree) {
+        updates.duree = '6'; // Valeur par défaut pour la durée
+      } else {
+        updates.duree = '';
+      }
+      
+      if (selected.est_islamique) {
+        updates.module = MODULES[3]; // 'FONDS ISLAMIQUE' par défaut
+      }
+      
+      if (Object.keys(updates).length > 0) {
+        updateFormData(updates);
+      }
+      
+      // Effacer toute erreur existante
+      setError(null);
+    }
+  }, [onChange, typesComptes, updateFormData]);
+
+  // Gestion du changement des champs de formulaire
+  const handleInputChange = useCallback((field: keyof FormOptions) => 
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      updateFormData({ [field]: event.target.value });
+    }, [updateFormData]);
+
+  // Mise à jour du type sélectionné
+  useEffect(() => {
+    setSelectedType(accountSubType);
+  }, [accountSubType]);
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
+          <CircularProgress />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent>
+          <Alert severity="error">{error}</Alert>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div>
-      <Typography variant="h6" gutterBottom>
-        Étape 2: Type de Compte
+    <Box sx={{ width: '100%' }}>
+      <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
+        Étape 2 : Sélection du type de compte et des paramètres
       </Typography>
 
-      <Alert severity="info" sx={{ mb: 3 }}>
-        Sélectionnez le type de compte et les options associées. Les frais seront appliqués automatiquement.
+      <Alert severity="info" sx={{ mb: 4, borderRadius: 1 }}>
+        Veuillez sélectionner un type de compte et renseigner les informations requises.
       </Alert>
 
       <Grid container spacing={3}>
+        {/* Sélection du type de compte */}
         <Grid item xs={12}>
-          <FormControl component="fieldset">
-            <FormLabel component="legend">Type de compte principal</FormLabel>
-            <RadioGroup value={selectedType} onChange={handleTypeChange}>
-              {Object.keys(ACCOUNT_TYPES).map((type) => (
-                <FormControlLabel
-                  key={type}
-                  value={type}
-                  control={<Radio />}
-                  label={ACCOUNT_TYPES[type].label}
-                />
+          <FormControl fullWidth margin="normal" required>
+            <InputLabel>Type de compte</InputLabel>
+            <Select
+              value={selectedType}
+              sx={{ minWidth: 200 }}
+              onChange={handleTypeChange}
+              label="Type de compte"
+              disabled={loading || loadingTypes}
+            >
+              {typesComptes.map((type) => (
+                <MenuItem key={type.id} value={type.code}>
+                  {type.libelle}
+                </MenuItem>
               ))}
-            </RadioGroup>
+              {loadingTypes && (
+                <MenuItem disabled>
+                  <Box display="flex" alignItems="center" width="100%">
+                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                    Chargement...
+                  </Box>
+                </MenuItem>
+              )}
+              {!loadingTypes && typesComptes.length === 0 && (
+                <MenuItem disabled>Aucun type de compte disponible</MenuItem>
+              )}
+            </Select>
           </FormControl>
         </Grid>
 
-        {selectedType && ACCOUNT_TYPES[selectedType].subTypes.length > 0 && (
-          <Grid item xs={12}>
-            <FormControl fullWidth>
-              <InputLabel>Sous-type de compte</InputLabel>
-              <Select
-                value={selectedSubType}
-                label="Sous-type de compte"
-                onChange={handleSubTypeChange}
-              >
-                <MenuItem value="">
-                  <em>Sélectionnez un sous-type</em>
-                </MenuItem>
-                {ACCOUNT_TYPES[selectedType].subTypes.map((subType) => (
-                  <MenuItem key={subType} value={subType}>
-                    {subType}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-        )}
+        {/* Sélection de la catégorie comptable */}
+        <Grid item xs={12}>
+          <FormControl sx={{ minWidth: 400 }} margin="normal">
+            <Autocomplete
+              options={filteredChapitres}
+              getOptionLabel={(option) => `${option.code} - ${option.libelle}${option.nature_solde ? ` (${option.nature_solde})` : ''}`}
+              value={selectedChapitre}
+              onChange={handleChapitreChange}
+              loading={loadingChapitres}
+              filterOptions={(x) => x} // Désactive le filtrage côté client car on gère tout côté serveur
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Rechercher un chapitre par code ou libellé"
+                  variant="outlined"
+                  onChange={handleSearchChange}
+                  placeholder="Tapez pour rechercher..."
+                  InputProps={{
+                    ...params.InputProps,
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon />
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <React.Fragment>
+                        {loadingChapitres ? <CircularProgress color="inherit" size={20} /> : null}
+                        {params.InputProps.endAdornment}
+                      </React.Fragment>
+                    ),
+                  }}
+                />
+              )}
+              renderOption={(props, option) => {
+                // Extraire la propriété key de props pour éviter l'avertissement
+                const { key, ...otherProps } = props;
+                return (
+                  <li key={key} {...otherProps}>
+                    <Box>
+                      <Typography variant="body1">
+                        <strong>{option.code}</strong> - {option.libelle}
+                      </Typography>
+                      {option.nature_solde && (
+                        <Typography variant="caption" color="text.secondary">
+                          Nature du solde: {option.nature_solde}
+                        </Typography>
+                      )}
+                    </Box>
+                  </li>
+                );
+              }}
+              noOptionsText={searchTerm ? "Aucun chapitre trouvé" : "Commencez à taper pour rechercher un chapitre"}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+              {chapitres.length} chapitres disponibles
+            </Typography>
+          </FormControl>
+        </Grid>
 
-        {selectedType && (
+        {/* Affichage des informations sélectionnées */}
+        {(selectedType || selectedChapitre) && (
           <Grid item xs={12}>
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Détails du compte sélectionné
+            <Card variant="outlined" sx={{ mt: 2, p: 2 }}>
+              <Typography variant="subtitle1" gutterBottom>
+                <strong>Type de compte :</strong> {
+                  selectedType ? 
+                    typesComptes.find(t => t.code === selectedType)?.libelle || 'Non sélectionné' : 
+                    'Non sélectionné'
+                }
+              </Typography>
+              {selectedChapitre && (
+                <Typography variant="subtitle1" gutterBottom>
+                  <strong>Chapitre :</strong> {selectedChapitre.libelle} ({selectedChapitre.code})
                 </Typography>
-                <Typography>
-                  <strong>Type:</strong> {ACCOUNT_TYPES[selectedType].label}
-                </Typography>
-                {selectedSubType && (
-                  <Typography>
-                    <strong>Sous-type:</strong> {selectedSubType}
-                  </Typography>
-                )}
-                {getFeeDetails()}
-                
-                {selectedType === 'Mata Boost' && (
-                  <Alert severity="warning" sx={{ mt: 2 }}>
-                    <strong>Note:</strong> Le compte Mata Boost comprend 6 sous-comptes (Business, Scolarité, Santé, Fête, Fournitures, Immobilier). Ils seront créés automatiquement.
-                  </Alert>
-                )}
-              </CardContent>
+              )}
             </Card>
           </Grid>
         )}
 
-        {/* Options supplémentaires */}
+        {/* Paramètres du compte */}
         {selectedType && (
           <Grid item xs={12}>
-            <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-              Options supplémentaires
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Montant minimum à maintenir"
-                  type="number"
-                  value={options.minimumBalance || ''}
-                  onChange={(e) => onChange('options', {
-                    ...options,
-                    minimumBalance: e.target.value
-                  })}
-                  helperText="Montant bloqué jusqu'à la clôture du compte"
-                />
+            <Card variant="outlined" sx={{ mt: 2, p: 3 }}>
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
+                Paramètres du compte
+              </Typography>
+              
+              <Grid container spacing={3}>
+                {/* Champ Montant */}
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    sx={{ minWidth: 200 }}
+                    label="Montant initial (FCFA)"
+                    type="number"
+                    value={options.montant || ''}
+                    onChange={handleInputChange('montant')}
+                    disabled={loading}
+                    required
+                    inputProps={{
+                      min: 0,
+                      step: 1000
+                    }}
+                  />
+                </Grid>
+
+                {/* Champ Durée (conditionnel) - Affiché uniquement pour les comptes qui nécessitent une durée */}
+                {(() => {
+                  const selectedAccountType = typesComptes.find(t => t.code === selectedType);
+                  if (selectedAccountType?.necessite_duree) {
+                    return (
+                      <Grid item xs={12} md={6}>
+                        <FormControl fullWidth>
+                          <InputLabel>Durée de blocage</InputLabel>
+                          <Select
+                            sx={{ minWidth: 200 }}
+                            value={options.duree || '3'}
+                            onChange={(e) => updateFormData({ duree: e.target.value as string })}
+                            label="Durée de blocage"
+                            disabled={loading}
+                            required
+                          >
+                            {Array.from({ length: 10 }, (_, i) => {
+                              const months = i + 3; // De 3 à 12 mois
+                              return (
+                                <MenuItem key={months} value={months.toString()}>
+                                  {months} mois
+                                </MenuItem>
+                              );
+                            })}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                    );
+                  }
+                  return null;
+                })()}
+
+                {/* Champ Module */}
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    sx={{ minWidth: 200 }}
+                    label="Frais sms  (FCFA)"
+                    type="number"
+                    value={'200'}
+                    onChange={handleInputChange('montant')}
+                    disabled={loading}
+                    required
+                    inputProps={{
+                      min: 0,
+                      step: 1000
+                    }}
+                  />
+                </Grid>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Fréquence des relevés</InputLabel>
-                  <Select
-                    value={options.statementFrequency || ''}
-                    label="Fréquence des relevés"
-                    onChange={(e) => onChange('options', {
-                      ...options,
-                      statementFrequency: e.target.value
-                    })}
-                  >
-                    <MenuItem value="mensuel">Mensuel</MenuItem>
-                    <MenuItem value="trimestriel">Trimestriel</MenuItem>
-                    <MenuItem value="semestriel">Semestriel</MenuItem>
-                    <MenuItem value="annuel">Annuel</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
+
+              <Alert severity="info" sx={{ mt: 3, fontSize: '0.9rem' }}>
+                Vérifiez que toutes les informations sont correctes avant de continuer.
+              </Alert>
+            </Card>
           </Grid>
         )}
       </Grid>
-    </div>
+    </Box>
   );
 };
 

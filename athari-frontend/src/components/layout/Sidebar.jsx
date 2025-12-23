@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../../assets/css/dash.css';
@@ -11,7 +11,8 @@ import {
   LogOut, 
   ShieldCheck,
   ChevronLeft,
-  Menu
+  Menu,
+  ChevronDown
 } from 'lucide-react';
 import { useAuth } from "../../context/AuthContext";
 
@@ -19,6 +20,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 
   const items = [
     { id: 'overview', icon: BarChart3, label: 'Tableau de bord', path: '/dashboard' },
@@ -101,17 +103,83 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
 
       {/* FOOTER */}
       <div className="sidebar-footer p-3 border-top mt-auto">
-        <Link 
-          to="/settings" 
-          className={`d-flex align-items-center gap-3 p-2 text-decoration-none mb-1 rounded-3 transition-all ${
-            location.pathname.startsWith('/settings') ? 'text-white shadow' : 'text-secondary hover-bg-light'
-          }`}
-          style={{ background: location.pathname.startsWith('/settings') ? activeGradient : 'transparent' }}
-        >
-          <Settings size={20} />
-          {/* Texte paramètres mis en gras */}
-          {sidebarOpen && <span className="small fw-bold">Paramètres</span>}
-        </Link>
+        <div className="mb-1">
+          <div 
+            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+              location.pathname.startsWith('/settings') ? 'text-white' : 'text-secondary hover-bg-light'
+            }`}
+            style={{ 
+              background: location.pathname.startsWith('/settings') ? activeGradient : 'transparent',
+              cursor: 'pointer'
+            }}
+            onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+          >
+            <div className="d-flex align-items-center gap-3">
+              <Settings size={20} />
+              {sidebarOpen && <span className="small fw-bold">Paramètres</span>}
+            </div>
+            {sidebarOpen && (
+              <ChevronDown 
+                size={16} 
+                className={`transition-all ${showSettingsMenu ? 'rotate-180' : ''}`}
+                style={{ transition: 'transform 0.2s ease' }}
+              />
+            )}
+          </div>
+          
+          {showSettingsMenu && sidebarOpen && (
+            <div className="ms-4 mt-1">
+              <Link
+                to="/compte"
+                className={`d-block p-2 text-decoration-none small rounded-3 mb-1 ${
+                  location.pathname === '/compte' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/compte' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                Comptes
+              
+              <Link
+                to="/liste-des-comptes"
+                className={`d-block p-2 text-decoration-none small rounded-3 ${
+                  location.pathname === '/liste-des-comptes' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '//liste-des-comptes' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                liste des comptes
+              </Link>
+              
+              </Link>
+
+              <Link
+                to="/Liste-type-de-compte"
+                className={`d-block p-2 text-decoration-none small rounded-3 ${
+                  location.pathname === '/Liste-type-de-compte' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/Ajout-type-de-compte' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                Liste des Type de comptes
+              </Link>
+            </div>
+          )}
+        </div>
 
         <div 
           role="button"

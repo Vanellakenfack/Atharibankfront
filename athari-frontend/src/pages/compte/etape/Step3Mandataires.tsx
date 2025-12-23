@@ -289,6 +289,13 @@ const Step3Mandataires = ({
           <Button
             variant="outlined"
             component="label"
+             sx={{
+                background: 'linear-gradient(135deg, #62bfc6ff 0%, #2e787d69 100%)',
+                boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
+                border: 'none',
+                padding: '10px 16px',
+                color:' #ffff'
+              }}
             startIcon={<PhotoCamera />}
           >
             Télécharger la signature
@@ -320,25 +327,53 @@ const Step3Mandataires = ({
           <Card variant="outlined">
             <CardContent>
               <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Button
-                    fullWidth
-                    variant={activeMandataire === 1 ? "contained" : "outlined"}
-                    onClick={() => setActiveMandataire(1)}
-                  >
-                    Mandataire 1
-                  </Button>
-                </Grid>
-                <Grid item xs={6}>
-                  <Button
-                    fullWidth
-                    variant={activeMandataire === 2 ? "contained" : "outlined"}
-                    onClick={() => setActiveMandataire(2)}
-                  >
-                    Mandataire 2 (Optionnel)
-                  </Button>
-                </Grid>
+              <Grid item xs={6}>
+                <Button
+                  fullWidth
+                  variant={activeMandataire === 1 ? "contained" : "outlined"}
+                  onClick={() => setActiveMandataire(1)}
+                  sx={{
+                    background: activeMandataire === 1 
+                      ? 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)' 
+                      : 'linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%)',
+                    color: activeMandataire === 1 ? '#fff' : 'rgba(0, 0, 0, 0.87)',
+                    border: 'none',
+                    padding: '10px 16px',
+                    '&:hover': {
+                      background: activeMandataire === 1 
+                        ? 'linear-gradient(135deg, #43A047 0%, #1B5E20 100%)' 
+                        : 'linear-gradient(135deg, #eeeeee 0%, #d5d5d5 100%)',
+                      boxShadow: '0 3px 5px rgba(0,0,0,0.2)'
+                    }
+                  }}
+                >
+                  Mandataire 1
+                </Button>
               </Grid>
+              <Grid item xs={6}>
+                <Button
+                  fullWidth
+                  variant={activeMandataire === 2 ? "contained" : "outlined"}
+                  onClick={() => setActiveMandataire(2)}
+                  sx={{
+                    background: activeMandataire === 2 
+                      ? 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)' 
+                      : 'linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%)',
+                    color: activeMandataire === 2 ? '#fff' : 'rgba(0, 0, 0, 0.87)',
+                    border: 'none',
+                    padding: '10px 16px',
+                    '&:hover': {
+                      background: activeMandataire === 2 
+                        ? 'linear-gradient(135deg, #43A047 0%, #1B5E20 100%)' 
+                        : 'linear-gradient(135deg, #eeeeee 0%, #d5d5d5 100%)',
+                      boxShadow: '0 3px 5px rgba(0,0,0,0.2)'
+                    }
+                  }}
+                >
+                  Mandataire 2 (Optionnel)
+                </Button>
+              </Grid>
+        </Grid>
 
               <Divider sx={{ my: 3 }} />
 
