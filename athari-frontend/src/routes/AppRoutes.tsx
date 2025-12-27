@@ -19,8 +19,9 @@ import ModifierClient from '../pages/client/ModifierClient';
 import TypeCompteForm from '../pages/compte/TypeCompteForm';
 import TypeCompteList from '../pages/compte/TypeCompteList';
 import ListeComptes from '../pages/compte/ListeComptes';
-// Ajoute "Link" dans l'importation existante
-
+import FraisCommissionPage from '../pages/FraisCommissionPage';
+import FraisApplicationPage from '../pages/FraisApplicationPage';
+import MataManagementPage from '../pages/MataManagementPage';
 
 const AppRoutes = () => {
   return (
@@ -72,7 +73,13 @@ const AppRoutes = () => {
         <Route path='/compte' element={<Formulaire />} />
         <Route path='/liste-des-comptes' element={<ListeComptes />} />
 
-
+        {/* Gestion des frais et commissions */}
+        <Route path="/frais/commissions/*" element={<FraisCommissionPage />} />
+        <Route path="/frais/applications/*" element={<FraisApplicationPage />} />
+        
+        {/* Gestion des opérations MATA */}
+        <Route path="/comptes/:compteId/mata/*" element={<MataManagementPage />} />
+        <Route path="/mata" element={<MataManagementPage />} />
 
       </Route>
 

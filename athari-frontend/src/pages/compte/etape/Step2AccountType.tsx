@@ -1,6 +1,8 @@
+// src/pages/compte/etape/Step2AccountType.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { planComptableService } from '../../../services/api/clientApi';
 import { typeCompteService } from '../../../services/api/typeCompteApi';
+import { compteService } from '../../../services/api/compteApi';
 import {
   FormControl,
   Grid,
@@ -16,7 +18,8 @@ import {
   Divider,
   CircularProgress,
   Autocomplete,
-  InputAdornment
+  InputAdornment,
+  Button
 } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';
 import type { SelectChangeEvent } from '@mui/material/Select';
@@ -34,6 +37,7 @@ interface ChapitreComptable {
   libelle: string;
   nature_solde: string;
   est_actif: boolean;
+  categorie_id?: string;
 }
 
 interface TypeCompte {
@@ -60,6 +64,8 @@ interface Step2AccountTypeProps {
   accountSubType: string;
   options: FormOptions;
   onChange: (field: string, value: unknown) => void;
+  onNext: (data: any) => Promise<void>;
+  isLastStep?: boolean;
 }
 
 const MODULES = [
@@ -74,6 +80,8 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
   accountSubType,
   options,
   onChange,
+  onNext,
+  isLastStep = false
 }) => {
   // États
   const [loading, setLoading] = useState<boolean>(true);
@@ -81,6 +89,7 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<string>(accountSubType || '');
   const [typesComptes, setTypesComptes] = useState<TypeCompte[]>([]);
+  const [validating, setValidating] = useState<boolean>(false);
   
   // États pour les chapitres
   const [chapitres, setChapitres] = useState<ChapitreComptable[]>([]);
@@ -91,44 +100,32 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
   // Charger les types de comptes
   useEffect(() => {
     const fetchTypesComptes = async () => {
-      console.log('Début du chargement des types de comptes...');
       try {
+        setLoadingTypes(true);
         const data = await typeCompteService.getTypesComptes();
-        console.log('Types de comptes chargés:', data);
         setTypesComptes(data);
-        setLoading(false); // S'assurer que le chargement est terminé
       } catch (err) {
         console.error('Erreur lors du chargement des types de comptes:', err);
         setError('Impossible de charger les types de comptes. Veuillez réessayer plus tard.');
       } finally {
-        console.log('Chargement des types terminé');
         setLoadingTypes(false);
+        setLoading(false);
       }
     };
 
     fetchTypesComptes();
   }, []);
 
-  // Mettre à jour les données du formulaire
-  const updateFormData = useCallback((updates: Partial<FormOptions>) => {
-    const newFormData = { ...options, ...updates };
-    onChange('options', newFormData);
-  }, [onChange, options]);
-
   // Charger tous les chapitres
   useEffect(() => {
     const loadAllChapitres = async () => {
-      console.log('Chargement de tous les chapitres...');
       try {
         setLoadingChapitres(true);
-        // Appel avec null comme premier paramètre pour récupérer tous les chapitres
         const data = await planComptableService.getChapitres(null, '');
-        console.log('Tous les chapitres chargés:', data);
         setChapitres(data);
         
         // Si un chapitre est déjà sélectionné dans les options, on le restaure
         if (options.chapitre_id) {
-          console.log('Restauration du chapitre sélectionné:', options.chapitre_id);
           const chapitre = data.find(c => c.id === options.chapitre_id);
           if (chapitre) {
             setSelectedChapitre(chapitre);
@@ -138,43 +135,22 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
         console.error('Erreur lors du chargement des chapitres:', err);
         setError('Impossible de charger les chapitres. Veuillez réessayer plus tard.');
       } finally {
-        console.log('Fin du chargement des chapitres');
         setLoadingChapitres(false);
-        setLoading(false);
       }
     };
 
     loadAllChapitres();
   }, [options.chapitre_id]);
 
-  // Mettre à jour la liste des chapitres filtrés lors de la saisie de recherche
+  // Mettre à jour la liste des chapitres filtrés
   useEffect(() => {
     const filterChapitres = async () => {
-      if (!searchTerm) {
-        // Si le terme de recherche est vide, recharger tous les chapitres
-        try {
-          setLoadingChapitres(true);
-          const data = await planComptableService.getChapitres(null, '');
-          console.log('Chargement de tous les chapitres:', data);
-          setChapitres(data);
-        } catch (err) {
-          console.error('Erreur lors du chargement des chapitres:', err);
-          setError('Erreur lors du chargement des chapitres. Veuillez réessayer.');
-        } finally {
-          setLoadingChapitres(false);
-        }
-        return;
-      }
-      
-      console.log('Recherche de chapitres avec le terme:', searchTerm);
       try {
         setLoadingChapitres(true);
         const data = await planComptableService.getChapitres(null, searchTerm);
-        console.log('Résultats de la recherche:', data);
         setChapitres(data);
       } catch (err) {
-        console.error('Erreur lors de la recherche des chapitres:', err);
-        setError('Erreur lors de la recherche des chapitres. Veuillez réessayer.');
+        console.error('Erreur lors du chargement des chapitres:', err);
       } finally {
         setLoadingChapitres(false);
       }
@@ -187,40 +163,32 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  // Mettre à jour options.chapitre_id quand selectedChapitre change
+  useEffect(() => {
+    if (selectedChapitre) {
+      onChange('options', { 
+        ...options, 
+        chapitre_id: selectedChapitre.id,
+        categorie_id: selectedChapitre.categorie_id || ''
+      });
+    }
+  }, [selectedChapitre]);
+
   // Gestion du changement de chapitre
   const handleChapitreChange = (event: React.SyntheticEvent, newValue: ChapitreComptable | null) => {
-    console.log('Chapitre sélectionné:', newValue);
     setSelectedChapitre(newValue);
-    
-    const updates: Partial<FormOptions> = {
-      chapitre_id: newValue?.id || '',
-      categorie_id: newValue?.categorie_id || ''
-    };
-    
-    // S'assurer que le montant est défini s'il est requis
-    if (!options.montant) {
-      updates.montant = '0';
-    }
-    
-    updateFormData(updates);
-    setError(null); // Effacer l'erreur si un chapitre est sélectionné
+    setError(null);
   };
 
   // Gestion de la recherche de chapitres
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
   };
 
-  // Options de filtre pour l'Autocomplete des chapitres (filtrage côté client en plus de l'API)
+  // Options de filtre pour l'Autocomplete
   const filteredChapitres = useMemo(() => {
-    if (!searchTerm) return chapitres;
-    const lowercasedSearch = searchTerm.toLowerCase();
-    return chapitres.filter(
-      chapitre => 
-        (chapitre.code && chapitre.code.toLowerCase().includes(lowercasedSearch)) ||
-        (chapitre.libelle && chapitre.libelle.toLowerCase().includes(lowercasedSearch))
-    );
-  }, [chapitres, searchTerm]);
+    return chapitres.filter(chapitre => chapitre.est_actif !== false);
+  }, [chapitres]);
 
   // Gestion du changement de type de compte
   const handleTypeChange = useCallback((event: SelectChangeEvent<string>) => {
@@ -228,59 +196,149 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
     const selected = typesComptes.find(t => t.code === typeCode);
     
     if (selected) {
-      setSelectedType(typeCode);
-      // Mettre à jour à la fois accountSubType et accountType
-      onChange('accountSubType', typeCode);
-      onChange('accountType', 'COMPTE_EPARGNE'); // ou une autre valeur appropriée
+      console.log('Type de compte sélectionné:', {
+        id: selected.id,
+        code: selected.code,
+        libelle: selected.libelle
+      });
       
-      // Mettre à jour les options supplémentaires en fonction du type de compte
+      setSelectedType(typeCode);
+      
+      // Mettre à jour à la fois l'ID (pour le backend) et le code (pour l'affichage)
+      // S'assurer que l'ID est bien un nombre
+      const typeId = typeof selected.id === 'string' ? 
+        parseInt(selected.id, 10) : 
+        selected.id;
+        
+      if (isNaN(typeId)) {
+        console.error('ID de type de compte invalide:', selected.id);
+        setError('Erreur: Type de compte invalide');
+        return;
+      }
+      
+      console.log('Mise à jour du type de compte - ID:', typeId, 'Code:', typeCode);
+      onChange('accountType', typeId);
+      onChange('accountSubType', typeCode);
+      
       const updates: Partial<FormOptions> = {};
       
       if (selected.necessite_duree) {
-        updates.duree = '6'; // Valeur par défaut pour la durée
+        updates.duree = '6';
       } else {
         updates.duree = '';
       }
       
       if (selected.est_islamique) {
-        updates.module = MODULES[3]; // 'FONDS ISLAMIQUE' par défaut
+        updates.module = MODULES[3];
       }
       
       if (Object.keys(updates).length > 0) {
-        updateFormData(updates);
+        onChange('options', { ...options, ...updates });
       }
       
-      // Effacer toute erreur existante
       setError(null);
     }
-  }, [onChange, typesComptes, updateFormData]);
+  }, [onChange, typesComptes, options]);
 
   // Gestion du changement des champs de formulaire
   const handleInputChange = useCallback((field: keyof FormOptions) => 
     (event: React.ChangeEvent<HTMLInputElement>) => {
-      updateFormData({ [field]: event.target.value });
-    }, [updateFormData]);
+      onChange('options', { ...options, [field]: event.target.value });
+    }, [onChange, options]);
+
+  // Valider l'étape 2
+  const handleValidateStep2 = async () => {
+    try {
+      // Validation du type de compte
+      if (!selectedType) {
+        throw new Error('Veuillez sélectionner un type de compte');
+      }
+
+      // Validation du montant
+      const montant = parseFloat(options.montant);
+      if (isNaN(montant) || montant <= 0) {
+        throw new Error('Veuillez saisir un montant initial valide (supérieur à 0)');
+      }
+
+      // Validation du chapitre (OBLIGATOIRE)
+      const chapitreId = selectedChapitre?.id || options.chapitre_id;
+      if (!chapitreId) {
+        throw new Error('Veuillez sélectionner un chapitre comptable');
+      }
+
+      setValidating(true);
+      setError(null);
+      
+      // Préparer les données avec les bons types
+      const etape2Data = {
+        account_type: accountType,
+        account_sub_type: accountSubType,
+        montant: Number(options.montant) || 0,
+        duree: Number(options.duree) || 0,
+        module: options.module || '',
+        chapitre_comptable_id: (selectedChapitre?.id || options.chapitre_id || '').toString().trim(),
+        categorie_id: (selectedChapitre?.categorie_id || options.categorie_id || '').toString().trim()
+      };
+
+      console.log('Données envoyées à l\'étape 2:', JSON.stringify(etape2Data, null, 2));
+      
+      // Validation supplémentaire des données
+      if (!etape2Data.account_type || !etape2Data.account_sub_type) {
+        throw new Error('Type de compte invalide');
+      }
+
+      if (etape2Data.duree < 0) {
+        throw new Error('La durée ne peut pas être négative');
+      }
+      
+      if (!etape2Data.chapitre_comptable_id) {
+        throw new Error('Veuillez sélectionner un chapitre comptable');
+      }
+
+      await onNext(etape2Data);
+      
+    } catch (err: any) {
+      console.error('Erreur de validation:', err);
+      
+      if (err.response?.status === 422) {
+        // Erreur de validation du serveur
+        const errorData = err.response.data;
+        if (errorData?.errors) {
+          // Formater les erreurs de validation Laravel
+          const errorMessages = Object.entries(errorData.errors)
+            .map(([field, messages]) => 
+              Array.isArray(messages) 
+                ? messages.join(', ')
+                : String(messages)
+            )
+            .join('\n');
+          setError(`Erreur de validation :\n${errorMessages}`);
+        } else if (errorData?.message) {
+          setError(errorData.message);
+        } else {
+          setError('Erreur de validation des données. Veuillez vérifier tous les champs.');
+        }
+      } else if (err.message) {
+        // Erreur de validation côté client
+        setError(err.message);
+      } else {
+        setError('Une erreur est survenue lors de la validation du formulaire');
+      }
+    } finally {
+      setValidating(false);
+    }
+  };
 
   // Mise à jour du type sélectionné
   useEffect(() => {
     setSelectedType(accountSubType);
   }, [accountSubType]);
 
-  if (loading) {
+  if (loading && loadingTypes) {
     return (
       <Card>
         <CardContent style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
           <CircularProgress />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card>
-        <CardContent>
-          <Alert severity="error">{error}</Alert>
         </CardContent>
       </Card>
     );
@@ -294,18 +352,24 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
 
       <Alert severity="info" sx={{ mb: 4, borderRadius: 1 }}>
         Veuillez sélectionner un type de compte et renseigner les informations requises.
+        <strong> Le chapitre comptable est obligatoire.</strong>
       </Alert>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
 
       <Grid container spacing={3}>
         {/* Sélection du type de compte */}
         <Grid item xs={12}>
-          <FormControl fullWidth margin="normal" required>
-            <InputLabel>Type de compte</InputLabel>
+          <FormControl sx={{ minWidth: 200}} margin="normal" required>
+            <InputLabel>Type de compte *</InputLabel>
             <Select
               value={selectedType}
-              sx={{ minWidth: 200 }}
               onChange={handleTypeChange}
-              label="Type de compte"
+              label="Type de compte *"
               disabled={loading || loadingTypes}
             >
               {typesComptes.map((type) => (
@@ -313,100 +377,76 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
                   {type.libelle}
                 </MenuItem>
               ))}
-              {loadingTypes && (
-                <MenuItem disabled>
-                  <Box display="flex" alignItems="center" width="100%">
-                    <CircularProgress size={20} sx={{ mr: 1 }} />
-                    Chargement...
-                  </Box>
-                </MenuItem>
-              )}
-              {!loadingTypes && typesComptes.length === 0 && (
-                <MenuItem disabled>Aucun type de compte disponible</MenuItem>
-              )}
             </Select>
           </FormControl>
         </Grid>
 
-        {/* Sélection de la catégorie comptable */}
+        {/* Sélection du chapitre comptable */}
         <Grid item xs={12}>
-          <FormControl sx={{ minWidth: 400 }} margin="normal">
-            <Autocomplete
-              options={filteredChapitres}
-              getOptionLabel={(option) => `${option.code} - ${option.libelle}${option.nature_solde ? ` (${option.nature_solde})` : ''}`}
-              value={selectedChapitre}
-              onChange={handleChapitreChange}
-              loading={loadingChapitres}
-              filterOptions={(x) => x} // Désactive le filtrage côté client car on gère tout côté serveur
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Rechercher un chapitre par code ou libellé"
-                  variant="outlined"
-                  onChange={handleSearchChange}
-                  placeholder="Tapez pour rechercher..."
-                  InputProps={{
-                    ...params.InputProps,
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon />
-                      </InputAdornment>
-                    ),
-                    endAdornment: (
-                      <React.Fragment>
-                        {loadingChapitres ? <CircularProgress color="inherit" size={20} /> : null}
-                        {params.InputProps.endAdornment}
-                      </React.Fragment>
-                    ),
-                  }}
-                />
-              )}
-              renderOption={(props, option) => {
-                // Extraire la propriété key de props pour éviter l'avertissement
-                const { key, ...otherProps } = props;
-                return (
-                  <li key={key} {...otherProps}>
-                    <Box>
-                      <Typography variant="body1">
-                        <strong>{option.code}</strong> - {option.libelle}
-                      </Typography>
-                      {option.nature_solde && (
-                        <Typography variant="caption" color="text.secondary">
-                          Nature du solde: {option.nature_solde}
+          <Box sx={{ position: 'relative' }}>
+            <FormControl sx={{ minWidth: 300}} margin="normal" required>
+              <Autocomplete
+                options={filteredChapitres}
+                getOptionLabel={(option) => `${option.code} - ${option.libelle}`}
+                value={selectedChapitre}
+                onChange={handleChapitreChange}
+                loading={loadingChapitres}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Rechercher et sélectionner un chapitre comptable *"
+                    variant="outlined"
+                    onChange={handleSearchChange}
+                    placeholder="Tapez pour rechercher un chapitre..."
+                    error={!selectedChapitre}
+                    helperText={!selectedChapitre ? "Ce champ est obligatoire" : ""}
+                    required
+                    InputProps={{
+                      ...params.InputProps,
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon />
+                        </InputAdornment>
+                      ),
+                      endAdornment: (
+                        <React.Fragment>
+                          {loadingChapitres ? <CircularProgress color="inherit" size={20} /> : null}
+                          {params.InputProps.endAdornment}
+                        </React.Fragment>
+                      ),
+                    }}
+                  />
+                )}
+                renderOption={(props, option) => {
+                  const { key, ...otherProps } = props;
+                  return (
+                    <li key={key} {...otherProps}>
+                      <Box>
+                        <Typography variant="body1">
+                          <strong>{option.code}</strong> - {option.libelle}
                         </Typography>
-                      )}
-                    </Box>
-                  </li>
-                );
-              }}
-              noOptionsText={searchTerm ? "Aucun chapitre trouvé" : "Commencez à taper pour rechercher un chapitre"}
-              isOptionEqualToValue={(option, value) => option.id === value.id}
-            />
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              {chapitres.length} chapitres disponibles
-            </Typography>
-          </FormControl>
-        </Grid>
-
-        {/* Affichage des informations sélectionnées */}
-        {(selectedType || selectedChapitre) && (
-          <Grid item xs={12}>
-            <Card variant="outlined" sx={{ mt: 2, p: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                <strong>Type de compte :</strong> {
-                  selectedType ? 
-                    typesComptes.find(t => t.code === selectedType)?.libelle || 'Non sélectionné' : 
-                    'Non sélectionné'
-                }
-              </Typography>
-              {selectedChapitre && (
-                <Typography variant="subtitle1" gutterBottom>
-                  <strong>Chapitre :</strong> {selectedChapitre.libelle} ({selectedChapitre.code})
+                        {option.nature_solde && (
+                          <Typography variant="caption" color="text.secondary">
+                            Nature du solde: {option.nature_solde}
+                          </Typography>
+                        )}
+                      </Box>
+                    </li>
+                  );
+                }}
+                noOptionsText={searchTerm ? "Aucun chapitre trouvé" : "Commencez à taper pour rechercher"}
+              />
+            </FormControl>
+            
+            {selectedChapitre && (
+              <Alert severity="success" sx={{ mt: 1 }}>
+                <Typography variant="body2">
+                  <strong>✓ Chapitre sélectionné :</strong> {selectedChapitre.code} - {selectedChapitre.libelle}
                 </Typography>
-              )}
-            </Card>
-          </Grid>
-        )}
+              </Alert>
+            )}
+          </Box>
+        </Grid>
 
         {/* Paramètres du compte */}
         {selectedType && (
@@ -421,38 +461,35 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
                 <Grid item xs={12} md={6}>
                   <TextField
                     fullWidth
-                    sx={{ minWidth: 200 }}
-                    label="Montant initial (FCFA)"
+                    label="Montant initial (FCFA) *"
                     type="number"
                     value={options.montant || ''}
                     onChange={handleInputChange('montant')}
-                    disabled={loading}
                     required
                     inputProps={{
                       min: 0,
                       step: 1000
                     }}
+                    helperText="Montant minimum pour l'ouverture du compte"
                   />
                 </Grid>
 
-                {/* Champ Durée (conditionnel) - Affiché uniquement pour les comptes qui nécessitent une durée */}
+                {/* Champ Durée (conditionnel) */}
                 {(() => {
                   const selectedAccountType = typesComptes.find(t => t.code === selectedType);
                   if (selectedAccountType?.necessite_duree) {
                     return (
                       <Grid item xs={12} md={6}>
                         <FormControl fullWidth>
-                          <InputLabel>Durée de blocage</InputLabel>
+                          <InputLabel>Durée de blocage *</InputLabel>
                           <Select
-                            sx={{ minWidth: 200 }}
                             value={options.duree || '3'}
-                            onChange={(e) => updateFormData({ duree: e.target.value as string })}
-                            label="Durée de blocage"
-                            disabled={loading}
+                            onChange={(e) => onChange('options', { ...options, duree: e.target.value as string })}
+                            label="Durée de blocage *"
                             required
                           >
                             {Array.from({ length: 10 }, (_, i) => {
-                              const months = i + 3; // De 3 à 12 mois
+                              const months = i + 3;
                               return (
                                 <MenuItem key={months} value={months.toString()}>
                                   {months} mois
@@ -467,27 +504,61 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
                   return null;
                 })()}
 
-                {/* Champ Module */}
+                {/* Champ Frais SMS */}
                 <Grid item xs={12} md={6}>
                   <TextField
                     fullWidth
-                    sx={{ minWidth: 200 }}
-                    label="Frais sms  (FCFA)"
+                    label="Frais SMS (FCFA)"
                     type="number"
                     value={'200'}
-                    onChange={handleInputChange('montant')}
-                    disabled={loading}
-                    required
-                    inputProps={{
-                      min: 0,
-                      step: 1000
-                    }}
+                    disabled
+                    helperText="Frais SMS fixe"
                   />
                 </Grid>
               </Grid>
 
+              {/* Bouton de validation */}
+              <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  variant="contained"
+                  onClick={handleValidateStep2}
+                  disabled={validating || !selectedType || !options.montant || !selectedChapitre}
+                  sx={{
+                    background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
+                    color: 'white',
+                    padding: '10px 30px',
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #43A047 0%, #1B5E20 100%)',
+                    },
+                    '&:disabled': {
+                      background: '#e0e0e0',
+                      color: '#9e9e9e'
+                    }
+                  }}
+                >
+                  {validating ? (
+                    <>
+                      <CircularProgress size={20} sx={{ mr: 1 }} />
+                      Validation en cours...
+                    </>
+                  ) : (
+                    'Valider cette étape'
+                  )}
+                </Button>
+              </Box>
+
               <Alert severity="info" sx={{ mt: 3, fontSize: '0.9rem' }}>
-                Vérifiez que toutes les informations sont correctes avant de continuer.
+                <strong>Vérification requise :</strong> 
+                <ul style={{ margin: '8px 0 0 20px', padding: 0 }}>
+                  <li>Type de compte sélectionné</li>
+                  <li>Montant initial renseigné</li>
+                  <li>Chapitre comptable sélectionné</li>
+                  {typesComptes.find(t => t.code === selectedType)?.necessite_duree && (
+                    <li>Durée de blocage définie</li>
+                  )}
+                </ul>
               </Alert>
             </Card>
           </Grid>

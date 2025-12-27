@@ -8,7 +8,7 @@ import {
   TextField,
   Table,
   TableBody,
-  TableCell as MuiTableCell,
+  TableCell,
   TableContainer,
   TableHead as MuiTableHead,
   TableRow as MuiTableRow,
@@ -59,41 +59,37 @@ interface Compte {
   created_at: string;
 }
 
-const TableHead = styled(MuiTableHead)(({ theme }) => ({
-  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-  '& .MuiTableCell-head': {
-    color: theme.palette.common.white,
-    fontWeight: 700,
-    fontSize: '0.875rem',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-  },
-  '& .MuiTableSortLabel-root': {
-    color: 'inherit',
-    '&:hover': {
-      color: 'rgba(255, 255, 255, 0.8)',
+const StyledTableHead = styled(MuiTableHead)({
+  '&.MuiTableHead-root': {
+    backgroundColor: '#F8FAFC',
+    '& .MuiTableCell-head': {
+      color: '#475569',
+      fontWeight: 'bold',
+      py: 2,
+      borderBottom: '1px solid #edf2f7',
     },
-    '&.Mui-active': {
-      color: 'inherit',
-      '& .MuiTableSortLabel-icon': {
-        color: 'rgba(255, 255, 255, 0.8)'
-      }
-    }
-  }
-}));
+  },
+});
+
+const StyledTableCell = styled(TableCell)({
+  padding: '16px',
+  color: '#1E293B',
+  borderBottom: '1px solid #edf2f7',
+});
 
 const TableRow = styled(MuiTableRow)(({ theme }) => ({
-  '&:nth-of-type(odd)': {
+  '&:hover': {
     backgroundColor: theme.palette.action.hover,
   },
   '&:last-child td, &:last-child th': {
     border: 0,
   },
+  '& .MuiTableCell-root': {
+    padding: '16px',
+    color: '#1E293B',
+    borderBottom: '1px solid #edf2f7',
+  },
 }));
-
-const TableCell = styled(MuiTableCell)({
-  padding: '12px 16px',
-});
 
 const headCells = [
   { id: 'numero_compte', label: 'N° Compte' },
@@ -360,19 +356,21 @@ const ListeComptes: React.FC = () => {
               <>
                 <TableContainer>
                   <Table>
-                    <TableHead sx={{ bgcolor: '#F8FAFC' }}>
+                    <StyledTableHead>
                       <TableRow>
                         {headCells.map((headCell) => (
-                          <TableCell 
+                          <StyledTableCell 
                             key={headCell.id} 
                             sx={{
-                              py: 1, 
-                              px: 1,
+                              py: 2,
+                              px: 2,
                               fontSize: '0.8rem',
                               fontWeight: 'bold', 
-                              color: '#475569',
+                              color: '#3074d3ff',
                               cursor: headCell.disableSorting ? 'default' : 'pointer',
-                              lineHeight: 1.2
+                              lineHeight: 1.2,
+                              backgroundColor: '#F8FAFC',
+                              borderBottom: '1px solid #edf2f7',
                             }}
                             onClick={headCell.disableSorting ? undefined : () => handleRequestSort(headCell.id)}
                           >
@@ -386,10 +384,10 @@ const ListeComptes: React.FC = () => {
                                 {headCell.label}
                               </TableSortLabel>
                             )}
-                          </TableCell>
+                          </StyledTableCell>
                         ))}
                       </TableRow>
-                    </TableHead>
+                    </StyledTableHead>
                     <TableBody>
                       {filteredComptes.length > 0 ? (
                         filteredComptes
@@ -400,10 +398,10 @@ const ListeComptes: React.FC = () => {
                               hover 
                               sx={{ '&:hover': { backgroundColor: '#F8FAFC' } }}
                             >
-                              <TableCell sx={{ color: '#1E293B', fontWeight: 500 }}>
+                              <StyledTableCell sx={{ color: '#1E293B', fontWeight: 500 }}>
                                 {compte.numero_compte}
-                              </TableCell>
-                              <TableCell>
+                              </StyledTableCell>
+                              <StyledTableCell>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                                   <Avatar 
                                     sx={{ 
@@ -423,8 +421,8 @@ const ListeComptes: React.FC = () => {
                                     </Typography>
                                   </Box>
                                 </Box>
-                              </TableCell>
-                              <TableCell>
+                              </StyledTableCell>
+                              <StyledTableCell>
                                 <Chip 
                                   label={compte.type_compte?.libelle || 'N/A'} 
                                   size="small" 
@@ -435,16 +433,16 @@ const ListeComptes: React.FC = () => {
                                     textTransform: 'capitalize'
                                   }} 
                                 />
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: 600, color: '#1E293B' }}>
+                              </StyledTableCell>
+                              <StyledTableCell sx={{ fontWeight: 600, color: '#1E293B' }}>
                                 {new Intl.NumberFormat('fr-FR', { 
                                   style: 'currency', 
                                   currency: compte.devise === 'FCFA' ? 'XOF' : (compte.devise || 'XOF'),
                                   minimumFractionDigits: 0,
                                   maximumFractionDigits: 0
                                 }).format(compte.solde || 0)}
-                              </TableCell>
-                              <TableCell>
+                              </StyledTableCell>
+                              <StyledTableCell>
                                 <Chip 
                                   label={compte.devise === 'FCFA' ? 'FCFA' : (compte.devise || 'XOF')} 
                                   size="small" 
@@ -455,11 +453,11 @@ const ListeComptes: React.FC = () => {
                                     fontWeight: 500
                                   }} 
                                 />
-                              </TableCell>
-                              <TableCell sx={{ color: '#64748B' }}>
+                              </StyledTableCell>
+                              <StyledTableCell sx={{ color: '#64748B' }}>
                                 {formatDate(compte.created_at)}
-                              </TableCell>
-                              <TableCell>
+                              </StyledTableCell>
+                              <StyledTableCell>
                                 <Chip 
                                   label={compte.statut === 'actif' ? 'Actif' : 'Inactif'} 
                                   size="small" 
@@ -470,8 +468,8 @@ const ListeComptes: React.FC = () => {
                                     textTransform: 'capitalize'
                                   }} 
                                 />
-                              </TableCell>
-                              <TableCell align="right">
+                              </StyledTableCell>
+                              <StyledTableCell align="right" sx={{ pr: 3 }}>
                                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
                                   <Tooltip title="Voir les détails">
                                     <IconButton 
@@ -520,12 +518,12 @@ const ListeComptes: React.FC = () => {
                                     </IconButton>
                                   </Tooltip>
                                 </Box>
-                              </TableCell>
+                              </StyledTableCell>
                             </TableRow>
                           ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={headCells.length} align="center" sx={{ py: 3 }}>
+                          <StyledTableCell colSpan={headCells.length} align="center" sx={{ py: 6 }}>
                             <Box sx={{ textAlign: 'center', py: 4 }}>
                               <img 
                                 src="/empty-state.svg" 
@@ -539,7 +537,7 @@ const ListeComptes: React.FC = () => {
                                 Essayez de modifier vos critères de recherche
                               </Typography>
                             </Box>
-                          </TableCell>
+                          </StyledTableCell>
                         </TableRow>
                       )}
                     </TableBody>

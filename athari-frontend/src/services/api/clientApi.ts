@@ -70,7 +70,7 @@ export const planComptableService = {
       }
       
       console.log('Paramètres de la requête getChapitres:', params);
-      const response = await api.get('/plan_comptable/comptes', { params });
+      const response = await api.get('/plan-comptable/chapitres', { params });
       return response.data.data;
     } catch (error) {
       console.error('Erreur lors de la récupération des chapitres:', error);

@@ -1,4 +1,6 @@
+// src/pages/compte/etape/Step4Documents.tsx
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Grid,
   Card,
@@ -14,12 +16,20 @@ import {
   ListItemSecondaryAction,
   IconButton,
   Box,
-  Paper
+  Paper,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Snackbar
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DescriptionIcon from '@mui/icons-material/Description';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { styled } from '@mui/material/styles';
+import { compteService, type CompteData } from '../../../services/api/compteApi';
 
 const VisuallyHiddenInput = styled('input')({
   clip: 'rect(0 0 0 0)',
@@ -33,12 +43,39 @@ const VisuallyHiddenInput = styled('input')({
   width: 1,
 });
 
-const Step4Documents = ({ documents, engagementAccepted, clientSignature, onChange }) => {
-  const [uploading, setUploading] = useState(false);
+interface Step4DocumentsProps {
+  documents: {
+    cni_client: File | null;
+    autres_documents: File[];
+  };
+  engagementAccepted: boolean;
+  clientSignature: File | null;
+  onChange: (field: 'documents' | 'engagementAccepted' | 'clientSignature', value: any) => void;
+  formData: CompteData;
+  onSave: (result: any) => void;
+  mode?: 'create' | 'edit';
+}
 
-  const handleFileUpload = (field, files) => {
+const Step4Documents: React.FC<Step4DocumentsProps> = ({ 
+  documents, 
+  engagementAccepted, 
+  clientSignature, 
+  onChange,
+  formData,
+  onSave,
+  mode = 'create'
+}) => {
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const navigate = useNavigate();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFileUpload = (field: 'cni_client' | 'autres', files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
     const file = files[0];
-    if (!file) return;
 
     // Vérifier la taille du fichier (8 Mo max)
     if (file.size > 8 * 1024 * 1024) {
@@ -66,7 +103,7 @@ const Step4Documents = ({ documents, engagementAccepted, clientSignature, onChan
     }
   };
 
-  const handleRemoveDocument = (index) => {
+  const handleRemoveDocument = (index: number) => {
     const newDocuments = [...documents.autres_documents];
     newDocuments.splice(index, 1);
     onChange('documents', {
@@ -75,11 +112,93 @@ const Step4Documents = ({ documents, engagementAccepted, clientSignature, onChan
     });
   };
 
-  const handleSignatureUpload = (file) => {
+  const handleSignatureUpload = (file: File | null) => {
     onChange('clientSignature', file);
   };
 
-  const renderFilePreview = (file) => {
+  // Valider et enregistrer le compte
+  const handleSaveCompte = async () => {
+    // Validation finale
+    if (!engagementAccepted) {
+      setError('Vous devez accepter les conditions générales');
+      return;
+    }
+
+    if (!documents.cni_client) {
+      setError('La CNI du client est requise');
+      return;
+    }
+
+    if (!clientSignature) {
+      setError('La signature du client est requise');
+      return;
+    }
+
+    setConfirmOpen(true);
+  };
+
+  const confirmSave = async () => {
+    setConfirmOpen(false);
+    setSaving(true);
+    setError(null);
+
+    try {
+      // Log pour déboguer
+      console.log('Données du formulaire avant préparation:', {
+        ...formData,
+        documents,
+        engagementAccepted,
+        clientSignature,
+        // Ne pas logger les fichiers pour éviter les problèmes de sérialisation
+        documentsPreview: documents ? {
+          cni_client: documents.cni_client ? documents.cni_client.name : null,
+          autres_documents: documents.autres_documents.map(d => d.name)
+        } : null,
+        clientSignaturePreview: clientSignature ? clientSignature.name : null
+      });
+
+      // Préparer les données complètes
+      const compteData: CompteData = {
+        ...formData,
+        documents,
+        engagementAccepted,
+        clientSignature
+      };
+
+      // Vérifier que accountType est défini
+      if (!compteData.accountType) {
+        throw new Error('Le type de compte n\'a pas été défini. Veuillez sélectionner un type de compte valide.');
+      }
+
+      // Préparer FormData
+      console.log('Préparation des données avec accountType:', compteData.accountType);
+      const formDataToSend = compteService.prepareFormData(compteData);
+
+      // Envoyer au backend
+      const result = await compteService.createCompte(formDataToSend);
+
+      // Appeler le callback de succès
+      if (onSave) {
+        onSave(result);
+      }
+
+      // Afficher le succès et rediriger après un court délai
+      setSuccessOpen(true);
+      
+      // Rediriger vers la liste des comptes après 2 secondes
+      setTimeout(() => {
+        navigate('/liste-des-comptes');
+      }, 2000);
+
+    } catch (err: any) {
+      console.error('Erreur lors de l\'enregistrement:', err);
+      setError(err.response?.data?.message || err.message || 'Une erreur est survenue lors de l\'enregistrement');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const renderFilePreview = (file: File) => {
     if (file.type.startsWith('image/')) {
       return (
         <Box sx={{ maxWidth: 200, maxHeight: 200, mt: 1 }}>
@@ -105,6 +224,12 @@ const Step4Documents = ({ documents, engagementAccepted, clientSignature, onChan
         Étape 4: Documents & Engagement
       </Typography>
 
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
       <Alert severity="info" sx={{ mb: 3 }}>
         Téléchargez les documents nécessaires. Formats acceptés: PDF, JPG, PNG (max 8 Mo chacun).
       </Alert>
@@ -127,6 +252,9 @@ const Step4Documents = ({ documents, engagementAccepted, clientSignature, onChan
                   <Button
                     component="label"
                     variant="outlined"
+                    startIcon={<CloudUploadIcon />}
+                    fullWidth
+                    disabled={saving}
                     sx={{
                       background: 'linear-gradient(135deg, #62bfc6ff 0%, #2e787d69 100%)',
                       boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
@@ -134,8 +262,6 @@ const Step4Documents = ({ documents, engagementAccepted, clientSignature, onChan
                       padding: '10px 16px',
                       color:' #ffff'
                     }}
-                    startIcon={<CloudUploadIcon />}
-                    fullWidth
                   >
                     Télécharger la CNI
                     <VisuallyHiddenInput
@@ -162,15 +288,16 @@ const Step4Documents = ({ documents, engagementAccepted, clientSignature, onChan
               <Button
                 component="label"
                 variant="outlined"
-                  sx={{
-                     mb: 2,
-                    background: 'linear-gradient(135deg, #62bfc6ff 0%, #2e787d69 100%)',
-                    boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
-                    border: 'none',
-                    padding: '10px 16px',
-                    color:' #ffff'
-                  }}
                 startIcon={<CloudUploadIcon />}
+                disabled={saving}
+                sx={{ 
+                  mb: 2,
+                  background: 'linear-gradient(135deg, #62bfc6ff 0%, #2e787d69 100%)',
+                  boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
+                  border: 'none',
+                  padding: '10px 16px',
+                  color:' #ffff'
+                }}
               >
                 Ajouter un document
                 <VisuallyHiddenInput
@@ -195,6 +322,7 @@ const Step4Documents = ({ documents, engagementAccepted, clientSignature, onChan
                           edge="end"
                           aria-label="delete"
                           onClick={() => handleRemoveDocument(index)}
+                          disabled={saving}
                         >
                           <DeleteIcon />
                         </IconButton>
@@ -212,25 +340,26 @@ const Step4Documents = ({ documents, engagementAccepted, clientSignature, onChan
           <Card variant="outlined">
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Signature du client
+                Signature du client *
               </Typography>
               <Button
                 component="label"
                 variant="outlined"
-                sx={{ 
-                    background: 'linear-gradient(135deg, #62bfc6ff 0%, #2e787d69 100%)',
-                    boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
-                    border: 'none',
-                    padding: '10px 16px',
-                    color:' #ffff'
-                  }}
                 startIcon={<CloudUploadIcon />}
+                disabled={saving}
+                sx={{
+                  background: 'linear-gradient(135deg, #62bfc6ff 0%, #2e787d69 100%)',
+                  boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
+                  border: 'none',
+                  padding: '10px 16px',
+                  color:' #ffff'
+                }}
               >
                 Télécharger la signature
                 <VisuallyHiddenInput
                   type="file"
                   accept="image/*"
-                  onChange={(e) => handleSignatureUpload(e.target.files[0])}
+                  onChange={(e) => handleSignatureUpload(e.target.files?.[0] || null)}
                 />
               </Button>
               {clientSignature && (
@@ -289,6 +418,7 @@ const Step4Documents = ({ documents, engagementAccepted, clientSignature, onChan
                     checked={engagementAccepted}
                     onChange={(e) => onChange('engagementAccepted', e.target.checked)}
                     color="primary"
+                    disabled={saving}
                   />
                 }
                 label="Je reconnais avoir lu et accepté les conditions générales d'ouverture de compte et m'engage à les respecter."
@@ -306,7 +436,7 @@ const Step4Documents = ({ documents, engagementAccepted, clientSignature, onChan
 
         {/* Récapitulatif */}
         <Grid item xs={12}>
-          <Alert severity="success">
+          <Alert severity={engagementAccepted && documents.cni_client && clientSignature ? "success" : "warning"}>
             <Typography variant="subtitle1" gutterBottom>
               Récapitulatif des documents
             </Typography>
@@ -334,7 +464,68 @@ const Step4Documents = ({ documents, engagementAccepted, clientSignature, onChan
             </List>
           </Alert>
         </Grid>
+
+        {/* Bouton d'enregistrement final */}
+        <Grid item xs={12}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+            <Button
+              variant="contained"
+              onClick={handleSaveCompte}
+              disabled={saving || !engagementAccepted || !documents.cni_client || !clientSignature}
+              startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <CheckCircleIcon />}
+              sx={{
+                background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
+                color: 'white',
+                padding: '12px 30px',
+                fontSize: '1rem',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #43A047 0%, #1B5E20 100%)',
+                }
+              }}
+            >
+              {saving ? 'Enregistrement en cours...' : 'Créer le Compte'}
+            </Button>
+          </Box>
+        </Grid>
       </Grid>
+
+      {/* Dialog de confirmation */}
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <DialogTitle>Confirmer la création du compte</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Êtes-vous sûr de vouloir créer ce compte ? Cette action est irréversible.
+          </Typography>
+          <Alert severity="info" sx={{ mt: 2 }}>
+            Vérifiez que toutes les informations sont correctes avant de continuer.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmOpen(false)} disabled={saving}>
+            Annuler
+          </Button>
+          <Button 
+            onClick={confirmSave} 
+            variant="contained" 
+            disabled={saving}
+            startIcon={saving ? <CircularProgress size={20} /> : null}
+            sx={{
+              background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
+              color: 'white',
+            }}
+          >
+            {saving ? 'Création...' : 'Confirmer'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar de succès */}
+      <Snackbar
+        open={successOpen}
+        autoHideDuration={6000}
+        onClose={() => setSuccessOpen(false)}
+        message="Compte créé avec succès !"
+      />
     </div>
   );
 };

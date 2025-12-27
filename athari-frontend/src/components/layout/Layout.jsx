@@ -7,7 +7,10 @@ export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#F8FAFC' }}>
+    <Box
+      className={`dashboard-container ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}
+      sx={{ display: 'flex', height: '100vh', bgcolor: '#F8FAFC', overflow: 'hidden' }}
+    >
       {/* Sidebar fixe */}
       <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
@@ -19,15 +22,16 @@ export default function Layout({ children }) {
           display: 'flex', 
           flexDirection: 'column',
           // Ajustement dynamique de la largeur
-          width: `calc(100% - ${sidebarOpen ? '260px' : '80px'})`,
+          width: `calc(100% - ${sidebarOpen ? '280px' : '80px'})`,
           transition: 'all 0.3s ease',
-          minWidth: 0 // Évite les bugs de débordement Flexbox
+          minWidth: 0, // Évite les bugs de débordement Flexbox
+          overflow: 'hidden'
         }}
       >
         <TopBar sidebarOpen={sidebarOpen} />
         
         {/* Ici s'affichera le contenu de vos pages */}
-        <Box sx={{ flexGrow: 1 }}>
+        <Box sx={{ flexGrow: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
           {children}
         </Box>
       </Box>

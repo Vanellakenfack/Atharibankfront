@@ -1,4 +1,3 @@
-// src/pages/compte/etape/Step1ClientInfo.tsx
 import React, { useState, useEffect } from 'react';
 import {
   TextField,
@@ -21,10 +20,12 @@ import {
   CircularProgress,
   Pagination,
   Select,
-  MenuItem
+  MenuItem,
+  Button
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { clientService } from '../../../services/api/clientApi';
+import { compteService } from '../../../services/api/compteApi';
 
 type Client = {
   id: number;
@@ -38,19 +39,21 @@ type Client = {
     nom_prenoms: string;
     sexe: 'M' | 'F';
     date_naissance: string;
-    // Ajoutez d'autres champs selon votre modèle
   };
-  // Ajoutez d'autres champs selon votre modèle
 };
 
 interface Step1ClientInfoProps {
   selectedClient: Client | null;
   onClientSelect: (client: Client) => void;
+  onNext: (clientId: number, accountSubType: string) => Promise<void>;
+  accountSubType: string;
 }
 
 const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({ 
   selectedClient, 
-  onClientSelect 
+  onClientSelect,
+  onNext,
+  accountSubType
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(0);
@@ -60,6 +63,7 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [validating, setValidating] = useState(false);
 
   // Charger les clients depuis l'API
   useEffect(() => {
@@ -114,17 +118,20 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
     setOrderBy(property);
   };
 
-  const handleChangePage = (_event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  const handleSelectClient = (client: Client) => {
+  const handleSelectClient = async (client: Client) => {
     onClientSelect(client);
+    
+    // Valider automatiquement l'étape 1
+    if (client && accountSubType) {
+      try {
+        setValidating(true);
+        await onNext(client.id, accountSubType);
+      } catch (err) {
+        console.error('Erreur validation étape 1:', err);
+      } finally {
+        setValidating(false);
+      }
+    }
   };
 
   // Pagination
@@ -141,7 +148,7 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
           Étape 1: Sélection du Client
         </Typography>
         <Alert severity="info" sx={{ mb: 2 }}>
-          Sélectionnez un client dans le tableau.
+          Sélectionnez un client dans le tableau. L'étape sera validée automatiquement.
         </Alert>
         
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
@@ -173,9 +180,9 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
           <Paper sx={{ width: '100%', overflow: 'hidden', margin: 0, maxWidth: 'none'}}>
             <TableContainer sx={{ 
                       maxHeight: 440,
-                      '& .MuiTable-root': {  // Cible le tableau directement
-                        minWidth: '100%',  // Forcement de la largeur minimale à 100%
-                        tableLayout: 'fixed'  // Pour forcer le respect des largeurs de colonnes
+                      '& .MuiTable-root': {
+                        minWidth: '100%',
+                        tableLayout: 'fixed'
                       }
                     }}
             >
@@ -310,12 +317,6 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
                         px: 1,
                         fontSize: '0.875rem',
                       },
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: 'divider',
-                      },
-                      '&:hover .MuiOutlinedInput-notchedOutline': {
-                        borderColor: 'text.secondary',
-                      },
                     }}
                   >
                     {[5, 10, 25, 50].map((size) => (
@@ -416,6 +417,15 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
                   />
                 </Grid>
               </Grid>
+              
+              {validating && (
+                <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <CircularProgress size={20} />
+                  <Typography variant="body2">
+                    Validation de l'étape 1 en cours...
+                  </Typography>
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>

@@ -312,16 +312,16 @@ const TypeCompteList = () => {
       <Paper elevation={3} sx={{ width: '100%', overflow: 'hidden', borderRadius: 2 }}>
         <TableContainer sx={{ maxHeight: 'calc(100vh - 250px)' }}>
           <Table stickyHeader size="small">
-            <TableHead>
+            <TableHead  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.light', color: 'primary.contrastText' }}>Code</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.light', color: 'primary.contrastText' }}>Libellé</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', backgroundColor: 'primary.light', color: 'primary.contrastText' }}>Description</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 'bold', backgroundColor: 'primary.light', color: 'primary.contrastText' }}>MATA</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 'bold', backgroundColor: 'primary.light', color: 'primary.contrastText' }}>Durée</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 'bold', backgroundColor: 'primary.light', color: 'primary.contrastText' }}>Islamique</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 'bold', backgroundColor: 'primary.light', color: 'primary.contrastText' }}>Statut</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 'bold', backgroundColor: 'primary.light', color: 'primary.contrastText' }}>Actions</TableCell>
+                <TableCell  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>Code</TableCell>
+                <TableCell  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>Libellé</TableCell>
+                <TableCell  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>Description</TableCell>
+                <TableCell align="center"  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>MATA</TableCell>
+                <TableCell align="center"  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>Durée</TableCell>
+                <TableCell align="center"  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>Islamique</TableCell>
+                <TableCell align="center"  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>Statut</TableCell>
+                <TableCell align="center"  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

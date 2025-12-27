@@ -126,7 +126,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               />
             )}
           </div>
-          
+          {/* compte, liste-des-comptes, liste-des-types-de-compte */}
           {showSettingsMenu && sidebarOpen && (
             <div className="ms-4 mt-1">
               <Link
@@ -152,7 +152,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
                     : 'text-secondary hover-bg-light'
                 }`}
                 style={{ 
-                  background: location.pathname === '//liste-des-comptes' ? activeGradient : 'transparent',
+                  background: location.pathname === '/liste-des-comptes' ? activeGradient : 'transparent',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -177,6 +177,40 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               >
                 Liste des Type de comptes
               </Link>
+
+              <Link
+                to="/frais/commissions"
+                className={`d-block p-2 text-decoration-none small rounded-3 mb-1 ${
+                  location.pathname.startsWith('/frais/commissions') 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname.startsWith('/frais/commissions') ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                frais et commissions
+              
+              <Link
+                to="/frais/applications"
+                className={`d-block p-2 text-decoration-none small rounded-3 ${
+                  location.pathname === '/frais/applications' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/frais/applications' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                frais et applications
+              </Link>
+              
+              </Link>
+
             </div>
           )}
         </div>
