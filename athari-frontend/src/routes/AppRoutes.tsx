@@ -17,6 +17,8 @@ import DetailsClient from '../pages/client/DetailsClient';
 import ModifierClient from '../pages/client/ModifierClient';
 import PlanComptableList from '../pages/plancomptable/PlanComptableList';
 import CategoryManager from '../pages/plancomptable/CategoryManager.jsx';
+import DatContractManager from '../pages/compte/DatContractManager.jsx';
+import DatTypeManager from '../pages/compte/DatTypeManager.jsx';
 // Ajoute "Link" dans l'importation existante
 
 
@@ -65,9 +67,16 @@ const AppRoutes = () => {
 
         {/* Plan Comptable */}     
            <Route path='/plan-comptable' element={<PlanComptableList />} />
-           <Route path='/categories' element={<CategoryManager/>} />
+           <Route path='plan-comptable/categories' element={<CategoryManager/>} />
+
+     {/* Gestion des contrats DAT */}
+            <Route path='/dat/contracts' element={<DatContractManager/>} />
+                        <Route path='/dat/types' element={<DatTypeManager/>} />
+
+            
 
 
+            
 
 
       </Route>

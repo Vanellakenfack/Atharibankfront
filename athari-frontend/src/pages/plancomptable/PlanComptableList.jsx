@@ -38,8 +38,8 @@ export default function PlanComptableList() {
   const fetchInitialData = async () => {
     try {
       const [resAccounts, resCategories] = await Promise.all([
-        ApiClient.get("/plan_comptable/comptes"),
-        ApiClient.get("/plan_comptable/categories")
+      ApiClient.get("/plan-comptable/comptes"),
+      ApiClient.get("/plan-comptable/categories")
       ]);
       setAccounts(resAccounts.data.data);
       setCategories(resCategories.data.data);
