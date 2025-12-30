@@ -3,10 +3,13 @@ import {
   Box, Button, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Paper, Typography, IconButton, 
   Switch, Dialog, DialogTitle, DialogContent, TextField, Grid, DialogActions,
-  MenuItem, Avatar, Chip, InputAdornment
+  MenuItem, Avatar, Chip, InputAdornment, Divider, Stack
 } from "@mui/material";
-import { Add, Edit, AccountBalance, Percent, Timer, SettingsSuggest } from "@mui/icons-material";
-import { indigo } from "@mui/material/colors";
+import { 
+  Add, Edit, AccountBalance, Timer, MenuBook, History, 
+  Gavel, SettingsSuggest, Security, Payments 
+} from "@mui/icons-material";
+import { indigo, green, orange, red, blue } from "@mui/material/colors";
 import Layout from "../../components/layout/Layout";
 import ApiClient from "../../services/api/ApiClient";
 
@@ -16,6 +19,7 @@ export default function DatTypeManager() {
   const [open, setOpen] = useState(false);
   const [editingType, setEditingType] = useState(null);
   
+  // Style cohérent avec DatContractManager
   const activeGradient = 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)';
 
   const initialFormState = {
@@ -23,9 +27,11 @@ export default function DatTypeManager() {
     taux_interet: "", 
     taux_penalite: "", 
     duree_mois: "", 
-    is_active: true,
-    plan_comptable_interet_id: "",
-    plan_comptable_penalite_id: ""
+    plan_comptable_chapitre_id: "", 
+    plan_comptable_interet_id: "",  
+    plan_comptable_penalite_id: "", 
+    periodicite_defaut: "E",         
+    is_active: true
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -45,12 +51,10 @@ export default function DatTypeManager() {
 
   const handleSubmit = async () => {
     try {
-      // TRÈS IMPORTANT : Conversion pour le decimal(5,4) de la base de données
-      // On envoie 0.05 si l'utilisateur a saisi 5
       const dataToSend = {
         ...formData,
         taux_interet: parseFloat(formData.taux_interet) / 100,
-        taux_penalite: parseFloat(formData.taux_penalite || 0) / 100,
+        taux_penalite: parseFloat(formData.taux_penalite) / 100,
       };
 
       if (editingType) {
@@ -61,7 +65,6 @@ export default function DatTypeManager() {
       setOpen(false);
       fetchData();
     } catch (e) { 
-      console.error(e.response?.data);
       alert(e.response?.data?.message || "Erreur lors de l'enregistrement."); 
     }
   };
@@ -70,88 +73,105 @@ export default function DatTypeManager() {
     <Layout>
       <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#F8FAFC', minHeight: '100vh' }}>
         
-        {/* HEADER */}
+        {/* HEADER MODERNE */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
           <Box>
             <Typography variant="h4" fontWeight="900" sx={{ color: '#1E293B', display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Avatar sx={{ bgcolor: indigo[500], background: activeGradient }}>
-                <AccountBalance />
+              <Avatar sx={{ bgcolor: indigo[500], background: activeGradient, width: 50, height: 50 }}>
+                <SettingsSuggest fontSize="large" />
               </Avatar>
-              Offres de Dépôts (DAT)
+              Types d'Offres DAT
             </Typography>
-            <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
-              Configurez les taux (format %) et liaisons comptables
+            <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, ml: 1 }}>
+              Paramétrage des produits financiers et liaisons comptables
             </Typography>
           </Box>
           <Button 
             variant="contained" 
             startIcon={<Add />} 
-            onClick={() => { 
-              setEditingType(null); 
-              setFormData(initialFormState);
-              setOpen(true); 
+            onClick={() => { setEditingType(null); setFormData(initialFormState); setOpen(true); }}
+            sx={{ 
+                background: activeGradient, 
+                borderRadius: 3, 
+                fontWeight: 'bold', 
+                px: 3, 
+                py: 1.2,
+                boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)' 
             }}
-            sx={{ background: activeGradient, borderRadius: '12px', fontWeight: 'bold', px: 3 }}
           >
             Nouvelle Offre
           </Button>
         </Box>
 
-        {/* TABLEAU */}
-        <Paper sx={{ borderRadius: 5, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+        <Paper sx={{ borderRadius: 5, overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.04)', border: '1px solid #F1F5F9' }}>
           <TableContainer>
             <Table>
               <TableHead>
                 <TableRow sx={{ bgcolor: '#F8FAFC' }}>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Nom de l'offre</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Taux (Annuel / Pén.)</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Durée</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Imputation Comptable</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Statut</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+                  <TableCell sx={{ fontWeight: '800', color: '#64748B', fontSize: '0.75rem', textTransform: 'uppercase' }}>Produit / Durée</TableCell>
+                  <TableCell sx={{ fontWeight: '800', color: '#64748B', fontSize: '0.75rem', textTransform: 'uppercase' }}>Conditions</TableCell>
+                  <TableCell sx={{ fontWeight: '800', color: '#64748B', fontSize: '0.75rem', textTransform: 'uppercase' }}>Pénalité Sortie</TableCell>
+                  <TableCell sx={{ fontWeight: '800', color: '#64748B', fontSize: '0.75rem', textTransform: 'uppercase' }}>Architecture Comptable</TableCell>
+                  <TableCell sx={{ fontWeight: '800', color: '#64748B', fontSize: '0.75rem', textTransform: 'uppercase' }}>État</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: '800', color: '#64748B', fontSize: '0.75rem', textTransform: 'uppercase' }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {types.map((type) => (
-                  <TableRow key={type.id} hover>
-                    <TableCell sx={{ fontWeight: '700' }}>{type.libelle}</TableCell>
+                  <TableRow key={type.id} hover sx={{ '&:hover': { bgcolor: '#F8FAFF' } }}>
                     <TableCell>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                        {/* Multiplication par 100 pour l'affichage humain */}
-                        <Chip label={`Int: ${(type.taux_interet * 100).toFixed(2)}%`} size="small" sx={{ bgcolor: '#EEF2FF', color: '#6366f1', fontWeight: 'bold' }} />
-                        <Chip label={`Pén: ${(type.taux_penalite * 100).toFixed(2)}%`} size="small" sx={{ bgcolor: '#FFF7ED', color: '#f59e0b', fontWeight: 'bold' }} />
-                      </Box>
+                      <Typography variant="body1" fontWeight="800" color="primary.main">{type.libelle}</Typography>
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                         <Timer sx={{ fontSize: 14, color: 'text.disabled' }} />
+                         <Typography variant="caption" fontWeight="bold" color="textSecondary">{type.duree_mois} Mois</Typography>
+                      </Stack>
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Timer fontSize="small" color="disabled" />
-                        <Typography variant="body2">{type.duree_mois} mois</Typography>
-                      </Box>
+                      <Chip 
+                        label={`${(type.taux_interet * 100).toFixed(2)} %`} 
+                        size="small" 
+                        sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: '800', borderRadius: 1.5 }} 
+                      />
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                        <Typography variant="caption" sx={{ color: '#10B981', fontWeight: 'bold' }}>
-                          Intérêt: {type.compte_interet?.code || 'Non lié'}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: '#F59E0B', fontWeight: 'bold' }}>
-                          Pénalité: {type.compte_penalite?.code || 'Non lié'}
-                        </Typography>
-                      </Box>
+                      <Chip 
+                        label={`${(type.taux_penalite * 100).toFixed(2)} %`} 
+                        size="small" 
+                        sx={{ bgcolor: '#FEF2F2', color: '#DC2626', fontWeight: '800', borderRadius: 1.5 }} 
+                      />
                     </TableCell>
                     <TableCell>
-                      <Switch checked={Boolean(type.is_active)} color="primary" size="small" />
+                      <Stack spacing={0.5}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Security sx={{ fontSize: 14, color: indigo[300] }} />
+                            <Typography variant="caption" sx={{ color: '#475569', fontWeight: '600' }}>
+                                Bilan: {type.plan_comptable_chapitre_id || '---'}
+                            </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Payments sx={{ fontSize: 14, color: orange[300] }} />
+                            <Typography variant="caption" color="textSecondary">
+                                Charge: {type.plan_comptable_interet_id || '---'}
+                            </Typography>
+                        </Box>
+                      </Stack>
+                    </TableCell>
+                    <TableCell>
+                      <Switch checked={Boolean(type.is_active)} color="success" size="small" />
                     </TableCell>
                     <TableCell align="right">
-                      <IconButton onClick={() => { 
-                        setEditingType(type); 
-                        setFormData({ 
-                          ...type,
-                          // Conversion inverse pour le formulaire lors de l'édition
-                          taux_interet: type.taux_interet * 100,
-                          taux_penalite: type.taux_penalite * 100
-                        }); 
-                        setOpen(true); 
-                      }}>
+                      <IconButton 
+                        sx={{ bgcolor: '#EEF2FF', color: '#6366f1', '&:hover': { bgcolor: '#6366f1', color: 'white' } }}
+                        onClick={() => { 
+                            setEditingType(type); 
+                            setFormData({ 
+                            ...type,
+                            taux_interet: type.taux_interet * 100,
+                            taux_penalite: (type.taux_penalite || 0) * 100
+                            }); 
+                            setOpen(true); 
+                        }}
+                      >
                         <Edit fontSize="small" />
                       </IconButton>
                     </TableCell>
@@ -162,48 +182,105 @@ export default function DatTypeManager() {
           </TableContainer>
         </Paper>
 
-        {/* DIALOGUE */}
-        <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 4 } }}>
-          <DialogTitle sx={{ fontWeight: 'bold' }}>
-            {editingType ? "Modifier l'offre" : "Nouvelle Offre DAT"}
+        {/* MODALE DE CONFIGURATION (DIALOGUE) */}
+        <Dialog 
+            open={open} 
+            onClose={() => setOpen(false)} 
+            fullWidth 
+            maxWidth="sm" 
+            PaperProps={{ sx: { borderRadius: 4, p: 1 } }}
+        >
+          <DialogTitle sx={{ fontWeight: '900', color: '#1E293B', fontSize: '1.2rem' }}>
+            {editingType ? "Édition de l'Offre" : "Configuration d'un nouveau Produit"}
           </DialogTitle>
           <DialogContent>
-            <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="caption" color="textSecondary" sx={{ mb: 3, display: 'block' }}>
+                Remplissez les informations financières et comptables du produit DAT.
+            </Typography>
+            
+            <Grid container spacing={2.5}>
               <Grid item xs={12}>
-                <TextField fullWidth label="Nom de l'offre" value={formData.libelle} onChange={(e) => setFormData({...formData, libelle: e.target.value})} />
+                <TextField 
+                    fullWidth 
+                    label="Désignation du produit" 
+                    variant="filled"
+                    value={formData.libelle} 
+                    onChange={(e) => setFormData({...formData, libelle: e.target.value})} 
+                    placeholder="ex: DAT Privilège 12 mois" 
+                />
               </Grid>
-              <Grid item xs={6}>
-                <TextField fullWidth type="number" label="Taux Intérêt (%)" value={formData.taux_interet} onChange={(e) => setFormData({...formData, taux_interet: e.target.value})} 
-                  InputProps={{ startAdornment: <InputAdornment position="start"><Percent fontSize="small"/></InputAdornment> }} />
+              
+              <Grid item xs={4}>
+                <TextField fullWidth type="number" label="Taux (%)" value={formData.taux_interet} 
+                  onChange={(e) => setFormData({...formData, taux_interet: e.target.value})} 
+                  InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} />
               </Grid>
-              <Grid item xs={6}>
-                <TextField fullWidth type="number" label="Taux Pénalité (%)" value={formData.taux_penalite} onChange={(e) => setFormData({...formData, taux_penalite: e.target.value})} 
-                  InputProps={{ startAdornment: <InputAdornment position="start"><Percent fontSize="small"/></InputAdornment> }} />
+
+              <Grid item xs={4}>
+                <TextField fullWidth type="number" label="Pénalité (%)" value={formData.taux_penalite} 
+                  onChange={(e) => setFormData({...formData, taux_penalite: e.target.value})} 
+                  InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} />
               </Grid>
+              
+              <Grid item xs={4}>
+                <TextField fullWidth type="number" label="Durée" value={formData.duree_mois} 
+                  onChange={(e) => setFormData({...formData, duree_mois: e.target.value})} 
+                  InputProps={{ endAdornment: <InputAdornment position="end">mois</InputAdornment> }} />
+              </Grid>
+
               <Grid item xs={12}>
-                <TextField fullWidth type="number" label="Durée (Mois)" value={formData.duree_mois} onChange={(e) => setFormData({...formData, duree_mois: e.target.value})} 
-                  InputProps={{ startAdornment: <InputAdornment position="start"><Timer fontSize="small"/></InputAdornment> }} />
+                <Divider sx={{ my: 1 }}><Chip label="Liaisons Plan Comptable" size="small" sx={{ fontWeight: 'bold' }} /></Divider>
               </Grid>
-              <Grid item xs={12}><Typography variant="subtitle2" sx={{ color: indigo[700], fontWeight: 'bold', mt: 1 }}>Liaisons Comptables</Typography></Grid>
+
               <Grid item xs={12}>
-                <TextField select fullWidth label="Compte Intérêts" value={formData.plan_comptable_interet_id} onChange={(e) => setFormData({...formData, plan_comptable_interet_id: e.target.value})}>
+                <TextField select fullWidth label="Compte de Capital (Bilan)" value={formData.plan_comptable_chapitre_id} 
+                  onChange={(e) => setFormData({...formData, plan_comptable_chapitre_id: e.target.value})}
+                  InputProps={{ startAdornment: <MenuBook sx={{ mr: 1, color: indigo[400] }} /> }}>
                   {planComptable.map((cpte) => (
-                    <MenuItem key={cpte.id} value={cpte.id}>{cpte.code} - {cpte.libelle}</MenuItem>
+                    <MenuItem key={cpte.id} value={cpte.id}>
+                        <Typography variant="body2" fontWeight="bold" sx={{ mr: 1 }}>{cpte.code}</Typography>
+                        <Typography variant="body2" color="textSecondary">{cpte.libelle}</Typography>
+                    </MenuItem>
                   ))}
                 </TextField>
               </Grid>
+
               <Grid item xs={12}>
-                <TextField select fullWidth label="Compte Pénalités" value={formData.plan_comptable_penalite_id} onChange={(e) => setFormData({...formData, plan_comptable_penalite_id: e.target.value})}>
+                <TextField select fullWidth label="Compte de Charges (Intérêts)" value={formData.plan_comptable_interet_id} 
+                  onChange={(e) => setFormData({...formData, plan_comptable_interet_id: e.target.value})}
+                  InputProps={{ startAdornment: <History sx={{ mr: 1, color: orange[400] }} /> }}>
                   {planComptable.map((cpte) => (
-                    <MenuItem key={cpte.id} value={cpte.id}>{cpte.code} - {cpte.libelle}</MenuItem>
+                    <MenuItem key={cpte.id} value={cpte.id}>
+                        <Typography variant="body2" fontWeight="bold" sx={{ mr: 1 }}>{cpte.code}</Typography>
+                        <Typography variant="body2" color="textSecondary">{cpte.libelle}</Typography>
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+
+              <Grid item xs={12}>
+                <TextField select fullWidth label="Compte de Produits (Pénalités)" value={formData.plan_comptable_penalite_id} 
+                  onChange={(e) => setFormData({...formData, plan_comptable_penalite_id: e.target.value})}
+                  InputProps={{ startAdornment: <Gavel sx={{ mr: 1, color: red[400] }} /> }}>
+                  {planComptable.map((cpte) => (
+                    <MenuItem key={cpte.id} value={cpte.id}>
+                        <Typography variant="body2" fontWeight="bold" sx={{ mr: 1 }}>{cpte.code}</Typography>
+                        <Typography variant="body2" color="textSecondary">{cpte.libelle}</Typography>
+                    </MenuItem>
                   ))}
                 </TextField>
               </Grid>
             </Grid>
           </DialogContent>
-          <DialogActions sx={{ p: 3 }}>
-            <Button onClick={() => setOpen(false)}>Annuler</Button>
-            <Button variant="contained" onClick={handleSubmit} sx={{ background: activeGradient }}>Confirmer</Button>
+          <DialogActions sx={{ p: 3, bgcolor: '#F8FAFC', borderTop: '1px solid #F1F5F9' }}>
+            <Button onClick={() => setOpen(false)} sx={{ color: '#64748B', fontWeight: 'bold' }}>Annuler</Button>
+            <Button 
+                variant="contained" 
+                onClick={handleSubmit} 
+                sx={{ background: activeGradient, borderRadius: 2, px: 4, fontWeight: 'bold' }}
+            >
+              Sauvegarder l'Offre
+            </Button>
           </DialogActions>
         </Dialog>
       </Box>

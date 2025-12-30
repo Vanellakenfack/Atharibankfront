@@ -2,14 +2,15 @@ import React, { useEffect, useState } from "react";
 import { 
   Box, Button, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Chip, IconButton, TextField, 
-  InputAdornment, Avatar, Paper, Typography, TablePagination,
-  Dialog, DialogTitle, DialogContent, DialogActions, Grid, MenuItem,
-  LinearProgress, Card, CardContent, CircularProgress, Divider
+  Avatar, Paper, Typography, Dialog, DialogTitle, DialogContent, 
+  DialogActions, Grid, MenuItem, LinearProgress, CircularProgress, 
+  Divider, Tabs, Tab, Stack, Tooltip, InputAdornment
 } from "@mui/material";
 import { 
-  Add, Search, AccountBalanceWallet, 
-  Calculate, InfoOutlined, Close
+  Add, Search, Assignment, Close, CheckCircleOutline, InfoOutlined, 
+  AccountBalanceWallet, DateRange, Redo
 } from "@mui/icons-material";
+import { indigo, green, blue } from "@mui/material/colors";
 import Layout from "../../components/layout/Layout";
 import ApiClient from "../../services/api/ApiClient";
 
@@ -19,155 +20,170 @@ export default function DatContractManager() {
   const [datTypes, setDatTypes] = useState([]);
   const [accounts, setAccounts] = useState([]); 
   
-  // --- UI STATE ---
+  // --- ÉTATS DE L'UI ---
+  const [tabIndex, setTabIndex] = useState(0);
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [openDetails, setOpenDetails] = useState(false);
+  const [openCloture, setOpenCloture] = useState(false);
 
-  // --- ÉTATS SIMULATION ---
+  // --- ÉTATS CALCULS / DÉTAILS ---
+  const [selectedContract, setSelectedContract] = useState(null);
+  const [calculatedDetails, setCalculatedDetails] = useState(null);
   const [simuData, setSimuData] = useState({ amount: 1000000, typeId: '' });
   const [backendSimulation, setBackendSimulation] = useState(null);
   const [simuLoading, setSimuLoading] = useState(false);
 
-  // --- ÉTAT CLÔTURE ---
-  const [clotureDialog, setClotureDialog] = useState({ open: false, data: null, contract: null });
-
-  // --- FORMULAIRE SOUSCRIPTION ---
+  // --- ÉTAT FORMULAIRE CORRIGÉ (DATE EXECUTION + MATURITE) ---
   const [formData, setFormData] = useState({
-    account_id: '',
+    client_source_account_id: '',
+    account_id: '', 
     dat_type_id: '',
     montant: '',
-    mode_versement: 'CAPITALISATION'
+    taux_interet_annuel: '',
+    periodicite: 'E',
+    date_execution: new Date().toISOString().split('T')[0], 
+            date_valeur: new Date().toISOString().split('T')[0],
+
+    date_maturite: '', 
+    destination_interet_id: '',
+    destination_capital_id: ''
   });
 
   const activeGradient = 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)';
 
-  // 1. CHARGEMENT DES DONNÉES (Gestion flexible des clés data/donnees)
+  // --- CHARGEMENT INITIAL ---
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [resContracts, resTypes, resAccounts] = await Promise.all([
+      const [resC, resT, resA] = await Promise.all([
         ApiClient.get("/dat/contracts"),
         ApiClient.get("/dat/types"),
         ApiClient.get("/comptes") 
       ]);
-
-      // Extraction sécurisée (Clé 'data' ou 'donnees')
-      const fetchedContracts = resContracts.data?.donnees || resContracts.data?.data || [];
-      const fetchedTypes = resTypes.data?.donnees || resTypes.data?.data || [];
+      setContracts(resC.data?.donnees || []);
+      setDatTypes(resT.data?.donnees || []);
+      setAccounts(resA.data?.data?.data || resA.data?.donnees || []);
       
- // Dans DatContractManager.jsx
-console.log("DEBUG ACCOUNTS FULL RES:", resAccounts.data); // Regardez ceci dans la console
-
-const dataAccounts = resAccounts.data?.data?.data || resAccounts.data?.donnees || [];
-
-setAccounts(dataAccounts);
-      setContracts(fetchedContracts);
-      setDatTypes(fetchedTypes);
-      
-      // Auto-sélection du premier type pour le simulateur
-      if (fetchedTypes.length > 0) {
-        setSimuData(prev => ({ ...prev, typeId: fetchedTypes[0].id }));
+      if (resT.data?.donnees?.length > 0 && !simuData.typeId) {
+        setSimuData(prev => ({ ...prev, typeId: resT.data.donnees[0].id }));
       }
-    } catch (error) { 
-      console.error("Erreur chargement API:", error); 
-    } finally { 
-      setLoading(false); 
-    }
+    } catch (error) { console.error("Erreur de chargement:", error); } 
+    finally { setLoading(false); }
   };
 
   useEffect(() => { fetchData(); }, []);
 
-  // 2. SIMULATION (Correction de l'erreur 405 côté Front)
+  // --- LOGIQUE SIMULATION LATERALE ---
   useEffect(() => {
-    const timer = setTimeout(async () => {
-      if (simuData.amount >= 1000 && simuData.typeId) {
-        setSimuLoading(true);
-        try {
-          const res = await ApiClient.post("/dat/simulate", { 
-            montant: simuData.amount, 
-            dat_type_id: simuData.typeId 
-          });
-          setBackendSimulation(res.data.simulation);
-        } catch (e) { 
-          console.error("Erreur simulation:", e); 
-        } finally { 
-          setSimuLoading(false); 
-        }
-      }
+    const timer = setTimeout(() => {
+      if (simuData.amount && simuData.typeId) runSimulation();
     }, 600);
     return () => clearTimeout(timer);
   }, [simuData]);
 
-  // 3. LOGIQUE DE CLÔTURE
-  const handleOpenCloture = async (contract) => {
+  const runSimulation = async () => {
+    setSimuLoading(true);
+    try {
+      const res = await ApiClient.post("/dat/simulate", { montant: simuData.amount, dat_type_id: simuData.typeId });
+      setBackendSimulation(res.data.simulation);
+    } catch (e) { setBackendSimulation(null); } 
+    finally { setSimuLoading(false); }
+  };
+
+  // --- ACTIONS CONTRATS ---
+  const handleShowDetails = async (contract) => {
+    setCalculatedDetails(null);
+    setSelectedContract(contract);
+    setOpenDetails(true);
     try {
       const res = await ApiClient.get(`/dat/${contract.id}`);
-      setClotureDialog({ 
-        open: true, 
-        data: res.data.donnees || res.data.data, 
-        contract 
+      setCalculatedDetails(res.data.donnees);
+    } catch (e) { setOpenDetails(false); }
+  };
+
+  const handleValidateContract = async (id) => {
+    if(!window.confirm("Valider l'activation du contrat et générer les écritures ?")) return;
+    setLoading(true);
+    try {
+        await ApiClient.post(`/dat/${id}/valider`);
+        fetchData();
+    } catch (e) { alert(e.response?.data?.message || "Erreur de validation"); } 
+    finally { setLoading(false); }
+  };
+
+  const handleOpenClotureModal = async (contract) => {
+    setSelectedContract(contract);
+    setOpenCloture(true);
+    try {
+        const res = await ApiClient.get(`/dat/${contract.id}`);
+        setCalculatedDetails(res.data.donnees);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleConfirmCloturer = async () => {
+    setSubmitLoading(true);
+    try {
+      await ApiClient.post(`/dat/${selectedContract.id}/cloturer`);
+      setOpenCloture(false);
+      fetchData(); 
+    } catch (error) { alert(error.response?.data?.message); } 
+    finally { setSubmitLoading(false); }
+  };
+
+  // --- LOGIQUE FORMULAIRE : CALCUL MATURITÉ AUTO ---
+  const handleTypeSelection = (typeId) => {
+    const type = datTypes.find(t => t.id === typeId);
+    if (type) {
+      // Calcul automatique de la date de maturité basé sur la date d'exécution
+      const dateBase = new Date(formData.date_execution);
+      dateBase.setMonth(dateBase.getMonth() + parseInt(type.duree_mois || 0));
+      const formattedDate = dateBase.toISOString().split('T')[0];
+
+      setFormData({ 
+        ...formData, 
+        dat_type_id: typeId, 
+        taux_interet_annuel: type.taux_interet,
+        date_maturite: formattedDate 
       });
-    } catch (e) { 
-      alert("Impossible de récupérer les détails de clôture"); 
     }
   };
 
-  const confirmCloture = async () => {
-    setSubmitLoading(true);
-    try {
-      await ApiClient.post(`/dat/${clotureDialog.contract.id}/cloturer`);
-      setClotureDialog({ open: false, data: null, contract: null });
-      fetchData();
-    } catch (e) { 
-      alert(e.response?.data?.message || "Erreur lors de la clôture"); 
-    } finally { 
-      setSubmitLoading(false); 
-    }
-  };
-
-  // 4. SOUMISSION SOUSCRIPTION
   const handleSubscribe = async () => {
-    if(!formData.account_id || !formData.dat_type_id || !formData.montant) {
-        alert("Veuillez remplir tous les champs");
-        return;
-    }
     setSubmitLoading(true);
     try {
-      await ApiClient.post("/dat/subscribe", formData);
+      await ApiClient.post("/dat/contracts", formData);
       setOpen(false);
       fetchData();
-      setFormData({ account_id: '', dat_type_id: '', montant: '', mode_versement: 'CAPITALISATION' });
     } catch (error) { 
-      alert(error.response?.data?.message || "Erreur de souscription"); 
-    } finally { 
-      setSubmitLoading(false); 
-    }
+      alert(error.response?.data?.message || "Erreur lors de la création. Vérifiez les champs obligatoires."); 
+    } 
+    finally { setSubmitLoading(false); }
   };
 
-  const filteredContracts = Array.isArray(contracts) ? contracts.filter(c => 
-    (c.compte?.numero_compte || "").includes(search) || (c.statut || "").includes(search.toUpperCase())
-  ) : [];
+  const getStatusColor = (status) => {
+      switch(status) {
+          case 'ACTIF': return 'success';
+          case 'EN_ATTENTE': return 'warning';
+          case 'CLOTURE': return 'default';
+          default: return 'primary';
+      }
+  };
 
   return (
     <Layout>
       <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#F8FAFC', minHeight: '100vh' }}>
         
         {/* HEADER */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 4, alignItems: 'center' }}>
-          <Box>
-            <Typography variant="h4" fontWeight="900" sx={{ color: '#1E293B' }}>Gestion des DAT</Typography>
-            <Typography variant="body2" color="textSecondary">Suivi et souscription des dépôts à terme</Typography>
-          </Box>
-          <Button 
-            variant="contained" 
-            onClick={() => setOpen(true)} 
-            startIcon={<Add />} 
-            sx={{ background: activeGradient, borderRadius: 3, px: 3, fontWeight: 'bold', textTransform: 'none' }}
-          >
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+          <Typography variant="h4" fontWeight="900" sx={{ color: '#1E293B', display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Avatar sx={{ bgcolor: indigo[500], background: activeGradient }}><Assignment /></Avatar>
+            Gestion des DAT
+          </Typography>
+          <Button variant="contained" startIcon={<Add />} onClick={() => { setTabIndex(0); setOpen(true); }}
+            sx={{ borderRadius: 3, background: activeGradient, fontWeight: 'bold' }}>
             Nouvelle Souscription
           </Button>
         </Box>
@@ -176,187 +192,236 @@ setAccounts(dataAccounts);
           {/* LISTE DES CONTRATS */}
           <Grid item xs={12} lg={8}>
             <Paper sx={{ borderRadius: 5, p: 3, boxShadow: '0 10px 30px rgba(0,0,0,0.04)' }}>
-              <TextField 
-                fullWidth placeholder="Rechercher par numéro de compte..." value={search} onChange={(e) => setSearch(e.target.value)} sx={{ mb: 3 }}
-                InputProps={{ startAdornment: <InputAdornment position="start"><Search color="primary" /></InputAdornment> }}
+              <TextField fullWidth placeholder="Rechercher par référence..." onChange={(e) => setSearch(e.target.value)}
+                sx={{ mb: 3, '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                InputProps={{ startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} /> }}
               />
+
               <TableContainer>
-                {loading ? <Box sx={{ textAlign: 'center', py: 5 }}><CircularProgress /></Box> : (
+                {loading ? <LinearProgress /> : (
                   <Table>
                     <TableHead>
-                      <TableRow sx={{ '& th': { fontWeight: 'bold', color: '#64748B', fontSize: '0.75rem' } }}>
-                        <TableCell>COMPTE</TableCell>
-                        <TableCell>CAPITAL</TableCell>
-                        <TableCell>PROGRESSION</TableCell>
-                        <TableCell>STATUT</TableCell>
-                        <TableCell align="right">ACTIONS</TableCell>
+                      <TableRow sx={{ '& th': { fontWeight: 'bold', color: '#64748B' } }}>
+                        <TableCell>Référence / Compte</TableCell>
+                        <TableCell>Capital</TableCell>
+                        <TableCell>Statut</TableCell>
+                        <TableCell align="right">Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {filteredContracts.length > 0 ? (
-                        filteredContracts.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((contract) => (
-                            <TableRow key={contract.id} hover>
-                            <TableCell>
-                                <Typography variant="body2" fontWeight="bold">{contract.compte?.numero_compte || 'N/A'}</Typography>
-                            </TableCell>
-                            <TableCell sx={{ fontWeight: 'bold' }}>{new Intl.NumberFormat().format(contract.capital_initial)} F</TableCell>
-                            <TableCell sx={{ minWidth: 150 }}>
-                                <LinearProgress variant="determinate" value={contract.progression_temps || 0} sx={{ height: 6, borderRadius: 5, mb: 0.5 }} />
-                                <Typography variant="caption" color="textSecondary">{contract.progression_temps || 0}% complété</Typography>
-                            </TableCell>
-                            <TableCell>
-                                <Chip 
-                                    label={contract.statut} 
-                                    size="small" 
-                                    color={contract.statut === 'ACTIF' ? 'success' : 'warning'} 
-                                    sx={{ fontWeight: 'bold', fontSize: '0.7rem' }} 
-                                />
-                            </TableCell>
-                            <TableCell align="right">
-                                <IconButton size="small" onClick={() => handleOpenCloture(contract)} color="error">
-                                <Close fontSize="small" />
-                                </IconButton>
-                            </TableCell>
-                            </TableRow>
-                        ))
-                      ) : (
-                        <TableRow><TableCell colSpan={5} align="center">Aucun contrat trouvé</TableCell></TableRow>
-                      )}
+                      {contracts.filter(c => c.numero_ordre?.includes(search)).map((c) => (
+                        <TableRow key={c.id} hover>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="bold">{c.numero_ordre || 'Saisie...'}</Typography>
+                            <Typography variant="caption" color="textSecondary">{c.compte?.numero_compte}</Typography>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>{new Intl.NumberFormat().format(c.montant_initial)} F</TableCell>
+                          <TableCell>
+                            <Chip label={c.statut} size="small" color={getStatusColor(c.statut)} sx={{ fontWeight: 'bold' }} />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Stack direction="row" spacing={1} justifyContent="flex-end">
+                              {c.statut === 'EN_ATTENTE' && (
+                                <Tooltip title="Activer"><IconButton size="small" sx={{ color: green[600], bgcolor: green[50] }} onClick={() => handleValidateContract(c.id)}><CheckCircleOutline fontSize="small" /></IconButton></Tooltip>
+                              )}
+                              <Tooltip title="Détails"><IconButton size="small" onClick={() => handleShowDetails(c)} sx={{ color: blue[600] }}><InfoOutlined fontSize="small" /></IconButton></Tooltip>
+                              {c.statut === 'ACTIF' && (
+                                <Tooltip title="Rupture"><IconButton size="small" color="error" onClick={() => handleOpenClotureModal(c)}><Close fontSize="small" /></IconButton></Tooltip>
+                              )}
+                            </Stack>
+                          </TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 )}
               </TableContainer>
-              <TablePagination component="div" count={filteredContracts.length} rowsPerPage={rowsPerPage} page={page} onPageChange={(e, p) => setPage(p)} />
             </Paper>
           </Grid>
 
-          {/* SIMULATEUR */}
+          {/* SIMULATEUR LATÉRAL */}
           <Grid item xs={12} lg={4}>
-            <Card sx={{ borderRadius: 5, border: '1px solid #E2E8F0', boxShadow: 'none' }}>
-              <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-                  <Calculate color="primary" /> Simulation de Gain
-                </Typography>
-                
-                <TextField 
-                  fullWidth label="Montant du dépôt" type="number" value={simuData.amount} 
-                  onChange={(e) => setSimuData({...simuData, amount: e.target.value})} sx={{ mb: 2 }} 
-                />
-                
-                <TextField 
-                  select fullWidth label="Choisir une offre" value={simuData.typeId} 
-                  onChange={(e) => setSimuData({...simuData, typeId: e.target.value})} sx={{ mb: 3 }}
-                >
-                  {Array.isArray(datTypes) && datTypes.map(t => (
-                    <MenuItem key={t.id} value={t.id}>{t.libelle}</MenuItem>
-                  ))}
+            <Paper sx={{ borderRadius: 5, p: 3, border: '1px solid #E2E8F0' }}>
+              <Typography variant="h6" fontWeight="800" gutterBottom><InfoOutlined color="primary" sx={{mr:1}}/> Simulation Rapide</Typography>
+              <Stack spacing={2} sx={{ mt: 2 }}>
+                <TextField fullWidth label="Montant" type="number" value={simuData.amount} onChange={(e) => setSimuData({...simuData, amount: e.target.value})} />
+                <TextField select fullWidth label="Offre DAT" value={simuData.typeId} onChange={(e) => setSimuData({...simuData, typeId: e.target.value})}>
+                  {datTypes.map(t => <MenuItem key={t.id} value={t.id}>{t.libelle}</MenuItem>)}
                 </TextField>
-
-                {simuLoading ? <Box sx={{ textAlign: 'center' }}><CircularProgress size={24} /></Box> : backendSimulation && (
-                  <Box sx={{ p: 2, bgcolor: '#F0F4FF', borderRadius: 4 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                      <Typography variant="caption">Intérêts estimés :</Typography>
-                      <Typography variant="body2" fontWeight="bold" color="primary">+{new Intl.NumberFormat().format(backendSimulation.gain_net)} F</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                      <Typography variant="caption">Échéance :</Typography>
-                      <Typography variant="body2" fontWeight="bold">{backendSimulation.date_fin}</Typography>
-                    </Box>
-                    <Divider sx={{ my: 1.5 }} />
-                    <Typography variant="h5" align="center" fontWeight="900" color="primary">
-                      {new Intl.NumberFormat().format(backendSimulation.total_echeance)} F
-                    </Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
+                <Box sx={{ p: 2, bgcolor: '#F1F5F9', borderRadius: 3 }}>
+                    {simuLoading ? <CircularProgress size={20} /> : (
+                        <Box>
+                            <Typography variant="caption" color="textSecondary">Échéance : {backendSimulation?.date_fin || '...'}</Typography>
+                            <Typography variant="h5" fontWeight="900" color="primary">{new Intl.NumberFormat().format(backendSimulation?.total_echeance || 0)} F</Typography>
+                        </Box>
+                    )}
+                </Box>
+              </Stack>
+            </Paper>
           </Grid>
         </Grid>
 
-        {/* MODALE SOUSCRIPTION (FIX COMPTES) */}
-        <Dialog open={open} onClose={() => !submitLoading && setOpen(false)} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 4 } }}>
-          <DialogTitle sx={{ fontWeight: 'bold' }}>Nouveau Contrat DAT</DialogTitle>
-          <DialogContent sx={{ mt: 1 }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                   <TextField 
-                  select 
-                  fullWidth 
-                  label="Compte Source" 
-                  value={formData.account_id} 
-                  onChange={(e) => setFormData({...formData, account_id: e.target.value})}
-                >
-                  {accounts.length > 0 ? (
-                    accounts.map((acc) => (
-                      <MenuItem key={acc.id} value={acc.id}>
-                        {acc.numero_compte} — {new Intl.NumberFormat().format(acc.solde)} F
-                      </MenuItem>
-                    ))
-                  ) : (
-                    <MenuItem disabled>Aucun compte trouvé (vérifiez la pagination)</MenuItem>
-                  )}
-                </TextField>
+        {/* --- MODALE SOUSCRIPTION (3 ÉTAPES) --- */}
+        <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="md">
+          <DialogTitle sx={{ fontWeight: 800, bgcolor: '#F8FAFC' }}>
+              <Stack direction="row" alignItems="center" spacing={1}><Add color="primary"/> Nouvelle Souscription DAT</Stack>
+          </DialogTitle>
+          <Tabs value={tabIndex} onChange={(e, v) => setTabIndex(v)} sx={{ px: 3, borderBottom: 1, borderColor: 'divider' }}>
+            <Tab label="1. Comptes" icon={<AccountBalanceWallet/>} iconPosition="start" />
+            <Tab label="2. Conditions" icon={<DateRange/>} iconPosition="start" />
+            <Tab label="3. Destination" icon={<Redo/>} iconPosition="start" />
+          </Tabs>
+          
+          <DialogContent sx={{ p: 4 }}>
+            {tabIndex === 0 && (
+              <Grid container spacing={3}>
+                <Grid item xs={12}>
+                  <TextField 
+                    fullWidth 
+                    type="date" 
+                    label="Date d'exécution (Mise en place)" 
+                    value={formData.date_execution} 
+                    onChange={(e) => setFormData({...formData, date_execution: e.target.value})}
+                    InputLabelProps={{ shrink: true }}
+                    helperText="Requis par le système"
+                  />
+                </Grid>
+                    
+                    <Grid item xs={12} md={6}>
+                      <TextField 
+                        fullWidth 
+                        type="date" 
+                        label="Date Valeur (Intérêts)" 
+                        value={formData.date_valeur} 
+                        onChange={(e) => setFormData({...formData, date_valeur: e.target.value})}
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField select fullWidth label="Compte Source (Débit)" value={formData.client_source_account_id}
+                    onChange={(e) => setFormData({...formData, client_source_account_id: e.target.value, destination_interet_id: e.target.value, destination_capital_id: e.target.value})}>
+                    {accounts.filter(a => !a.numero_compte.startsWith('25') && !a.numero_compte.startsWith('36')).map(acc => (
+                      <MenuItem key={acc.id} value={acc.id}>{acc.numero_compte} - {acc.intitule}</MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField select fullWidth label="Compte Scellement (36xx)" value={formData.account_id}
+                    onChange={(e) => setFormData({...formData, account_id: e.target.value})}>
+                    {accounts.filter(a => a.numero_compte.startsWith('36') || a.numero_compte.startsWith('25')).map(acc => (
+                      <MenuItem key={acc.id} value={acc.id}>{acc.numero_compte}</MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField select fullWidth label="Offre DAT" value={formData.dat_type_id} onChange={(e) => handleTypeSelection(e.target.value)}>
+                    {datTypes.map(t => <MenuItem key={t.id} value={t.id}>{t.libelle} ({t.duree_mois} mois)</MenuItem>)}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField fullWidth label="Montant" type="number" value={formData.montant} onChange={(e) => setFormData({...formData, montant: e.target.value})} 
+                  InputProps={{ endAdornment: <InputAdornment position="end">F CFA</InputAdornment> }}/>
+                </Grid>
               </Grid>
-              <Grid item xs={12}>
-                <TextField 
-                  select fullWidth label="Type de DAT" value={formData.dat_type_id} 
-                  onChange={(e) => setFormData({...formData, dat_type_id: e.target.value})}
-                >
-                  {Array.isArray(datTypes) && datTypes.map(type => (
-                    <MenuItem key={type.id} value={type.id}>{type.libelle} - {type.duree_mois} mois</MenuItem>
-                  ))}
-                </TextField>
+            )}
+
+            {tabIndex === 1 && (
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={4}>
+                    <TextField fullWidth label="Taux Annuel (%)" value={formData.taux_interet_annuel} InputProps={{ readOnly: true }} />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField select fullWidth label="Paiement Intérêts" value={formData.periodicite} onChange={(e) => setFormData({...formData, periodicite: e.target.value})}>
+                    <MenuItem value="E">À l'échéance</MenuItem>
+                    <MenuItem value="M">Mensuel</MenuItem>
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Tooltip title="Calculée automatiquement selon la date d'exécution et l'offre">
+                    <TextField fullWidth type="date" label="Date de Maturité" value={formData.date_maturite} 
+                        InputLabelProps={{ shrink: true }} 
+                        InputProps={{ readOnly: true, sx: { bgcolor: '#F1F5F9' } }} 
+                    />
+                  </Tooltip>
+                </Grid>
               </Grid>
-              <Grid item xs={12}>
-                <TextField 
-                  fullWidth type="number" label="Montant à investir" value={formData.montant} 
-                  onChange={(e) => setFormData({...formData, montant: e.target.value})}
-                />
+            )}
+
+            {tabIndex === 2 && (
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <TextField select fullWidth label="Retour Capital vers..." value={formData.destination_capital_id}
+                    onChange={(e) => setFormData({...formData, destination_capital_id: e.target.value})}>
+                    {accounts.map(acc => <MenuItem key={acc.id} value={acc.id}>{acc.numero_compte} - {acc.intitule}</MenuItem>)}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField select fullWidth label="Versement Intérêts vers..." value={formData.destination_interet_id}
+                    onChange={(e) => setFormData({...formData, destination_interet_id: e.target.value})}>
+                    {accounts.map(acc => <MenuItem key={acc.id} value={acc.id}>{acc.numero_compte} - {acc.intitule}</MenuItem>)}
+                  </TextField>
+                </Grid>
               </Grid>
-            </Grid>
+            )}
           </DialogContent>
-          <DialogActions sx={{ p: 3 }}>
-            <Button onClick={() => setOpen(false)}>Annuler</Button>
-            <Button variant="contained" onClick={handleSubscribe} disabled={submitLoading} sx={{ background: activeGradient }}>
-              Confirmer la souscription
-            </Button>
+
+          <DialogActions sx={{ p: 3, bgcolor: '#F8FAFC' }}>
+            <Button onClick={() => setOpen(false)} color="inherit">Annuler</Button>
+            {tabIndex > 0 && <Button onClick={() => setTabIndex(tabIndex - 1)}>Précédent</Button>}
+            {tabIndex < 2 ? (
+              <Button variant="contained" onClick={() => setTabIndex(tabIndex + 1)}>Suivant</Button>
+            ) : (
+              <Button variant="contained" onClick={handleSubscribe} disabled={submitLoading} sx={{background: activeGradient}}>
+                {submitLoading ? <CircularProgress size={20} /> : "Confirmer le Placement"}
+              </Button>
+            )}
           </DialogActions>
         </Dialog>
 
-        {/* MODALE CLÔTURE */}
-        <Dialog open={clotureDialog.open} onClose={() => setClotureDialog({ ...clotureDialog, open: false })} PaperProps={{ sx: { borderRadius: 4 } }}>
-          <DialogTitle sx={{ fontWeight: 'bold', color: 'error.main' }}>Confirmation de clôture</DialogTitle>
-          <DialogContent>
-            {clotureDialog.data && (
-              <Box sx={{ mt: 1 }}>
-                <Typography variant="body2" sx={{ mb: 2 }}>Récapitulatif financier avant remboursement :</Typography>
-                <Paper variant="outlined" sx={{ p: 2, bgcolor: '#FFF5F5' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="caption">Capital :</Typography>
-                    <Typography variant="body2">{new Intl.NumberFormat().format(clotureDialog.data.capital)} F</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="caption" color="error">Pénalité retrait anticipé :</Typography>
-                    <Typography variant="body2" color="error">-{new Intl.NumberFormat().format(clotureDialog.data.penalites)} F</Typography>
-                  </Box>
-                  <Divider sx={{ my: 1 }} />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle1" fontWeight="bold">Net à reverser :</Typography>
-                    <Typography variant="subtitle1" fontWeight="bold" color="primary">
-                      {new Intl.NumberFormat().format(clotureDialog.data.montant_final)} F
-                    </Typography>
-                  </Box>
-                </Paper>
-              </Box>
-            )}
-          </DialogContent>
-          <DialogActions sx={{ p: 2.5 }}>
-            <Button onClick={() => setClotureDialog({ ...clotureDialog, open: false })}>Annuler</Button>
-            <Button variant="contained" color="error" onClick={confirmCloture} disabled={submitLoading}>
-              Clôturer maintenant
-            </Button>
-          </DialogActions>
+        {/* --- MODALE DÉTAILS --- */}
+        <Dialog open={openDetails} onClose={() => setOpenDetails(false)} maxWidth="sm" fullWidth>
+            <DialogTitle sx={{ fontWeight: 800 }}>Détails : {selectedContract?.numero_ordre}</DialogTitle>
+            <DialogContent>
+                {calculatedDetails ? (
+                    <Stack spacing={3} sx={{ mt: 2 }}>
+                        <Box sx={{ p: 2, bgcolor: indigo[50], borderRadius: 3 }}>
+                            <Typography variant="subtitle2" color="indigo">Situation Actuelle</Typography>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                                <Typography variant="body2">Initial :</Typography>
+                                <Typography variant="body2" fontWeight="bold">{new Intl.NumberFormat().format(selectedContract?.montant_initial)} F</Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="body2">Intérêts courus :</Typography>
+                                <Typography variant="body2" fontWeight="bold" color="success.main">+{new Intl.NumberFormat().format(calculatedDetails?.interets_courus || 0)} F</Typography>
+                            </Box>
+                        </Box>
+                        <Box>
+                            <Typography variant="caption">Progression Temps ({calculatedDetails?.jours_ecoules}j / {calculatedDetails?.duree_totale_jours}j)</Typography>
+                            <LinearProgress variant="determinate" value={(calculatedDetails?.jours_ecoules / calculatedDetails?.duree_totale_jours) * 100 || 0} sx={{ height: 10, borderRadius: 5, mt: 1 }} />
+                        </Box>
+                    </Stack>
+                ) : <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>}
+            </DialogContent>
+            <DialogActions><Button onClick={() => setOpenDetails(false)}>Fermer</Button></DialogActions>
         </Dialog>
+
+        {/* --- MODALE CLÔTURE --- */}
+        <Dialog open={openCloture} onClose={() => setOpenCloture(false)} maxWidth="xs" fullWidth>
+            <DialogTitle sx={{ color: 'error.main', fontWeight: 800 }}>Rupture de Contrat</DialogTitle>
+            <DialogContent>
+                <Stack spacing={2} sx={{ mt: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2">Capital :</Typography><Typography fontWeight="bold">{new Intl.NumberFormat().format(calculatedDetails?.capital_actuel || 0)} F</Typography></Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="error">Pénalités :</Typography><Typography fontWeight="bold" color="error">-{new Intl.NumberFormat().format(calculatedDetails?.penalites || 0)} F</Typography></Box>
+                    <Divider />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography fontWeight="bold">Net à reverser :</Typography><Typography variant="h6" fontWeight="900" color="primary">{new Intl.NumberFormat().format(calculatedDetails?.montant_final || 0)} F</Typography></Box>
+                </Stack>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={() => setOpenCloture(false)}>Annuler</Button>
+                <Button variant="contained" color="error" onClick={handleConfirmCloturer} disabled={submitLoading}>Confirmer la Rupture</Button>
+            </DialogActions>
+        </Dialog>
+
       </Box>
     </Layout>
   );

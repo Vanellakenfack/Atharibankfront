@@ -1,31 +1,46 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Building2, Trash2, Search, RotateCw, AlertCircle } from 'lucide-react';
-import apiClient from '../../services/api/ApiClient'; // Ton instance configurée
-import { Modal, Button, Form, Table, Badge, InputGroup } from 'react-bootstrap';
-import TopBar from '../../components/layout/TopBar';
-
+import { 
+    Box, Button, Table, TableBody, TableCell, TableContainer, 
+    TableHead, TableRow, Chip, IconButton, TextField, 
+    Avatar, Paper, Typography, Dialog, DialogTitle, DialogContent, 
+    DialogActions, Grid, LinearProgress, CircularProgress, 
+    Stack, InputAdornment, Tooltip, Divider, List, ListItem, ListItemText
+} from "@mui/material";
+import { 
+    Add, Search, Delete, RestartAlt, InfoOutlined, 
+    Domain, BusinessCenter, WarningAmber, CalendarToday, Fingerprint,
+    Close, Edit
+} from "@mui/icons-material";
+import { indigo, red, grey, blue } from "@mui/material/colors";
+import Layout from "../../components/layout/Layout";
+import apiClient from '../../services/api/ApiClient';
 
 const Agence = () => {
-    // États pour les données
     const [agencies, setAgencies] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
     
-    // États pour le formulaire et UI
-    const [showModal, setShowModal] = useState(false);
+    // Modales
+    const [showFormModal, setShowFormModal] = useState(false);
+    const [showDetails, setShowDetails] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    
+    // Données
+    const [selectedAgency, setSelectedAgency] = useState(null);
+    const [isEdit, setIsEdit] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({ code: '', name: '', short_name: '' });
     const [errors, setErrors] = useState({});
 
-    // 1. Fetch data avec gestion d'erreurs pro
+    const activeGradient = 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)';
+
     const loadAgencies = async () => {
         setLoading(true);
         try {
             const { data } = await apiClient.get('/agencies');
-            // On accède à .data.data car Laravel API Resource wrap dans une clé 'data'
             setAgencies(data.data || []);
         } catch (err) {
-            console.error("Échec du chargement:", err.response?.data?.message);
+            console.error("Erreur chargement:", err);
         } finally {
             setLoading(false);
         }
@@ -33,146 +48,177 @@ const Agence = () => {
 
     useEffect(() => { loadAgencies(); }, []);
 
-    // 2. Filtrage côté client (plus rapide pour de petits volumes)
-    const filteredAgencies = useMemo(() => {
-        return agencies.filter(a => 
-            a.agency_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            a.code.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [agencies, searchTerm]);
+    // --- LOGIQUE FORMULAIRE (CREATE & UPDATE) ---
+    const handleOpenForm = (agency = null) => {
+        setErrors({});
+        if (agency) {
+            setSelectedAgency(agency);
+            setFormData({ 
+                code: agency.code, 
+                name: agency.agency_name, 
+                short_name: agency.initials 
+            });
+            setIsEdit(true);
+        } else {
+            setFormData({ code: '', name: '', short_name: '' });
+            setIsEdit(false);
+        }
+        setShowFormModal(true);
+    };
 
-    // 3. Soumission avec gestion de validation Laravel
-    const handleCreateAgency = async (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
         setErrors({});
-
         try {
-            await apiClient.post('/agencies', formData);
-            setShowModal(false);
-            setFormData({ code: '', name: '', short_name: '' });
-            loadAgencies(); // Rafraîchissement propre
-        } catch (err) {
-            if (err.response?.status === 422) {
-                setErrors(err.response.data.errors);
+            if (isEdit) {
+                await apiClient.put(`/agencies/${selectedAgency.id}`, formData);
+            } else {
+                await apiClient.post('/agencies', formData);
             }
+            setShowFormModal(false);
+            loadAgencies();
+        } catch (err) {
+            if (err.response?.status === 422) setErrors(err.response.data.errors);
         } finally {
             setIsSubmitting(false);
         }
     };
 
+    // --- LOGIQUE SUPPRESSION ---
+    const handleDelete = async () => {
+        if (!selectedAgency) return;
+        setIsSubmitting(true);
+        try {
+            await apiClient.delete(`/agencies/${selectedAgency.id}`);
+            setShowDeleteConfirm(false);
+            loadAgencies();
+        } catch (err) {
+            console.error("Erreur suppression:", err);
+        } finally {
+            setIsSubmitting(false);
+            setSelectedAgency(null);
+        }
+    };
+
+    const filteredAgencies = useMemo(() => {
+        return agencies.filter(a => 
+            a.agency_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            a.code?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [agencies, searchTerm]);
+
     return (
-        <div className="p-4 bg-light min-vh-100">
-           
-            <TopBar/>
-            {/* Header Stratégique */}
-            <div className="d-flex justify-content-between align-items-end mb-4">
-                <div>
-                    <h3 className="fw-bold mb-1 text-dark">Réseau d'Agences</h3>
-                    <p className="text-muted mb-0">Gestion centralisée des points de service Athari.</p>
-                </div>
-                <Button variant="primary" className="d-flex align-items-center gap-2" onClick={() => setShowModal(true)}>
-                    <Plus size={19} /> Créer une agence
-                </Button>
-            </div>
+        <Layout>
+            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#F8FAFC', minHeight: '100vh' }}>
+                
+                {/* HEADER */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+                    <Typography variant="h4" fontWeight="900" sx={{ color: '#1E293B', display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Avatar sx={{ bgcolor: indigo[500], background: activeGradient }}><Domain /></Avatar>
+                        Réseau d'Agences
+                    </Typography>
+                    <Button variant="contained" startIcon={<Add />} onClick={() => handleOpenForm()}
+                        sx={{ borderRadius: 3, background: activeGradient, fontWeight: 'bold' }}>
+                        Nouvelle Agence
+                    </Button>
+                </Box>
 
-            {/* Barre de recherche et Filtres */}
-            <div className="card border-0 shadow-sm mb-4">
-                <div className="card-body">
-                    <InputGroup style={{ maxWidth: '400px' }}>
-                        <InputGroup.Text className="bg-white border-end-0">
-                            <Search size={18} className="text-muted" />
-                        </InputGroup.Text>
-                        <Form.Control 
-                            placeholder="Rechercher par code ou nom..." 
-                            className="border-start-0 ps-0"
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </InputGroup>
-                </div>
-            </div>
+                {/* FILTRES */}
+                <Paper sx={{ borderRadius: 4, p: 2, mb: 4, border: '1px solid #E2E8F0', boxShadow: 'none' }}>
+                    <TextField fullWidth placeholder="Rechercher..." onChange={(e) => setSearchTerm(e.target.value)}
+                        InputProps={{ startAdornment: <InputAdornment position="start"><Search /></InputAdornment>,
+                        sx: { borderRadius: 3, bgcolor: '#F1F5F9', "& fieldset": { border: 'none' } } }}
+                    />
+                </Paper>
 
-            {/* Liste des Agences */}
-            <div className="card border-0 shadow-sm rounded-3">
-                <Table responsive hover className="mb-0 align-middle">
-                    <thead className="bg-light">
-                        <tr className="text-uppercase small fw-bold">
-                            <th className="ps-4">Code</th>
-                            <th>Nom complet</th>
-                            <th>Abréviation</th>
-                            <th>Date Création</th>
-                            <th className="text-end pe-4">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading ? (
-                            <tr><td colSpan="5" className="text-center py-5"><RotateCw className="spinner-border border-0 text-primary" /></td></tr>
-                        ) : filteredAgencies.length > 0 ? (
-                            filteredAgencies.map(agency => (
-                                <tr key={agency.id}>
-                                    <td className="ps-4 fw-bold text-primary">{agency.code}</td>
-                                    <td className="fw-medium">{agency.agency_name}</td>
-                                    <td><Badge bg="secondary" className="px-2 py-1">{agency.initials}</Badge></td>
-                                    <td className="text-muted">{agency.created_at}</td>
-                                    <td className="text-end pe-4">
-                                        <Button variant="link" className="text-danger p-0 border-0">
-                                            <Trash2 size={18} />
-                                        </Button>
-                                    </td>
-                                </tr>
-                            ))
-                        ) : (
-                            <tr><td colSpan="5" className="text-center py-5 text-muted">Aucune agence trouvée.</td></tr>
-                        )}
-                    </tbody>
-                </Table>
-            </div>
+                {/* TABLEAU */}
+                <Paper sx={{ borderRadius: 5, overflow: 'hidden', border: '1px solid #E2E8F0' }}>
+                    <TableContainer>
+                        {loading && <LinearProgress color="primary" />}
+                        <Table>
+                            <TableHead sx={{ bgcolor: '#F8FAFC' }}>
+                                <TableRow>
+                                    <TableCell sx={{ fontWeight: 'bold', pl: 4 }}>CODE</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>NOM COMPLET</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>INITIALES</TableCell>
+                                    <TableCell align="right" sx={{ fontWeight: 'bold', pr: 4 }}>ACTIONS</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {filteredAgencies.map((agency) => (
+                                    <TableRow key={agency.id} hover>
+                                        <TableCell sx={{ pl: 4, fontWeight: 'bold', color: indigo[600] }}>{agency.code}</TableCell>
+                                        <TableCell sx={{ fontWeight: 600 }}>{agency.agency_name}</TableCell>
+                                        <TableCell><Chip label={agency.initials} size="small" sx={{ bgcolor: '#EEF2FF', color: indigo[600] }} /></TableCell>
+                                        <TableCell align="right" sx={{ pr: 4 }}>
+                                            <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                                <IconButton onClick={() => { setSelectedAgency(agency); setShowDetails(true); }} size="small" sx={{ color: indigo[400] }}><InfoOutlined /></IconButton>
+                                                <IconButton onClick={() => handleOpenForm(agency)} size="small" sx={{ color: blue[500] }}><Edit /></IconButton>
+                                                <IconButton onClick={() => { setSelectedAgency(agency); setShowDeleteConfirm(true); }} size="small" sx={{ color: red[400] }}><Delete /></IconButton>
+                                            </Stack>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Paper>
 
-            {/* Modal de création */}
-            <Modal show={showModal} onHide={() => setShowModal(false)} centered>
-                <Modal.Header closeButton className="border-0 pb-0">
-                    <Modal.Title className="fw-bold">Nouvelle Agence</Modal.Title>
-                </Modal.Header>
-                <Form onSubmit={handleCreateAgency}>
-                    <Modal.Body>
-                        <Form.Group className="mb-3">
-                            <Form.Label className="small fw-bold text-muted">CODE UNIQUE</Form.Label>
-                            <Form.Control 
-                                isInvalid={!!errors.code}
-                                placeholder="ex: AGE-DOU-01"
-                                onChange={e => setFormData({...formData, code: e.target.value})}
-                            />
-                            <Form.Control.Feedback type="invalid">{errors.code?.[0]}</Form.Control.Feedback>
-                        </Form.Group>
+                {/* FORM MODAL (CREATE / EDIT) */}
+                <Dialog open={showFormModal} onClose={() => setShowFormModal(false)} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 5 } }}>
+                    <DialogTitle sx={{ fontWeight: 800 }}>{isEdit ? "Modifier l'agence" : "Nouvelle Agence"}</DialogTitle>
+                    <form onSubmit={handleSubmit}>
+                        <DialogContent>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12}><TextField fullWidth label="CODE" value={formData.code} error={!!errors.code} helperText={errors.code?.[0]} onChange={e => setFormData({...formData, code: e.target.value})} /></Grid>
+                                <Grid item xs={12}><TextField fullWidth label="NOM" value={formData.name} error={!!errors.name} helperText={errors.name?.[0]} onChange={e => setFormData({...formData, name: e.target.value})} /></Grid>
+                                <Grid item xs={12}><TextField fullWidth label="INITIALES" value={formData.short_name} error={!!errors.short_name} helperText={errors.short_name?.[0]} onChange={e => setFormData({...formData, short_name: e.target.value})} /></Grid>
+                            </Grid>
+                        </DialogContent>
+                        <DialogActions sx={{ p: 3 }}>
+                            <Button onClick={() => setShowFormModal(false)}>Annuler</Button>
+                            <Button type="submit" variant="contained" disabled={isSubmitting} sx={{ borderRadius: 3, background: activeGradient }}>
+                                {isSubmitting ? <CircularProgress size={24} color="inherit" /> : "Enregistrer"}
+                            </Button>
+                        </DialogActions>
+                    </form>
+                </Dialog>
 
-                        <Form.Group className="mb-3">
-                            <Form.Label className="small fw-bold text-muted">NOM DE L'AGENCE</Form.Label>
-                            <Form.Control 
-                                isInvalid={!!errors.name}
-                                onChange={e => setFormData({...formData, name: e.target.value})}
-                            />
-                            <Form.Control.Feedback type="invalid">{errors.name?.[0]}</Form.Control.Feedback>
-                        </Form.Group>
-
-                        <Form.Group className="mb-3">
-                            <Form.Label className="small fw-bold text-muted">ABRÉVIATION (NOM COURT)</Form.Label>
-                            <Form.Control 
-                                isInvalid={!!errors.short_name}
-                                placeholder="ex: ACY"
-                                onChange={e => setFormData({...formData, short_name: e.target.value})}
-                            />
-                            <Form.Control.Feedback type="invalid">{errors.short_name?.[0]}</Form.Control.Feedback>
-                        </Form.Group>
-                    </Modal.Body>
-                    <Modal.Footer className="border-0 pt-0">
-                        <Button variant="light" onClick={() => setShowModal(false)}>Annuler</Button>
-                        <Button variant="primary" type="submit" disabled={isSubmitting}>
-                            {isSubmitting ? 'Enregistrement...' : 'Confirmer la création'}
+                {/* MODALE SUPPRESSION */}
+                <Dialog open={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} PaperProps={{ sx: { borderRadius: 5, p: 2 } }}>
+                    <Box sx={{ textAlign: 'center', p: 2 }}>
+                        <Avatar sx={{ bgcolor: red[50], color: red[500], width: 60, height: 60, mx: 'auto', mb: 2 }}><WarningAmber sx={{ fontSize: 40 }} /></Avatar>
+                        <Typography variant="h6" fontWeight="bold">Confirmer la suppression</Typography>
+                        <Typography variant="body2" color="textSecondary">Supprimer l'agence <b>{selectedAgency?.agency_name}</b> ?</Typography>
+                    </Box>
+                    <DialogActions sx={{ justifyContent: 'center', gap: 2, pb: 2 }}>
+                        <Button onClick={() => setShowDeleteConfirm(false)}>Annuler</Button>
+                        <Button onClick={handleDelete} variant="contained" sx={{ bgcolor: red[500], borderRadius: 3 }}>
+                            {isSubmitting ? <CircularProgress size={20} color="inherit" /> : "Supprimer"}
                         </Button>
-                    </Modal.Footer>
-                </Form>
-            </Modal>
-        </div>
+                    </DialogActions>
+                </Dialog>
+
+                {/* MODALE DÉTAILS */}
+                <Dialog open={showDetails} onClose={() => setShowDetails(false)} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 5 } }}>
+                    <DialogTitle sx={{ fontWeight: 800, display: 'flex', justifyContent: 'space-between' }}>
+                        Détails <IconButton onClick={() => setShowDetails(false)}><Close /></IconButton>
+                    </DialogTitle>
+                    <DialogContent>
+                        {selectedAgency && (
+                            <List disablePadding>
+                                <ListItem sx={{ px: 0 }}><ListItemText primary="Code" secondary={selectedAgency.code} /></ListItem>
+                                <Divider />
+                                <ListItem sx={{ px: 0 }}><ListItemText primary="Désignation" secondary={selectedAgency.agency_name} /></ListItem>
+                                <Divider />
+                                <ListItem sx={{ px: 0 }}><ListItemText primary="Création" secondary={selectedAgency.created_at} /></ListItem>
+                            </List>
+                        )}
+                    </DialogContent>
+                </Dialog>
+            </Box>
+        </Layout>
     );
 };
 
