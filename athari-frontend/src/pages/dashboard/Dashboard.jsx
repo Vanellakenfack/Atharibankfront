@@ -5,6 +5,8 @@ import { BarChart3, TrendingUp, Users, Zap, ArrowUpRight, ArrowDownRight, Wallet
 import Sidebar from '../../components/layout/Sidebar'
 import TopBar from '../../components/layout/TopBar'
 
+import TitanicPie from '../../components/charts/TitanicPie';
+
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeNav, setActiveNav] = useState('overview')
@@ -87,22 +89,10 @@ export default function App() {
                     <select className="form-select form-select-sm w-auto border-0 bg-light">
                       <option>7 derniers jours</option>
                     </select>
+                     
                   </div>
-                  <div className="bg-light rounded-4 p-4" style={{ height: 250 }}>
-                    <div className="h-100 d-flex align-items-end gap-3">
-                      {[40, 60, 45, 70, 55, 80, 65, 90].map((h, idx) => (
-                        <div key={idx} className="flex-fill position-relative group">
-                          <div 
-                            className="w-100 rounded-top-3 transition-all" 
-                            style={{ 
-                              height: `${h}%`, 
-                              background: 'linear-gradient(180deg, #6366f1 0%, #e0e7ff 100%)',
-                              cursor: 'pointer'
-                            }}
-                          ></div>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="bg-light rounded-4 p-4" style={{ height: 'auto' }}>
+                     <TitanicPie />
                   </div>
                 </div>
               </div>

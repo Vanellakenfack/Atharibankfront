@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../../assets/css/dash.css';
@@ -11,7 +11,13 @@ import {
   LogOut, 
   ShieldCheck,
   ChevronLeft,
-  Menu
+  Menu,
+  ChevronDown,
+  FileChartLine,
+  FileText,
+  FileType,
+  BookOpen,
+  List
 } from 'lucide-react';
 import { useAuth } from "../../context/AuthContext";
 
@@ -19,15 +25,21 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showDATMenu, setShowDATMenu] = useState(false);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
 
   const items = [
     { id: 'overview', icon: BarChart3, label: 'Tableau de bord', path: '/dashboard' },
-    { id: 'users', icon: Users, label: 'Utilisateurs', path: '/users' },
+    { id: 'users', icon: Users, label: 'Utilisateurs', path: '/users/management' },
     { id: 'Clients', icon: Users, label: 'Clients', path: '/client' },
     { id: 'logs', icon: ShieldCheck, label: 'Logs d\'audit', path: '/log' },
     { id: 'analytics', icon: TrendingUp, label: 'Analyses', path: '/analytics' },
     { id: 'Performance', icon: Zap, label: 'Performance', path: '/performance' },
+    { id: 'Plan-comptable', icon: FileChartLine, label: 'Plan comptable', path: '/plan-comptable' },
   ];
+
+  const activeGradient = 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)';
 
   const handleLogout = async () => {
     if (window.confirm("Voulez-vous vraiment vous déconnecter ?")) {
@@ -36,7 +48,9 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     }
   };
 
-  const activeGradient = 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)';
+  const isDATPATH = location.pathname.startsWith('/dat');
+  const isAccountPATH = location.pathname === '/compte' || location.pathname === '/liste-des-comptes';
+  const isTypeComptePATH = location.pathname === '/Liste-type-de-compte' || location.pathname === '/Ajout-type-de-compte';
 
   return (
     <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'} border-end bg-white`} 
@@ -97,21 +111,255 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
             </Link>
           );
         })}
+
+        {/* MENU DAT - SAISIE DAT ET TYPE DAT */}
+        <div className="mb-2">
+          <div 
+            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+              isDATPATH ? 'text-white' : 'text-secondary hover-bg-light'
+            }`}
+            style={{ 
+              background: isDATPATH ? activeGradient : 'transparent',
+              cursor: 'pointer'
+            }}
+            onClick={() => setShowDATMenu(!showDATMenu)}
+          >
+            <div className="d-flex align-items-center gap-3">
+              <FileChartLine size={20} />
+              {sidebarOpen && <span className="small fw-bold">DAT</span>}
+            </div>
+            {sidebarOpen && (
+              <ChevronDown 
+                size={16} 
+                className={`transition-all ${showDATMenu ? 'rotate-180' : ''}`}
+                style={{ transition: 'transform 0.2s ease' }}
+              />
+            )}
+          </div>
+          
+          {/* Sous-menu DAT */}
+          {showDATMenu && sidebarOpen && (
+            <div className="ms-4 mt-1">
+              <Link
+                to="/dat/contracts"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  location.pathname === '/dat/contracts' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/dat/contracts' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileText size={16} />
+                Saisie DAT
+              </Link>
+              
+              <Link
+                to="/dat/types"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                  location.pathname === '/dat/types' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/dat/types' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileType size={16} />
+                Types DAT
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* MENU COMPTE - OUVERTURE ET LISTE DES COMPTES */}
+        <div className="mb-2">
+          <div 
+            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+              isAccountPATH ? 'text-white' : 'text-secondary hover-bg-light'
+            }`}
+            style={{ 
+              background: isAccountPATH ? activeGradient : 'transparent',
+              cursor: 'pointer'
+            }}
+            onClick={() => setShowAccountMenu(!showAccountMenu)}
+          >
+            <div className="d-flex align-items-center gap-3">
+              <BookOpen size={20} />
+              {sidebarOpen && <span className="small fw-bold">Compte</span>}
+            </div>
+            {sidebarOpen && (
+              <ChevronDown 
+                size={16} 
+                className={`transition-all ${showAccountMenu ? 'rotate-180' : ''}`}
+                style={{ transition: 'transform 0.2s ease' }}
+              />
+            )}
+          </div>
+          
+          {/* Sous-menu Compte */}
+          {showAccountMenu && sidebarOpen && (
+            <div className="ms-4 mt-1">
+              <Link
+                to="/compte"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  location.pathname === '/compte' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/compte' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <BookOpen size={16} />
+                Ouvrir un compte
+              </Link>
+              
+              <Link
+                to="/liste-des-comptes"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                  location.pathname === '/liste-des-comptes' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/liste-des-comptes' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <List size={16} />
+                Liste des comptes
+              </Link>
+            </div>
+          )}
+        </div>
       </nav>
 
       {/* FOOTER */}
       <div className="sidebar-footer p-3 border-top mt-auto">
-        <Link 
-          to="/settings" 
-          className={`d-flex align-items-center gap-3 p-2 text-decoration-none mb-1 rounded-3 transition-all ${
-            location.pathname.startsWith('/settings') ? 'text-white shadow' : 'text-secondary hover-bg-light'
-          }`}
-          style={{ background: location.pathname.startsWith('/settings') ? activeGradient : 'transparent' }}
-        >
-          <Settings size={20} />
-          {/* Texte paramètres mis en gras */}
-          {sidebarOpen && <span className="small fw-bold">Paramètres</span>}
-        </Link>
+        <div className="mb-1">
+          <div 
+            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+              location.pathname.startsWith('/settings') || isTypeComptePATH ? 'text-white' : 'text-secondary hover-bg-light'
+            }`}
+            style={{ 
+              background: location.pathname.startsWith('/settings') || isTypeComptePATH ? activeGradient : 'transparent',
+              cursor: 'pointer'
+            }}
+            onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+          >
+            <div className="d-flex align-items-center gap-3">
+              <Settings size={20} />
+              {sidebarOpen && <span className="small fw-bold">Paramètres</span>}
+            </div>
+            {sidebarOpen && (
+              <ChevronDown 
+                size={16} 
+                className={`transition-all ${showSettingsMenu ? 'rotate-180' : ''}`}
+                style={{ transition: 'transform 0.2s ease' }}
+              />
+            )}
+          </div>
+          {/* Sous-menu Paramètres */}
+          {showSettingsMenu && sidebarOpen && (
+            <div className="ms-4 mt-1">
+
+              <Link
+                to="/users/roles"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                  location.pathname === '/users/roles' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/users/roles' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileText size={16} />
+                Roles des utilisaters
+              </Link>
+
+
+              <Link
+                to="/Liste-type-de-compte"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  location.pathname === '/Liste-type-de-compte' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/Liste-type-de-compte' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <List size={16} />
+                Liste des Type de comptes
+              </Link>
+
+              {/*<Link
+                to="/frais/commissions"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  location.pathname.startsWith('/frais/commissions') 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname.startsWith('/frais/commissions') ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileText size={16} />
+                Frais et commissions
+              </Link>
+              <Link
+                to="/users/management"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  location.pathname.startsWith('/users/management') 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname.startsWith('/users/management') ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileText size={16} />
+                  Gestion des utilisateurs
+              </Link>
+*/}
+              
+              <Link
+                to="/frais/applications"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                  location.pathname === '/frais/applications' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/frais/applications' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileText size={16} />
+                Frais et applications
+              </Link>
+            </div>
+          )}
+        </div>
 
         <div 
           role="button"

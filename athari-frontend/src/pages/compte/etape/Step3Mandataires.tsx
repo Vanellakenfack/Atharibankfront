@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// src/pages/compte/etape/Step3Mandataires.tsx
+import React, { useState, useEffect } from 'react';
 import {
   Grid,
   TextField,
@@ -12,6 +13,9 @@ import {
   CardContent,
   Typography,
   Divider,
+  Box,
+  Alert,
+  CircularProgress
 } from '@mui/material';
 import PhotoCamera from '@mui/icons-material/PhotoCamera';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -22,8 +26,8 @@ import { fr } from 'date-fns/locale';
 // Valeurs par défaut pour un mandataire
 const defaultMandataire = {
   sexe: '',
-  noms: '',
-  prenoms: '',
+  nom: '',
+  prenom: '',
   date_naissance: null,
   lieu_naissance: '',
   telephone: '',
@@ -40,34 +44,148 @@ const defaultMandataire = {
   signature: null,
 };
 
-const Step3Mandataires = ({ 
+interface Step3MandatairesProps {
+  mandataire1: any;
+  mandataire2: any;
+  onChange: (field: 'mandataire1' | 'mandataire2', value: any) => void;
+  onNext: (mandatairesData: any) => Promise<void>;
+  isLastStep?: boolean;
+}
+
+const Step3Mandataires: React.FC<Step3MandatairesProps> = ({ 
   mandataire1 = defaultMandataire, 
   mandataire2 = defaultMandataire, 
-  onChange 
+  onChange,
+  onNext,
+  isLastStep = false
 }) => {
   const [activeMandataire, setActiveMandataire] = useState(1);
+  const [validating, setValidating] = useState(false);
+  const [error, setError] = useState('');
 
   // Fusionner avec les valeurs par défaut pour éviter undefined
   const safeMandataire1 = { ...defaultMandataire, ...mandataire1 };
   const safeMandataire2 = { ...defaultMandataire, ...mandataire2 };
 
-  const handleChange = (mandataireNumber, field, value) => {
-    const currentMandataire = mandataireNumber === 1 ? safeMandataire1 : safeMandataire2;
-    const updatedMandataire = {
-      ...currentMandataire,
-      [field]: value
-    };
+  const handleChange = (mandataireNumber: number, field: string, value: any) => {
+    // Créer une copie du mandataire actuel en préservant les références des objets Date
+    const currentData = mandataireNumber === 1 ? { ...safeMandataire1 } : { ...safeMandataire2 };
     
-    onChange(mandataireNumber === 1 ? 'mandataire1' : 'mandataire2', updatedMandataire);
+    // Mettre à jour la valeur du champ
+    currentData[field] = value;
+    
+    // Log pour déboguer
+    console.log(`Changement pour mandataire ${mandataireNumber} - ${field}:`, {
+      ancienneValeur: mandataireNumber === 1 ? safeMandataire1[field] : safeMandataire2[field],
+      nouvelleValeur: value,
+      situation_familiale: currentData.situation_familiale
+    });
+    
+    // Mettre à jour l'état via la prop onChange
+    onChange(mandataireNumber === 1 ? 'mandataire1' : 'mandataire2', currentData);
   };
 
-  const handleSignatureUpload = (mandataireNumber, file) => {
+  const handleSignatureUpload = (mandataireNumber: number, file: File | null) => {
     if (file) {
       handleChange(mandataireNumber, 'signature', file);
     }
   };
 
-  const renderMandataireForm = (mandataireNumber, data) => {
+  // Valider l'étape 3
+  const handleValidateStep3 = async () => {
+    // Vérifier les champs obligatoires pour le mandataire 1
+    const requiredFields = [
+      'sexe', 'noms', 'prenoms', 'date_naissance', 'lieu_naissance',
+      'telephone', 'adresse', 'nationalite', 'profession', 'situation_familiale', 'cni'
+    ];
+
+    const missingFields = requiredFields.filter(field => {
+      return !safeMandataire1[field] && safeMandataire1[field] !== 0;
+    });
+
+    if (missingFields.length > 0) {
+      setError(`Veuillez remplir tous les champs obligatoires pour le mandataire 1. Champs manquants: ${missingFields.join(', ')}`);
+      return;
+    }
+
+    // Vérification des champs du conjoint si marié
+    if (safeMandataire1.situation_familiale === 'marie') {
+      const conjointFields = ['nom_conjoint', 'date_naissance_conjoint', 'lieu_naissance_conjoint', 'cni_conjoint'];
+      const missingConjointFields = conjointFields.filter(field => {
+        return !safeMandataire1[field] && safeMandataire1[field] !== 0;
+      });
+
+      if (missingConjointFields.length > 0) {
+        setError(`Veuillez remplir tous les champs concernant le conjoint pour le mandataire 1. Champs manquants: ${missingConjointFields.join(', ')}`);
+        return;
+      }
+    }
+
+    try {
+      setValidating(true);
+      setError('');
+
+      // Formater les données selon le format attendu par le backend
+      const formatMandataireData = (data: any) => {
+        // Fonction utilitaire pour formater une date
+        const formatDate = (date: any) => {
+          if (!date) return null;
+          // Si c'est déjà une chaîne au format YYYY-MM-DD, la retourner telle quelle
+          if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return date;
+          }
+          // Si c'est un objet Date, le formater
+          if (date instanceof Date) {
+            return date.toISOString().split('T')[0];
+          }
+          // Sinon, essayer de créer une date
+          try {
+            const d = new Date(date);
+            return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+          } catch (e) {
+            console.error('Erreur de format de date:', e);
+            return null;
+          }
+        };
+
+        const formattedData = {
+          ...data, // Conserver toutes les propriétés existantes
+          nom: data.nom || data.noms || '',
+          prenom: data.prenom || data.prenoms || '',
+          date_naissance: formatDate(data.date_naissance),
+          date_naissance_conjoint: formatDate(data.date_naissance_conjoint),
+          nom_jeune_fille_mere: data.nom_jeune_fille_mere || '',
+          numero_cni: data.numero_cni || data.cni || '',
+          lieu_naissance_conjoint: data.lieu_naissance_conjoint || null,
+          cni_conjoint: data.cni_conjoint || null,
+          signature_path: data.signature_path || null
+        };
+        
+        // Ne pas supprimer les champs vides pour éviter les pertes de données
+        return formattedData;
+      };
+
+      const etape3Data = {
+        mandataire_1: formatMandataireData(safeMandataire1),
+      };
+
+      // Ajouter le mandataire 2 uniquement si des informations sont renseignées
+      if (safeMandataire2.noms || safeMandataire2.nom) {
+        etape3Data.mandataire_2 = formatMandataireData(safeMandataire2);
+      }
+
+      console.log('Données envoyées à l\'API (étape 3):', etape3Data);
+      await onNext(etape3Data);
+
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors de la validation de l\'étape 3');
+      console.error('Erreur détaillée:', err);
+    } finally {
+      setValidating(false);
+    }
+  };
+  
+  const renderMandataireForm = (mandataireNumber: number, data: any) => {
     const isMandataire1 = mandataireNumber === 1;
     
     return (
@@ -80,7 +198,7 @@ const Step3Mandataires = ({
 
         {/* Sexe */}
         <Grid item xs={12} sm={6}>
-          <FormControl component="fieldset">
+          <FormControl component="fieldset" required>
             <FormLabel component="legend">Sexe *</FormLabel>
             <RadioGroup
               row
@@ -115,7 +233,7 @@ const Step3Mandataires = ({
           />
         </Grid>
 
-        {/* Date de naissance - CORRIGÉ */}
+        {/* Date de naissance */}
         <Grid item xs={12} sm={6}>
           <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={fr}>
             <DatePicker
@@ -211,16 +329,16 @@ const Step3Mandataires = ({
           />
         </Grid>
 
-        {/* Situation familiale - CORRIGÉ: RadioGroup au lieu de Checkbox */}
+        {/* Situation familiale */}
         <Grid item xs={12}>
-          <FormControl component="fieldset">
+          <FormControl component="fieldset" required>
             <FormLabel component="legend">Situation familiale *</FormLabel>
             <RadioGroup
               row
               value={data.situation_familiale}
               onChange={(e) => handleChange(mandataireNumber, 'situation_familiale', e.target.value)}
             >
-              {['marié', 'célibataire', 'divorcé', 'veuf/veuve'].map((status) => (
+              {['marie', 'celibataire', 'autres'].map((status) => (
                 <FormControlLabel
                   key={status}
                   value={status}
@@ -233,7 +351,7 @@ const Step3Mandataires = ({
         </Grid>
 
         {/* Informations du conjoint (si marié) */}
-        {data.situation_familiale === 'marié' && (
+        {data.situation_familiale === 'marie' && (
           <>
             <Grid item xs={12}>
               <Typography variant="subtitle1" gutterBottom>
@@ -289,6 +407,13 @@ const Step3Mandataires = ({
           <Button
             variant="outlined"
             component="label"
+            sx={{
+              background: 'linear-gradient(135deg, #62bfc6ff 0%, #2e787d69 100%)',
+              boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
+              border: 'none',
+              padding: '10px 16px',
+              color:' #ffff'
+            }}
             startIcon={<PhotoCamera />}
           >
             Télécharger la signature
@@ -296,7 +421,7 @@ const Step3Mandataires = ({
               type="file"
               hidden
               accept="image/*"
-              onChange={(e) => handleSignatureUpload(mandataireNumber, e.target.files?.[0])}
+              onChange={(e) => handleSignatureUpload(mandataireNumber, e.target.files?.[0] || null)}
             />
           </Button>
           {data.signature && (
@@ -315,6 +440,12 @@ const Step3Mandataires = ({
         Étape 3: Mandataires
       </Typography>
 
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
       <Grid container spacing={3}>
         <Grid item xs={12}>
           <Card variant="outlined">
@@ -325,6 +456,20 @@ const Step3Mandataires = ({
                     fullWidth
                     variant={activeMandataire === 1 ? "contained" : "outlined"}
                     onClick={() => setActiveMandataire(1)}
+                    sx={{
+                      background: activeMandataire === 1 
+                        ? 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)' 
+                        : 'linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%)',
+                      color: activeMandataire === 1 ? '#fff' : 'rgba(0, 0, 0, 0.87)',
+                      border: 'none',
+                      padding: '10px 16px',
+                      '&:hover': {
+                        background: activeMandataire === 1 
+                          ? 'linear-gradient(135deg, #43A047 0%, #1B5E20 100%)' 
+                          : 'linear-gradient(135deg, #eeeeee 0%, #d5d5d5 100%)',
+                        boxShadow: '0 3px 5px rgba(0,0,0,0.2)'
+                      }
+                    }}
                   >
                     Mandataire 1
                   </Button>
@@ -334,6 +479,20 @@ const Step3Mandataires = ({
                     fullWidth
                     variant={activeMandataire === 2 ? "contained" : "outlined"}
                     onClick={() => setActiveMandataire(2)}
+                    sx={{
+                      background: activeMandataire === 2 
+                        ? 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)' 
+                        : 'linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%)',
+                      color: activeMandataire === 2 ? '#fff' : 'rgba(0, 0, 0, 0.87)',
+                      border: 'none',
+                      padding: '10px 16px',
+                      '&:hover': {
+                        background: activeMandataire === 2 
+                          ? 'linear-gradient(135deg, #43A047 0%, #1B5E20 100%)' 
+                          : 'linear-gradient(135deg, #eeeeee 0%, #d5d5d5 100%)',
+                        boxShadow: '0 3px 5px rgba(0,0,0,0.2)'
+                      }
+                    }}
                   >
                     Mandataire 2 (Optionnel)
                   </Button>
@@ -359,13 +518,14 @@ const Step3Mandataires = ({
               <Card variant="outlined">
                 <CardContent>
                   <Typography variant="subtitle1" gutterBottom>
-                    Mandataire 1
+                    Mandataire 1 (Principal)
                   </Typography>
                   {safeMandataire1.noms ? (
                     <>
                       <Typography><strong>Nom:</strong> {safeMandataire1.noms} {safeMandataire1.prenoms}</Typography>
                       <Typography><strong>CNI:</strong> {safeMandataire1.cni || 'Non renseigné'}</Typography>
                       <Typography><strong>Téléphone:</strong> {safeMandataire1.telephone || 'Non renseigné'}</Typography>
+                      <Typography><strong>Statut:</strong> {safeMandataire1.situation_familiale || 'Non renseigné'}</Typography>
                     </>
                   ) : (
                     <Typography color="textSecondary">Non renseigné</Typography>
@@ -377,13 +537,14 @@ const Step3Mandataires = ({
               <Card variant="outlined">
                 <CardContent>
                   <Typography variant="subtitle1" gutterBottom>
-                    Mandataire 2
+                    Mandataire 2 (Optionnel)
                   </Typography>
                   {safeMandataire2.noms ? (
                     <>
                       <Typography><strong>Nom:</strong> {safeMandataire2.noms} {safeMandataire2.prenoms}</Typography>
                       <Typography><strong>CNI:</strong> {safeMandataire2.cni || 'Non renseigné'}</Typography>
                       <Typography><strong>Téléphone:</strong> {safeMandataire2.telephone || 'Non renseigné'}</Typography>
+                      <Typography><strong>Statut:</strong> {safeMandataire2.situation_familiale || 'Non renseigné'}</Typography>
                     </>
                   ) : (
                     <Typography color="textSecondary">Non renseigné</Typography>
@@ -392,6 +553,34 @@ const Step3Mandataires = ({
               </Card>
             </Grid>
           </Grid>
+        </Grid>
+
+        {/* Bouton de validation */}
+        <Grid item xs={12}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+            <Button
+              variant="contained"
+              onClick={handleValidateStep3}
+              disabled={validating || !safeMandataire1.noms}
+              sx={{
+                background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
+                color: 'white',
+                padding: '10px 30px',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #43A047 0%, #1B5E20 100%)',
+                }
+              }}
+            >
+              {validating ? (
+                <>
+                  <CircularProgress size={20} sx={{ mr: 1 }} />
+                  Validation...
+                </>
+              ) : (
+                'Valider cette étape'
+              )}
+            </Button>
+          </Box>
         </Grid>
       </Grid>
     </div>

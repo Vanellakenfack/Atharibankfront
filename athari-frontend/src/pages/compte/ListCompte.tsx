@@ -12,7 +12,9 @@ import {
   Tooltip,
   CircularProgress,
   Alert,
-  ButtonGroup
+  ButtonGroup,
+  Box,
+  Typography
 } from '@mui/material';
 import {
   Visibility,
@@ -21,7 +23,7 @@ import {
   Block,
   CheckCircle,
   Cancel,
-  Gavel
+  Gavel,
 } from '@mui/icons-material';
 
 const statusColors = {
@@ -78,6 +80,11 @@ const AccountList = ({
 
   return (
     <TableContainer component={Paper}>
+      <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', textAlign: 'center' }}>
+        <Typography variant="h6" component="h2">
+          Gestion des Comptes
+        </Typography>
+      </Box>
       <Table>
         <TableHead>
           <TableRow>

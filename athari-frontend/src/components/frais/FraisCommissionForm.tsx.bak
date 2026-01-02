@@ -1,0 +1,474 @@
+import React, { useEffect, useState } from 'react';
+import { useFrais } from '../../hooks/useFrais';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { 
+  Alert,
+  CircularProgress,
+  TextField,
+  Button, 
+  Card, 
+  Typography, 
+  FormControlLabel,
+  Switch as MuiSwitch,
+  Box,
+  Divider,
+  InputAdornment,
+  Paper,
+  Stack,
+  Tabs,
+  Tab,
+  FormGroup,
+  FormHelperText
+} from '@mui/material';
+import Grid from '@mui/material/Grid';
+import { 
+  Save as SaveIcon, 
+  ArrowBack as ArrowBackIcon, 
+  Percent as PercentIcon,
+  AttachMoney as MoneyIcon,
+  ToggleOn as ToggleOnIcon,
+  ToggleOff as ToggleOffIcon,
+  AccountBalance as AccountBalanceIcon,
+  Settings as SettingsIcon,
+  Receipt as ReceiptIcon,
+  AccountTree as AccountTreeIcon,
+  Description as DescriptionIcon,
+  Info as InfoIcon
+} from '@mui/icons-material';
+import { useForm, Controller } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
+
+// Définition du schéma de validation avec Yup
+const fraisCommissionSchema = yup.object().shape({
+  // Informations générales
+  type_compte_id: yup.number().required('Le type de compte est requis'),
+  
+  // Frais d'ouverture
+  frais_ouverture: yup.number().min(0, 'Doit être positif').nullable(),
+  frais_ouverture_actif: yup.boolean().default(false),
+  
+  // Frais de tenue de compte
+  frais_tenue_compte: yup.number().min(0, 'Doit être positif').nullable(),
+  frais_tenue_actif: yup.boolean().default(false),
+  
+  // Commission sur les mouvements
+  commission_mouvement: yup.number().min(0, 'Doit être positif').nullable(),
+  commission_mouvement_type: yup.string().oneOf(['POURCENTAGE', 'MONTANT_FIXE'], 'Type de commission invalide').nullable(),
+  commission_mouvement_actif: yup.boolean().default(false),
+  
+  // Commission sur les retraits
+  commission_retrait: yup.number().min(0, 'Doit être positif').nullable(),
+  commission_retrait_actif: yup.boolean().default(false),
+  
+  // Commission SMS
+  commission_sms: yup.number().min(0, 'Doit être positif').nullable(),
+  commission_sms_actif: yup.boolean().default(false),
+  
+  // Autres frais
+  frais_deblocage: yup.number().min(0, 'Doit être positif').nullable(),
+  frais_deblocage_actif: yup.boolean().default(false),
+  
+  frais_cloture_anticipe: yup.number().min(0, 'Doit être positif').nullable(),
+  frais_cloture_anticipe_actif: yup.boolean().default(false),
+  
+  // Paramètres d'intérêt
+  taux_interet_annuel: yup.number().min(0, 'Doit être positif').nullable(),
+  frequence_calcul_interet: yup.string().nullable(),
+  heure_calcul_interet: yup.string().nullable(),
+  interets_actifs: yup.boolean().default(false),
+  
+  // Pénalités
+  penalite_retrait_anticipe: yup.number().min(0, 'Doit être positif').nullable(),
+  penalite_actif: yup.boolean().default(false),
+  
+  // Seuils et minimums
+  minimum_compte: yup.number().min(0, 'Doit être positif').nullable(),
+  minimum_compte_actif: yup.boolean().default(false),
+  
+  // Commissions mensuelles
+  seuil_commission_mensuelle: yup.number().min(0, 'Doit être positif').nullable(),
+  commission_mensuelle_elevee: yup.number().min(0, 'Doit être positif').nullable(),
+  commission_mensuelle_basse: yup.number().min(0, 'Doit être positif').nullable(),
+  
+  // Comptes associés
+  compte_commission_paiement: yup.string().nullable(),
+  compte_produit_commission: yup.string().nullable(),
+  compte_attente_produits: yup.string().nullable(),
+  compte_attente_sms: yup.string().nullable(),
+  
+  // Paramètres avancés
+  retrait_anticipe_autorise: yup.boolean().default(false),
+  validation_retrait_anticipe: yup.boolean().default(false),
+  duree_blocage_min: yup.number().min(0, 'Doit être positif').nullable(),
+  duree_blocage_max: yup.number().min(0, 'Doit être positif').nullable(),
+  observations: yup.string().nullable()
+});
+
+type FraisCommissionFormData = yup.InferType<typeof fraisCommissionSchema>;
+
+// Composant pour les onglets personnalisés
+function TabPanel(props: any) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`frais-tabpanel-${index}`}
+      aria-labelledby={`frais-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+const FraisCommissionForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
+  const { id } = useParams<{ id?: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [tabValue, setTabValue] = useState(0);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { 
+    fraisCommissions, 
+    loadFraisCommissions, 
+    typeComptes,
+    getTypeComptes
+  } = useFrais();
+
+  const { control, handleSubmit, formState: { errors, isSubmitting }, watch, setValue, reset } = useForm<FraisCommissionFormData>({
+    resolver: yupResolver(fraisCommissionSchema),
+    defaultValues: {
+      type_compte_id: undefined,
+      frais_ouverture: null,
+      frais_ouverture_actif: false,
+      frais_tenue_compte: null,
+      frais_tenue_actif: false,
+      commission_mouvement: null,
+      commission_mouvement_type: 'POURCENTAGE',
+      commission_mouvement_actif: false,
+      commission_retrait: null,
+      commission_retrait_actif: false,
+      commission_sms: null,
+      commission_sms_actif: false,
+      frais_deblocage: null,
+      frais_deblocage_actif: false,
+      frais_cloture_anticipe: null,
+      frais_cloture_anticipe_actif: false,
+      taux_interet_annuel: null,
+      frequence_calcul_interet: 'MENSUEL',
+      heure_calcul_interet: '00:00',
+      interets_actifs: false,
+      penalite_retrait_anticipe: null,
+      penalite_actif: false,
+      minimum_compte: null,
+      minimum_compte_actif: false,
+      seuil_commission_mensuelle: null,
+      commission_mensuelle_elevee: null,
+      commission_mensuelle_basse: null,
+      compte_commission_paiement: '',
+      compte_produit_commission: '',
+      compte_attente_produits: '',
+      compte_attente_sms: '',
+      retrait_anticipe_autorise: false,
+      validation_retrait_anticipe: false,
+      duree_blocage_min: null,
+      duree_blocage_max: null,
+      observations: ''
+    }
+  });
+
+  // Charger les données initiales
+  useEffect(() => {
+    const init = async () => {
+      try {
+        setLoading(true);
+        await getTypeComptes();
+        
+        if (isEdit && id) {
+          // Si c'est une édition, charger les données existantes
+          const frais = await fraisService.getFraisCommission(parseInt(id));
+          if (frais) {
+            // Mapper les champs du serveur vers le formulaire
+            const formData = {
+              ...frais,
+              // Assurez-vous que les champs sont correctement mappés
+            };
+            reset(formData);
+          }
+        } else if (location.state?.typeCompteId) {
+          // Si c'est une création avec un type de compte présélectionné
+          setValue('type_compte_id', location.state.typeCompteId);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des données:', error);
+        setSubmitError('Erreur lors du chargement des données');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    init();
+  }, [id, isEdit, location.state, reset, setValue]);
+
+  const onSubmit = async (data: FraisCommissionFormData) => {
+    setSubmitError(null);
+    setSubmitSuccess(null);
+    try {
+      const fraisData = {
+        ...data,
+        type: data.estPourcentage ? 'POURCENTAGE' : 'MONTANT_FIXE',
+        actif: data.estActif ?? true,
+        valeur: Number(data.valeur)
+      };
+
+      console.log('[FraisCommissionForm] Submit', { isEdit, id, fraisData });
+
+      if (isEdit && id) {
+        const result = await updateFraisCommission(parseInt(id), fraisData);
+        if (!result?.success) {
+          const msg = result?.error || 'Erreur lors de la mise à jour de la configuration';
+          setSubmitError(msg);
+          console.error('[FraisCommissionForm] Update failed:', msg, result);
+          return;
+        }
+        setSubmitSuccess('Configuration mise à jour avec succès');
+      } else {
+        const result = await createFraisCommission(fraisData);
+        if (!result?.success) {
+          const msg = result?.error || 'Erreur lors de la création de la configuration';
+          setSubmitError(msg);
+          console.error('[FraisCommissionForm] Create failed:', msg, result);
+          return;
+        }
+        setSubmitSuccess('Configuration créée avec succès');
+      }
+      
+      navigate('/frais/commissions');
+    } catch (error) {
+      setSubmitError('Erreur lors de la sauvegarde');
+      console.error('Erreur lors de la sauvegarde:', error);
+    }
+  };
+
+  const onInvalid = (formErrors: unknown) => {
+    console.warn('[FraisCommissionForm] Validation errors:', formErrors);
+    const messages: string[] = [];
+    if (formErrors && typeof formErrors === 'object') {
+      for (const val of Object.values(formErrors as Record<string, any>)) {
+        const msg = val?.message;
+        if (typeof msg === 'string' && msg.trim()) messages.push(msg);
+      }
+    }
+    setSubmitError(
+      messages.length > 0
+        ? `Validation: ${messages.join(' | ')}`
+        : 'Veuillez corriger les erreurs du formulaire avant d\'enregistrer.'
+    );
+  };
+
+  if (loading && !isSubmitting) return <div>Chargement...</div>;
+  if (error) return <div>Erreur: {error}</div>;
+
+  return (
+    <Box sx={{ px: { xs: 2, md: 4 }, py: 4, maxWidth: 1400, mx: 'auto' }}>
+      <Card component={Paper} sx={{ p: 3, maxWidth: 1200, margin: '0 auto' }}>
+        <Box component="form" onSubmit={handleSubmit(onSubmit, onInvalid)}>
+          {submitError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {submitError}
+            </Alert>
+          )}
+          {submitSuccess && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              {submitSuccess}
+            </Alert>
+          )}
+          <Typography variant="h4" component="h1" gutterBottom>
+            {isEdit ? 'Modifier le frais de commission' : 'Nouveau frais de commission'}
+          </Typography>
+          
+          <Divider sx={{ my: 3 }} />
+
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Controller
+                name="code"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="Code"
+                    fullWidth
+                    margin="normal"
+                    error={!!errors.code}
+                    helperText={errors.code?.message}
+                    placeholder="Ex: FRAIS_TRANSFERT"
+                  />
+                )}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Controller
+                name="libelle"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="Libellé"
+                    fullWidth
+                    margin="normal"
+                    error={!!errors.libelle}
+                    helperText={errors.libelle?.message}
+                    placeholder="Ex: Frais de transfert"
+                  />
+                )}
+              />
+            </Grid>
+          </Grid>
+
+        <Controller
+          name="description"
+          control={control}
+          render={({ field }) => (
+            <TextField
+              {...field}
+              label="Description"
+              fullWidth
+              margin="normal"
+              multiline
+              rows={3}
+              placeholder="Description détaillée du frais"
+            />
+          )}
+        />
+
+        <Grid container spacing={3} alignItems="center" sx={{ mt: 1 }}>
+          <Grid item>
+            <Controller
+              name="estPourcentage"
+              control={control}
+              defaultValue={false}
+              render={({ field }) => (
+                <FormControlLabel
+                  control={
+                    <MuiSwitch
+                      inputRef={field.ref}
+                      checked={field.value ?? false}
+                      onChange={(_, checked) => field.onChange(checked)}
+                      color="primary"
+                    />
+                  }
+                  label={field.value ? 'Pourcentage' : 'Montant fixe'}
+                />
+              )}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Controller
+              name="valeur"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  value={field.value ?? ''}
+                  type="number"
+                  label={estPourcentage ? 'Valeur (%)' : 'Valeur (FCFA)'}
+                  fullWidth
+                  margin="normal"
+                  error={!!errors.valeur}
+                  helperText={errors.valeur?.message}
+                  onChange={(e) => {
+                    const v = (e.target as HTMLInputElement).value;
+                    field.onChange(v === '' ? '' : Number(v));
+                  }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                      {estPourcentage ? <PercentIcon /> : 'FCFA'}
+                    </InputAdornment>
+                    ),
+                    inputProps: {
+                      step: estPourcentage ? 0.1 : 1,
+                      min: 0
+                    }
+                  }}
+                />
+              )}
+            />
+          </Grid>
+        </Grid>
+
+        <Box mt={3}>
+          <Controller
+            name="estActif"
+            control={control}
+            defaultValue={true}
+            render={({ field }) => (
+              <FormControlLabel
+                control={
+                  <MuiSwitch
+                    inputRef={field.ref}
+                    checked={field.value ?? true}
+                    onChange={(_, checked) => field.onChange(checked)}
+                    color="primary"
+                  />
+                }
+                label="Actif"
+              />
+            )}
+          />
+        </Box>
+
+        <Divider sx={{ my: 3 }} />
+
+        <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            sx={{
+            background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+            borderRadius: '10px',
+            px: 3,
+            py: 1.2,
+            textTransform: 'none',
+            fontWeight: 'bold',
+            boxShadow: '0 10px 15px -3px rgba(99, 102, 241, 0.3)',
+            '&:hover': { opacity: 0.9 }
+          }}
+
+            startIcon={<SaveIcon />}
+            disabled={isSubmitting}
+            onClick={() => console.log('[FraisCommissionForm] Click Enregistrer')}
+          >
+            {isSubmitting ? (
+              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+                <CircularProgress size={18} color="inherit" />
+                Enregistrement...
+              </Box>
+            ) : (
+              'Enregistrer'
+            )}
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={() => navigate('/frais/commissions')}
+            startIcon={<ArrowBackIcon />}
+          >
+            Retour
+          </Button>
+        </Stack>
+        </Box>
+      </Card>
+    </Box>
+  );
+};
+
+export default FraisCommissionForm;

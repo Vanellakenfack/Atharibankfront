@@ -7,6 +7,7 @@ import Home from '../pages/Home';
 import ListeClient from '../pages/client/ListeClient';
 import RoleManagement from "../pages/users/RoleManagement";
 import UserManagement from "../pages/users/UserManagement";
+import Formulaire from '../pages/compte/Formulaire';
 import ProtectedRoute from './ProtectedRoute';
 import Dashboard from '../pages/dashboard/Dashboard';
 import AuditLogView from '../pages/AuditLogView';
@@ -15,12 +16,17 @@ import FormClientMorale from '../pages/client/FormClientMorale';
 import ChoicePage from '../pages/client/ChoicePage';
 import DetailsClient from '../pages/client/DetailsClient';
 import ModifierClient from '../pages/client/ModifierClient';
+import TypeCompteForm from '../pages/compte/TypeCompteForm';
+import TypeCompteList from '../pages/compte/TypeCompteList';
+import ListeComptes from '../pages/compte/ListeComptes';
+import FraisCommissionPage from '../pages/FraisCommissionPage';
+import FraisApplicationPage from '../pages/FraisApplicationPage';
+import MataManagementPage from '../pages/MataManagementPage';
 import PlanComptableList from '../pages/plancomptable/PlanComptableList';
 import CategoryManager from '../pages/plancomptable/CategoryManager.jsx';
 import DatContractManager from '../pages/compte/DatContractManager.jsx';
 import DatTypeManager from '../pages/compte/DatTypeManager.jsx';
 // Ajoute "Link" dans l'importation existante
-
 
 const AppRoutes = () => {
   return (
@@ -49,6 +55,10 @@ const AppRoutes = () => {
         <Route path="accounts/create" element={<AccountManagement />} />
         <Route path="accounts/:id" element={<AccountManagement />} />
         <Route path="accounts/:id/edit" element={<AccountManagement />} />
+        
+        {/* Types de comptes */}
+        <Route path="/ajout-type-de-compte" element={<TypeCompteForm />} />
+        <Route path="/Liste-type-de-compte" element={<TypeCompteList />} />
 
         {/* Clients */}
         <Route path='/client' element={<ListeClient />} /> 
@@ -64,14 +74,24 @@ const AppRoutes = () => {
         {/* gestion de s agences */}
         <Route path='/agence' element={<Agence />} />
 
+        {/* gestion des comptes clients */}
+        <Route path='/compte' element={<Formulaire />} />
+        <Route path='/liste-des-comptes' element={<ListeComptes />} />
 
+        {/* Gestion des frais et commissions */}
+        <Route path="/frais/commissions/*" element={<FraisCommissionPage />} />
+        <Route path="/frais/applications/*" element={<FraisApplicationPage />} />
+        
+        {/* Gestion des opérations MATA */}
+        <Route path="/comptes/:compteId/mata/*" element={<MataManagementPage />} />
+        <Route path="/mata" element={<MataManagementPage />} />
         {/* Plan Comptable */}     
            <Route path='/plan-comptable' element={<PlanComptableList />} />
            <Route path='plan-comptable/categories' element={<CategoryManager/>} />
 
      {/* Gestion des contrats DAT */}
-            <Route path='/dat/contracts' element={<DatContractManager/>} />
-                        <Route path='/dat/types' element={<DatTypeManager/>} />
+        <Route path='/dat/contracts' element={<DatContractManager/>} />
+        <Route path='/dat/types' element={<DatTypeManager/>} />
 
             
 
