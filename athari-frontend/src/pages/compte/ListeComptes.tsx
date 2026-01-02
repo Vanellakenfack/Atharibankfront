@@ -2,6 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../../components/layout/Sidebar';
 import TopBar from '../../components/layout/TopBar';
+
+// Fonction utilitaire pour obtenir le code de devise ISO 4217
+const getIsoCurrency = (customCurrency: string): string => {
+  const currencyMap: Record<string, string> = {
+    'FCFA': 'XOF',
+    'EURO': 'EUR',
+    'DOLLAR': 'USD',
+    'POUND': 'GBP',
+  };
+  
+  // Retourne le code ISO correspondant ou 'XOF' par défaut
+  return currencyMap[customCurrency?.toUpperCase()] || 'XOF';
+};
 import {
   Box,
   Typography,
@@ -437,7 +450,7 @@ const ListeComptes: React.FC = () => {
                               <StyledTableCell sx={{ fontWeight: 600, color: '#1E293B' }}>
                                 {new Intl.NumberFormat('fr-FR', { 
                                   style: 'currency', 
-                                  currency: compte.devise === 'FCFA' ? 'XOF' : (compte.devise || 'XOF'),
+                                  currency: getIsoCurrency(compte.devise),
                                   minimumFractionDigits: 0,
                                   maximumFractionDigits: 0
                                 }).format(compte.solde || 0)}

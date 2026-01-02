@@ -68,21 +68,21 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
   const safeMandataire2 = { ...defaultMandataire, ...mandataire2 };
 
   const handleChange = (mandataireNumber: number, field: string, value: any) => {
-    // Créer une copie profonde du mandataire actuel
-    const currentMandataire = JSON.parse(JSON.stringify(mandataireNumber === 1 ? safeMandataire1 : safeMandataire2));
+    // Créer une copie du mandataire actuel en préservant les références des objets Date
+    const currentData = mandataireNumber === 1 ? { ...safeMandataire1 } : { ...safeMandataire2 };
     
     // Mettre à jour la valeur du champ
-    currentMandataire[field] = value;
+    currentData[field] = value;
     
     // Log pour déboguer
     console.log(`Changement pour mandataire ${mandataireNumber} - ${field}:`, {
       ancienneValeur: mandataireNumber === 1 ? safeMandataire1[field] : safeMandataire2[field],
       nouvelleValeur: value,
-      situation_familiale: currentMandataire.situation_familiale
+      situation_familiale: currentData.situation_familiale
     });
     
     // Mettre à jour l'état via la prop onChange
-    onChange(mandataireNumber === 1 ? 'mandataire1' : 'mandataire2', currentMandataire);
+    onChange(mandataireNumber === 1 ? 'mandataire1' : 'mandataire2', currentData);
   };
 
   const handleSignatureUpload = (mandataireNumber: number, file: File | null) => {
@@ -127,34 +127,41 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
 
       // Formater les données selon le format attendu par le backend
       const formatMandataireData = (data: any) => {
+        // Fonction utilitaire pour formater une date
+        const formatDate = (date: any) => {
+          if (!date) return null;
+          // Si c'est déjà une chaîne au format YYYY-MM-DD, la retourner telle quelle
+          if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return date;
+          }
+          // Si c'est un objet Date, le formater
+          if (date instanceof Date) {
+            return date.toISOString().split('T')[0];
+          }
+          // Sinon, essayer de créer une date
+          try {
+            const d = new Date(date);
+            return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+          } catch (e) {
+            console.error('Erreur de format de date:', e);
+            return null;
+          }
+        };
+
         const formattedData = {
-          sexe: data.sexe,
-          nom: data.nom || data.noms,
-          prenom: data.prenom || data.prenoms,
-          date_naissance: data.date_naissance ? new Date(data.date_naissance).toISOString().split('T')[0] : null,
-          lieu_naissance: data.lieu_naissance,
-          telephone: data.telephone,
-          adresse: data.adresse,
-          nationalite: data.nationalite,
-          profession: data.profession,
+          ...data, // Conserver toutes les propriétés existantes
+          nom: data.nom || data.noms || '',
+          prenom: data.prenom || data.prenoms || '',
+          date_naissance: formatDate(data.date_naissance),
+          date_naissance_conjoint: formatDate(data.date_naissance_conjoint),
           nom_jeune_fille_mere: data.nom_jeune_fille_mere || '',
-          numero_cni: data.numero_cni || data.cni,
-          situation_familiale: data.situation_familiale,
-          nom_conjoint: data.nom_conjoint || null,
-          date_naissance_conjoint: data.date_naissance_conjoint ? 
-            new Date(data.date_naissance_conjoint).toISOString().split('T')[0] : null,
+          numero_cni: data.numero_cni || data.cni || '',
           lieu_naissance_conjoint: data.lieu_naissance_conjoint || null,
           cni_conjoint: data.cni_conjoint || null,
           signature_path: data.signature_path || null
         };
         
-        // Supprimer les champs null ou undefined
-        Object.keys(formattedData).forEach(key => {
-          if (formattedData[key] === null || formattedData[key] === undefined) {
-            delete formattedData[key];
-          }
-        });
-        
+        // Ne pas supprimer les champs vides pour éviter les pertes de données
         return formattedData;
       };
 

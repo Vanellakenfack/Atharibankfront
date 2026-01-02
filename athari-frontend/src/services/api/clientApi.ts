@@ -70,10 +70,28 @@ export const planComptableService = {
       }
       
       console.log('Paramètres de la requête getChapitres:', params);
-      const response = await api.get('/plan-comptable/chapitres', { params });
+      const response = await api.get('/plan-comptable/comptes', { params });
       return response.data.data;
     } catch (error) {
       console.error('Erreur lors de la récupération des chapitres:', error);
+      if (error.response) {
+        console.error('Détails de l\'erreur:', {
+          status: error.response.status,
+          data: error.response.data,
+          headers: error.response.headers
+        });
+      }
+      throw error;
+    }
+  },
+
+  // Récupérer un chapitre par son ID
+  async getChapitre(chapitreId: string) {
+    try {
+      const response = await api.get(`/plan-comptable/comptes/${chapitreId}`);
+      return response.data.data;
+    } catch (error) {
+      console.error(`Erreur lors de la récupération du chapitre ${chapitreId}:`, error);
       if (error.response) {
         console.error('Détails de l\'erreur:', {
           status: error.response.status,

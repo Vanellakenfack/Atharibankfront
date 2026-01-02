@@ -1,17 +1,15 @@
-import axios from 'axios';
+//update
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+import ApiClient from './ApiClient';
 
-// Fonction pour obtenir le token
-const getToken = () => {
-  const token = localStorage.getItem('authToken');
-  if (!token) {
-    console.error('Token non trouvé dans localStorage');
-    // Rediriger vers la page de login
+
+// Fonction pour gérer les erreurs d'authentification
+const handleAuthError = (error: any) => {
+  if (error.response?.status === 401) {
+    console.error('Erreur d\'authentification, redirection vers la page de connexion');
     window.location.href = '/login';
-    throw new Error('Token d\'authentification manquant');
   }
-  return token;
+  throw error;
 };
 
 // Interface pour les données du compte
@@ -20,10 +18,16 @@ export interface CompteData {
   accountType: string;
   accountSubType: string;
   options: {
-    montant: string;
-    duree: string;
+    solde: string;
+    duree_blocage_mois: string;
     module: string;
     chapitre_id: string;
+    devise?: string;
+  };
+  gestionnaire?: {
+    nom: string;
+    prenom: string;
+    code: string;
   };
   mandataire1: any;
   mandataire2: any;
@@ -37,61 +41,42 @@ export interface CompteData {
 
 export const compteService = {
   // Créer un compte
-    async createCompte(formData: FormData): Promise<any> {
+  async createCompte(formData: FormData): Promise<any> {
     try {
-        const token = getToken();
-        const response = await axios.post(`${API_BASE_URL}/comptes/creer`, formData, {
+      const response = await ApiClient.post('/comptes/creer', formData, {
         headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
-        },
-        });
-        return response.data;
-    } catch (error: any) {
-        if (error.response?.data?.errors) {
-        console.error('Erreurs de validation détaillées:', error.response.data.errors);
-        }
-        if (error.response?.data?.message) {
-        console.error('Message d\'erreur:', error.response.data.message);
-        }
-        throw error;
-    }
-    },
-
-  // Valider étape 1
-  async validerEtape1(data: any): Promise<any> {
-    try {
-      const token = getToken();
-      console.log('Données étape 1:', data);
-      
-      const response = await axios.post(`${API_BASE_URL}/comptes/etape1/valider`, data, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'multipart/form-data',
         },
       });
       return response.data;
     } catch (error: any) {
-      console.error('Erreur validation étape 1:', error);
-      if (error.response?.status === 401) {
-        window.location.href = '/login';
+      if (error.response?.data?.errors) {
+        console.error('Erreurs de validation détaillées:', error.response.data.errors);
       }
-      throw error;
+      if (error.response?.data?.message) {
+        console.error('Message d\'erreur:', error.response.data.message);
+      }
+      return handleAuthError(error);
+    }
+  },
+
+  // Valider étape 1
+  async validerEtape1(data: any): Promise<any> {
+    try {
+      console.log('Données étape 1:', data);
+      const response = await ApiClient.post('/comptes/etape1/valider', data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Erreur validation étape 1:', error);
+      return handleAuthError(error);
     }
   },
 
   // Valider étape 2
   async validerEtape2(data: any): Promise<any> {
     try {
-      const token = getToken();
       console.log('Données étape 2 envoyées:', JSON.stringify(data, null, 2));
-      
-      const response = await axios.post(`${API_BASE_URL}/comptes/etape2/valider`, data, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await ApiClient.post('/comptes/etape2/valider', data);
       console.log('Réponse étape 2:', response.data);
       return response.data;
     } catch (error: any) {
@@ -100,20 +85,13 @@ export const compteService = {
         data: error.response?.data,
         message: error.message
       });
-      
-      if (error.response?.status === 401) {
-        window.location.href = '/login';
-      }
-      
-      throw error;
+      return handleAuthError(error);
     }
   },
 
   // Valider étape 3
   async validerEtape3(data: any): Promise<any> {
     try {
-      const token = getToken();
-      
       // Créer un objet FormData pour envoyer les données
       const formData = new FormData();
       
@@ -191,12 +169,11 @@ export const compteService = {
         console.log(pair[0] + ': ' + pair[1]);
       }
 
-      const response = await axios.post(
-        `${API_BASE_URL}/comptes/etape3/valider`,
+      const response = await ApiClient.post(
+        '/comptes/etape3/valider',
         formData,
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
           },
         }
@@ -208,34 +185,22 @@ export const compteService = {
         console.error('Détails de l\'erreur:', error.response.data);
         console.error('Status:', error.response.status);
       }
-      if (error.response?.status === 401) {
-        window.location.href = '/login';
-      }
-      throw error;
+      return handleAuthError(error);
     }
   },
 
+  formatDate(dateString: string | Date): string {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0]; // Format YYYY-MM-DD
+  },
+
   // Préparer FormData pour l'envoi final
-    prepareFormData(compteData: CompteData): FormData {
+  prepareFormData(compteData: CompteData): FormData {
     const formData = new FormData();
-
-    // Fonction utilitaire pour formater les dates
-    const formatDate = (dateString: string | Date): string => {
-      if (!dateString) return '';
-      const date = new Date(dateString);
-      return date.toISOString().split('T')[0]; // Format YYYY-MM-DD
-    };
-
-    // Log pour débogage
-    console.log('Données du compte:', JSON.stringify(compteData, null, 2));
-    console.log('Type de compte ID:', compteData.accountType);
-    console.log('Date de naissance mandataire 1:', compteData.mandataire1?.date_naissance);
-    console.log('Situation familiale:', compteData.mandataire1?.situation_familiale);
 
     // Étape 1: Informations de base
     if (compteData.client) {
-      console.log('Préparation des données - accountType:', compteData.accountType, 'Type:', typeof compteData.accountType);
-      
       // S'assurer que accountType est un nombre valide
       let typeCompteId: number | null = null;
       
@@ -250,27 +215,50 @@ export const compteService = {
         }
       }
       
-      console.log('Type de compte ID converti:', typeCompteId);
-      
       if (typeCompteId === null || isNaN(typeCompteId)) {
         console.error('Erreur: Le type de compte est invalide:', compteData.accountType);
         throw new Error('Le type de compte n\'est pas valide. Veuillez sélectionner un type de compte.');
       }
       
-      formData.append('etape1[client_id]', compteData.client.id.toString());
-      formData.append('etape1[type_compte_id]', typeCompteId.toString());
-      formData.append('etape1[code_type_compte]', compteData.accountSubType || '');
+      // S'assurer que code_type_compte est une chaîne de 2 caractères
+      let codeTypeCompte = '';
+      if (compteData.accountSubType && typeof compteData.accountSubType === 'string') {
+        // Prendre les 2 premiers caractères et les compléter avec des zéros si nécessaire
+        codeTypeCompte = String(compteData.accountSubType).padStart(2, '0').slice(0, 2);
+      } else {
+        // Si pas de accountSubType, utiliser les 2 premiers chiffres de l'ID du type de compte
+        codeTypeCompte = String(typeCompteId).padStart(2, '0').slice(0, 2);
+      }
       
-      console.log('Données ajoutées à formData - type_compte_id:', typeCompteId);
-      formData.append('etape1[devise]', 'FCFA');
-      formData.append('etape1[gestionnaire_nom]', 'Nom Gestionnaire');
-      formData.append('etape1[gestionnaire_prenom]', 'Prénom Gestionnaire');
-      formData.append('etape1[gestionnaire_code]', 'CODE123');
+      // Ajouter les champs de l'étape 1
+      formData.append('etape1[client_id]', String(compteData.client.id));
+      formData.append('etape1[code_type_compte]', codeTypeCompte);
+      formData.append('etape1[devise]', compteData.options?.devise || 'FCFA');
+      formData.append('etape1[type_compte_id]', String(typeCompteId));
+      
+      // Ajouter type_compte_id à la racine pour la compatibilité
+      //formData.append('type_compte_id', String(typeCompteId));
+      
+      // Ajout des champs du gestionnaire depuis le formulaire
+      if (compteData.gestionnaire) {
+        formData.append('etape2[gestionnaire_nom]', compteData.gestionnaire.nom );
+        formData.append('etape2[gestionnaire_prenom]', compteData.gestionnaire.prenom );
+        formData.append('etape2[gestionnaire_code]', compteData.gestionnaire.code );
+      }
     }
 
-    // Étape 2: Plan comptable
+    // Étape 2: Plan comptable et options
     if (compteData.options) {
-      formData.append('etape2[plan_comptable_id]', compteData.options.chapitre_id || '');
+      if (compteData.options.chapitre_id) {
+        formData.append('etape2[plan_comptable_id]', String(compteData.options.chapitre_id));
+      }
+      // Ajout du solde et de la durée
+      if (compteData.options.solde) {
+        formData.append('etape2[solde]', String(compteData.options.solde));
+      }
+      if (compteData.options.duree_blocage_mois) {
+        formData.append('etape2[duree_blocage_mois]', String(compteData.options.duree_blocage_mois));
+      }
     }
 
     // Étape 3: Mandataires
@@ -282,7 +270,7 @@ export const compteService = {
       formData.append('etape3[mandataire_1][sexe]', m1.sexe || '');
       formData.append('etape3[mandataire_1][nom]', m1.nom || m1.noms || '');
       formData.append('etape3[mandataire_1][prenom]', m1.prenom || m1.prenoms || '');
-      formData.append('etape3[mandataire_1][date_naissance]', formatDate(m1.date_naissance));
+      formData.append('etape3[mandataire_1][date_naissance]', this.formatDate(m1.date_naissance));
       formData.append('etape3[mandataire_1][lieu_naissance]', m1.lieu_naissance || '');
       formData.append('etape3[mandataire_1][telephone]', m1.telephone || '');
       formData.append('etape3[mandataire_1][adresse]', m1.adresse || '');
@@ -295,7 +283,7 @@ export const compteService = {
       // Si marié, ajouter les champs du conjoint
       if (isMarried) {
         formData.append('etape3[mandataire_1][nom_conjoint]', m1.nom_conjoint || '');
-        formData.append('etape3[mandataire_1][date_naissance_conjoint]', formatDate(m1.date_naissance_conjoint));
+        formData.append('etape3[mandataire_1][date_naissance_conjoint]', this.formatDate(m1.date_naissance_conjoint));
         formData.append('etape3[mandataire_1][lieu_naissance_conjoint]', m1.lieu_naissance_conjoint || '');
         formData.append('etape3[mandataire_1][cni_conjoint]', m1.cni_conjoint || '');
       } else {
@@ -328,5 +316,5 @@ export const compteService = {
     }
 
     return formData;
-    }
+  }
 };

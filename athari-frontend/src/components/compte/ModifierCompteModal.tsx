@@ -19,93 +19,68 @@ import {
 import { Close as CloseIcon } from '@mui/icons-material';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
-import compteService from '../../services/api/compteService';
+import { api } from '../../services/api/clientApi';
 
-interface Client {
+// Définition du type Compte basé sur la structure du service
+interface Mandataire {
   id: number;
-  num_client: string;
   nom: string;
   prenom: string;
-  type_client: string;
-  telephone: string;
-  email: string;
-  adresse_ville: string;
-  adresse_quartier: string;
-  bp: string;
-  pays_residence: string;
-  immobiliere?: string;
-  autres_biens?: string;
-  gestionnaire?: string;
-  profil?: string;
-  taxable: number;
-  interdit_chequier: number;
-  solde_initial: string;
-  created_at: string | null;
-  updated_at: string | null;
+  telephone?: string;
+  relation?: string;
+  // Propriétés du mandataire si nécessaire
 }
 
-interface TypeCompte {
-  id: number;
-  code: string;
-  libelle: string;
-  est_mata: boolean;
-  necessite_duree: boolean;
-  est_islamique: boolean;
-  actif: boolean;
-  created_at: string;
-  updated_at: string;
+interface Client {
+  id?: number;
+  num_client?: string;
+  type_client?: string;
+  telephone?: string;
+  email?: string;
+  adresse_ville?: string;
+  adresse_quartier?: string;
+  bp?: string;
+  pays_residence?: string;
+  prenom?: string;
+  nom?: string;
 }
 
-interface Compte {
+interface CompteType {
   id: number;
   numero_compte: string;
   client_id: number;
   type_compte_id: number;
-  chapitre_comptable_id: number | null;
+  chapitre_comptable_id?: string;
+  solde: number | string;
+  solde_disponible: number | string;
+  solde_bloque: number | string;
   devise: string;
   gestionnaire_nom: string;
   gestionnaire_prenom: string;
   gestionnaire_code: string;
-  rubriques_mata: Record<string, number>;
+  rubriques_mata: Record<string, any> | null;
   duree_blocage_mois: number | null;
-  statut: string;
-  solde: number;
-  solde_disponible: number;
-  solde_bloque: number;
-  notice_acceptee: boolean;
-  date_acceptation_notice: string | null;
-  signature_path: string | null;
+  statut: 'actif' | 'inactif' | 'cloture' | 'suspendu';
   date_ouverture: string;
   date_cloture: string | null;
+  notice_acceptee: boolean;
+  date_acceptation_notice: string | null;
   observations: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-  deleted_at: string | null;
-  client: Client;
-  type_compte: TypeCompte;
-  chapitre_comptable: {
-    id: number;
-    code: string;
-    libelle: string;
-  } | null;
-  plan_comptable: {
-    id: number;
-    code: string;
-    libelle: string;
-  } | null;
-  mandataires: Array<{
-    id: number;
-    nom: string;
-    prenom: string;
-    relation: string;
-  }>;
+  mandataires?: Mandataire[];
+  client?: Client;
 }
+
+const compteService = {
+  updateCompte: (id: number, data: Partial<CompteType>): Promise<CompteType> => {
+    return api.put(`/comptes/${id}`, data).then(response => response.data);
+  }
+};
 
 interface ModifierCompteModalProps {
   open: boolean;
   onClose: () => void;
-  compte: Compte | null;
-  onUpdate: (compte: Compte) => void;
+  compte: CompteType | null;
+  onUpdate: (compte: CompteType) => void;
 }
 
 // Liste des statuts possibles
@@ -117,15 +92,15 @@ const STATUTS = [
 
 // Liste des devises (à adapter selon vos besoins)
 const DEVISES = [
-  { value: 'XOF', label: 'Franc CFA (XOF)' },
-  { value: 'EUR', label: 'Euro (EUR)' },
-  { value: 'USD', label: 'Dollar US (USD)' },
+  { value: 'FCFA', label: 'FCFA' },
+  { value: 'EURO', label: 'EURO' },
+  { value: 'DOLLAR', label: 'DOLLAR' },
 ];
 
 interface FormValues {
-  solde: number;
-  solde_disponible: number;
-  solde_bloque: number;
+  solde: number | string;
+  solde_disponible: number | string;
+  solde_bloque: number | string;
   devise: string;
   statut: string;
   gestionnaire_nom: string;
@@ -138,13 +113,23 @@ interface FormValues {
   adresse_quartier: string;
   bp: string;
   pays_residence: string;
+  duree_blocage_mois: number | null;
 }
 
 const validationSchema = Yup.object({
   solde: Yup.number().required('Le solde est requis').min(0, 'Le solde ne peut pas être négatif'),
   solde_disponible: Yup.number().min(0, 'Le solde disponible ne peut pas être négatif'),
   solde_bloque: Yup.number().min(0, 'Le solde bloqué ne peut pas être négatif'),
-  devise: Yup.string().required('La devise est requise'),
+  duree_blocage_mois: Yup.number()
+    .nullable()
+    .integer('La durée doit être un nombre entier')
+    .min(3, 'La durée minimale est de 3 mois')
+    .max(12, 'La durée maximale est de 12 mois')
+    .typeError('La durée doit être un nombre'),
+  devise: Yup.string()
+    .required('La devise est requise')
+    .oneOf(['FCFA', 'EURO', 'DOLLAR', 'POUND'], 'La devise doit être : FCFA, EURO, DOLLAR ou POUND')
+    .transform((value) => value ? value.toUpperCase() : value),
   statut: Yup.string().required('Le statut est requis'),
   gestionnaire_nom: Yup.string().required('Le nom du gestionnaire est requis'),
   gestionnaire_prenom: Yup.string().required('Le prénom du gestionnaire est requis'),
@@ -183,7 +168,8 @@ const ModifierCompteModal: React.FC<ModifierCompteModalProps> = ({
       adresse_ville: initialCompte?.client?.adresse_ville || '',
       adresse_quartier: initialCompte?.client?.adresse_quartier || '',
       bp: initialCompte?.client?.bp || '',
-      pays_residence: initialCompte?.client?.pays_residence || ''
+      pays_residence: initialCompte?.client?.pays_residence || '',
+      duree_blocage_mois: initialCompte?.duree_blocage_mois || null
     },
     validationSchema,
     enableReinitialize: true,
@@ -194,32 +180,75 @@ const ModifierCompteModal: React.FC<ModifierCompteModalProps> = ({
         setLoading(true);
         setError('');
         
-        const updatedCompte = await compteService.updateCompte(initialCompte.id, {
+        // Valider duree_blocage_mois
+        let dureeBlocageMois: number | null = null;
+        if (values.duree_blocage_mois !== null && values.duree_blocage_mois !== undefined && values.duree_blocage_mois !== '') {
+          // Convertir en nombre et vérifier que c'est un entier valide
+          const duree = parseInt(values.duree_blocage_mois.toString(), 10);
+          if (isNaN(duree) || duree < 3 || duree > 12) {
+            throw new Error('La durée de blocage doit être un nombre entier entre 3 et 12 mois');
+          }
+          dureeBlocageMois = duree;
+        }
+        
+        // Normaliser la devise en majuscules
+        const updatedValues = {
           ...values,
-          solde: Number(values.solde),
-          solde_disponible: Number(values.solde_disponible),
-          solde_bloque: Number(values.solde_bloque),
-          // Mise à jour des informations du client
-          client: {
-            ...initialCompte.client,
-            telephone: values.telephone,
-            email: values.email,
-            adresse_ville: values.adresse_ville,
-            adresse_quartier: values.adresse_quartier,
-            bp: values.bp,
-            pays_residence: values.pays_residence,
-          },
-        });
+          devise: values.devise ? values.devise.toUpperCase() : values.devise,
+          duree_blocage_mois: dureeBlocageMois
+        };
+        
+        // Préparer uniquement les champs attendus par l'API
+        const dataToSend: Record<string, any> = {
+          // Champs autorisés par UpdateCompteRequest
+          devise: updatedValues.devise,
+          statut: updatedValues.statut as 'actif' | 'inactif' | 'suspendu',
+          gestionnaire_nom: updatedValues.gestionnaire_nom || null,
+          gestionnaire_prenom: updatedValues.gestionnaire_prenom || null,
+          gestionnaire_code: updatedValues.gestionnaire_code || null,
+          rubriques_mata: initialCompte.rubriques_mata || {},
+          observations: updatedValues.observations || null,
+        };
+
+        // Ajouter duree_blocage_mois uniquement s'il a une valeur
+        if (dureeBlocageMois !== null) {
+          // S'assurer que la valeur est un nombre entier et la convertir explicitement
+          dataToSend.duree_blocage_mois = Math.floor(Number(dureeBlocageMois));
+        } else {
+          // Si la durée de blocage est null ou undefined, l'exclure complètement
+          delete dataToSend.duree_blocage_mois;
+        }
+
+        // Mise à jour séparée des informations du client
+        const clientData = {
+          telephone: values.telephone,
+          email: values.email,
+          adresse_ville: values.adresse_ville,
+          adresse_quartier: values.adresse_quartier,
+          bp: values.bp,
+          pays_residence: values.pays_residence,
+        };
+
+        // Envoyer uniquement les données autorisées
+        const updatedCompte = await compteService.updateCompte(initialCompte.id, dataToSend);
         
         onUpdate({
           ...initialCompte,
-          ...updatedCompte.data,
+          ...updatedCompte,
         });
         
         onClose();
-      } catch (err) {
+      } catch (err: any) {
         console.error('Erreur lors de la mise à jour du compte:', err);
-        setError('Une erreur est survenue lors de la mise à jour du compte');
+        
+        // Afficher le message d'erreur détaillé s'il est disponible
+        if (err.response?.data?.message) {
+          setError(`Erreur: ${err.response.data.message}`);
+        } else if (err.message) {
+          setError(`Erreur: ${err.message}`);
+        } else {
+          setError('Une erreur est survenue lors de la mise à jour du compte');
+        }
       } finally {
         setLoading(false);
       }
@@ -266,22 +295,22 @@ const ModifierCompteModal: React.FC<ModifierCompteModalProps> = ({
               {/* Type de compte */}
               <TextField
                 label="Type de compte"
-                value={initialCompte.type_compte?.libelle || 'Non spécifié'}
+                value={initialCompte.type_compte_id || 'Non spécifié'}
                 fullWidth
                 margin="normal"
                 disabled
               />
 
               {/* Chapitre comptable */}
-              <TextField
-                label="Chapitre comptable"
-                value={initialCompte.chapitre_comptable 
-                  ? `${initialCompte.chapitre_comptable.code} - ${initialCompte.chapitre_comptable.libelle}`
-                  : 'Non spécifié'}
-                fullWidth
-                margin="normal"
-                disabled
-              />
+              <Box>
+                <Typography variant="subtitle2" color="textSecondary">
+                  Chapitre Comptable:
+                </Typography>
+                <Typography variant="body2">
+                  {initialCompte.chapitre_comptable_id ? 
+                    `${initialCompte.chapitre_comptable_id} - Chapitre` : 'Non défini'}
+                </Typography>
+              </Box>
 
               {/* Gestionnaire Prénom */}
               <TextField
@@ -478,7 +507,22 @@ const ModifierCompteModal: React.FC<ModifierCompteModalProps> = ({
                 </Box>
               )}
 
-              {/* Mandataires cette section n'est affichée que si initialCompte.mandataires existe et contient au moins un élément.*/}
+              {/* Durée de blocage */}
+              <TextField
+                label="Durée de blocage (mois)"
+                name="duree_blocage_mois"
+                type="number"
+                value={formik.values.duree_blocage_mois || ''}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.duree_blocage_mois && Boolean(formik.errors.duree_blocage_mois)}
+                helperText={formik.touched.duree_blocage_mois && formik.errors.duree_blocage_mois}
+                fullWidth
+                margin="normal"
+                inputProps={{ min: 3, max: 12, step: 1 }}
+              />
+
+              {/* Mandataires */}
               {initialCompte.mandataires && initialCompte.mandataires.length > 0 && (
                 <Box gridColumn="1 / -1">
                   <Typography variant="subtitle2" gutterBottom>
@@ -495,8 +539,13 @@ const ModifierCompteModal: React.FC<ModifierCompteModalProps> = ({
                     {initialCompte.mandataires.map((mandataire, index) => (
                       <Box key={index} p={1} bgcolor="#f5f5f5" borderRadius={1}>
                         <Typography variant="body2">
-                          <strong>{mandataire.prenom} {mandataire.nom}</strong><br />
-                          Relation: {mandataire.relation}
+                          <strong>{mandataire.prenom} {mandataire.nom}</strong>
+                          {mandataire.relation && (
+                            <>
+                              <br />
+                              Relation: {mandataire.relation}
+                            </>
+                          )}
                         </Typography>
                       </Box>
                     ))}

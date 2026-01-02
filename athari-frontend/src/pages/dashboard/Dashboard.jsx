@@ -32,10 +32,10 @@ export default function App() {
   ]
 
   const recentTransactions = [
-    { id: 101, client: 'Dupont Jean', amount: 150000, type: 'Dépôt', date: '13 Jan, 14:32', status: 'Validé' },
-    { id: 102, client: 'Martin Sophie', amount: 75000, type: 'Retrait', date: '13 Jan, 13:15', status: 'Validé' },
-    { id: 103, client: 'Bernard Pierre', amount: 250000, type: 'Dépôt', date: '13 Jan, 11:45', status: 'En attente' },
-    { id: 104, client: 'Leclerc Marie', amount: 125000, type: 'Retrait', date: '13 Jan, 10:20', status: 'Validé' },
+    { id: 101, client: 'martin Jean', amount: 150000, type: 'Dépôt', date: '13 Jan, 14:32', status: 'Validé' },
+    { id: 102, client: 'boubp Sophie', amount: 75000, type: 'Retrait', date: '13 Jan, 13:15', status: 'Validé' },
+    { id: 103, client: 'siewe Pierre', amount: 250000, type: 'Dépôt', date: '13 Jan, 11:45', status: 'En attente' },
+    { id: 104, client: 'gnandeu Marie', amount: 125000, type: 'Retrait', date: '13 Jan, 10:20', status: 'Validé' },
   ]
 
   return (

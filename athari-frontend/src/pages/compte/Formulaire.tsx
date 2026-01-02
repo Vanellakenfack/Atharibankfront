@@ -16,6 +16,8 @@ import {
   Typography,
   styled
 } from '@mui/material';
+import Sidebar from '../../components/layout/Sidebar';
+import TopBar from '../../components/layout/TopBar';
 import Step1ClientInfo from './etape/Step1ClientInfo';
 import Step2AccountType from './etape/Step2AccountType';
 import Step3Mandataires from './etape/Step3Mandataires';
@@ -63,7 +65,7 @@ const StyledConnector = styled('div')({
     left: 'calc(-50% + 20px)',
     right: 'calc(50% + 20px)',
   },
-  '& .MuiStepConnector-line.MuiStepConnector-lineHorizontal': {
+  '& .MuiStepConnector-line': {
     borderTopWidth: 3,
     borderColor: '#e0e0e0',
   },
@@ -84,6 +86,11 @@ const defaultFormData: CompteData = {
     duree: '',
     module: '',
     chapitre_id: '',
+  },
+  gestionnaire: {
+    nom: '',
+    prenom: '',
+    code: ''
   },
   mandataire1: {
     sexe: '',
@@ -144,6 +151,7 @@ const AccountForm: React.FC<AccountFormProps> = ({
   onCancel, 
   mode = 'create' 
 }) => {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState<CompteData>(defaultFormData);
   const [loading, setLoading] = useState(false);
@@ -226,6 +234,27 @@ const AccountForm: React.FC<AccountFormProps> = ({
     try {
       setLoading(true);
       const response = await compteService.validerEtape2(etape2Data);
+      
+      // Mettre à jour le formData avec l'accountType
+      updateFormData('accountType', etape2Data.account_type);
+      updateFormData('accountSubType', etape2Data.account_sub_type);
+      
+      // Mettre à jour les options du formulaire
+      updateFormData('options', {
+        ...formData.options,
+        montant: etape2Data.montant,
+        duree: etape2Data.duree,
+        module: etape2Data.module,
+        chapitre_id: etape2Data.chapitre_comptable_id,
+        categorie_id: etape2Data.categorie_id    
+      });
+
+    // Mettre à jour l'objet gestionnaire
+    updateFormData('gestionnaire', {
+      nom: etape2Data.gestionnaire_nom || '',
+      prenom: etape2Data.gestionnaire_prenom || '',
+      code: etape2Data.gestionnaire_code || ''
+    });
       
       // Marquer l'étape comme validée
       if (!stepValidated.includes(2)) {
@@ -349,168 +378,181 @@ const AccountForm: React.FC<AccountFormProps> = ({
   };
 
   return (
-    <Container maxWidth="lg">
-      <Card sx={{ p: 3, mt: 3, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-        {/* Bouton retour */}
-        <Tooltip title="Retour au menu principal" arrow>
-          <IconButton
-            onClick={() => navigate('/dashboard')}
-            sx={{ 
-              mb: 2,
-              background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
-              color: 'white',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #43A047 0%, #1B5E20 100%)',
-              }
-            }}
-          >
-            <ArrowBackIcon />
-          </IconButton>
-        </Tooltip>
-        
-        <Typography variant="h4" component="h2" gutterBottom sx={{ 
-          fontWeight: 'bold', 
-          mb: 4,
-          color: '#2c3e50',
-          textAlign: 'center'
-        }}>
-          {mode === 'create' ? 'Ouverture de Compte' : 'Modification de Compte'}
-        </Typography>
-
-        {/* Stepper */}
-        <Stepper
-          activeStep={activeStep}
-          alternativeLabel
-          connector={<StyledConnector />}
-          sx={{ 
-            mb: 6,
-            '& .MuiStep-root': {
-              padding: '0 10px',
-            },
-            '& .MuiStepLabel-root': {
-              flexDirection: 'column',
-              '& .MuiStepLabel-label': {
-                marginTop: '8px',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: '#555',
-                '&.Mui-active, &.Mui-completed': {
-                  color: '#333',
-                  fontWeight: 600,
-                },
-              },
-            },
-          }}
-        >
-          {steps.map((label, index) => (
-            <Step key={label}>
-              <StepLabel 
-                StepIconComponent={(props) => (
-                  <StyledStepIcon ownerState={{
-                    active: props.active,
-                    completed: props.completed,
-                  }}>
-                    {index + 1}
-                  </StyledStepIcon>
-                )}
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#F8FAFC' }}>
+      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <Box 
+        component="main" 
+        sx={{ 
+          flexGrow: 1, 
+          display: 'flex', 
+          flexDirection: 'column',
+          width: `calc(100% - ${sidebarOpen ? '260px' : '80px'})`,
+          transition: 'width 0.3s ease'
+        }}
+      >
+        <TopBar sidebarOpen={sidebarOpen} />
+        <Container maxWidth="lg" sx={{ py: 4, flex: 1 }}>
+          <Card sx={{ p: 3, mt: 3, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+            {/* Bouton retour 
+            <Tooltip title="Retour au menu principal" arrow>
+              <IconButton
+                onClick={() => navigate('/dashboard')}
+                sx={{ 
+                  mb: 2,
+                  background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
+                  color: 'white',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #43A047 0%, #1B5E20 100%)',
+                  }
+                }}
               >
-                {label}
-              </StepLabel>
-            </Step>
-          ))}
-        </Stepper>
-        
-        {/* Messages d'erreur */}
-        {error && (
-          <Alert 
-            severity="error" 
-            sx={{ mb: 3 }} 
-            onClose={() => setError('')}
-            action={
-              <Button color="inherit" size="small" onClick={() => setError('')}>
-                Fermer
-              </Button>
-            }
-          >
-            {error}
-          </Alert>
-        )}
-
-        {/* Étape courante */}
-        {renderStep()}
-
-        {/* Boutons de navigation (sauf pour l'étape 4 qui a son propre bouton) */}
-        {activeStep !== 3 && (
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-            <Button
-              variant="outlined"
-              onClick={activeStep === 0 ? onCancel : handleBack}
-              disabled={loading}
-              sx={{
-                background: 'linear-gradient(135deg, #B0B0B0 0%, #8E8E8E 100%)',
-                borderRadius: '50px',
-                padding: '10px 30px',
-                fontSize: '1rem',
-                fontWeight: 600,
-                textTransform: 'none',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
-                color: '#fff',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #9E9E9E 0%, #7A7A7A 100%)',
-                  boxShadow: '0 6px 18px rgba(0, 0, 0, 0.3)',
-                },
-              }}
-            >
-              {activeStep === 0 ? 'Annuler' : 'Retour'}
-            </Button>
-
-            <Button
-              variant="contained"
-              onClick={handleNext}
-              disabled={loading || !stepValidated.includes(activeStep)}
-              sx={{
-                background: 'linear-gradient(135deg, #2196F3 0%, #0D47A1 100%)',
-                borderRadius: '50px',
-                padding: '10px 30px',
-                fontSize: '1rem',
-                fontWeight: 600,
-                textTransform: 'none',
-                boxShadow: '0 4px 14px rgba(33, 150, 243, 0.4)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #1E88E5 0%, #0D365F 100%)',
-                  boxShadow: '0 6px 20px rgba(33, 150, 243, 0.5)',
-                },
-                '&.Mui-disabled': {
-                  background: '#e0e0e0',
-                  color: '#9e9e9e',
-                }
-              }}
-            >
-              Suivant
-            </Button>
-          </Box>
-        )}
-
-        {/* Indicateur de chargement global */}
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 3, gap: 2 }}>
-            <CircularProgress />
-            <Typography variant="body2" color="text.secondary">
-              Traitement en cours...
+                <ArrowBackIcon />
+              </IconButton>
+            </Tooltip>
+            */}
+            <Typography variant="h4" component="h2" gutterBottom sx={{ 
+              fontWeight: 'bold', 
+              mb: 4,
+              color: '#2c3e50',
+              textAlign: 'center'
+            }}>
+              {mode === 'create' ? 'Ouverture de Compte' : 'Modification de Compte'}
             </Typography>
-          </Box>
-        )}
-      </Card>
 
-      {/* Snackbar de succès */}
-      <Snackbar
-        open={!!successMessage}
-        autoHideDuration={6000}
-        onClose={() => setSuccessMessage('')}
-        message={successMessage}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      />
-    </Container>
+            {/* Stepper */}
+            <Stepper
+              activeStep={activeStep}
+              alternativeLabel
+              connector={<StyledConnector />}
+              sx={{ 
+                mb: 6,
+                '& .MuiStep-root': {
+                  padding: '0 10px',
+                },
+                '& .MuiStepLabel-root': {
+                  flexDirection: 'column',
+                  '& .MuiStepLabel-label': {
+                    marginTop: '8px',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    color: '#555',
+                    '&.Mui-active, &.Mui-completed': {
+                      color: '#333',
+                      fontWeight: 600,
+                    },
+                  },
+                },
+              }}
+            >
+              {steps.map((label, index) => (
+                <Step key={label}>
+                  <StepLabel 
+                    StepIconComponent={(props) => (
+                      <StyledStepIcon ownerState={{
+                        active: props.active,
+                        completed: props.completed,
+                      }}>
+                        {index + 1}
+                      </StyledStepIcon>
+                    )}
+                  >
+                    {label}
+                  </StepLabel>
+                </Step>
+              ))}
+            </Stepper>
+            
+            {/* Messages d'erreur */}
+            {error && (
+              <Alert 
+                severity="error" 
+                sx={{ mb: 3 }} 
+                onClose={() => setError('')}
+                action={
+                  <Button color="inherit" size="small" onClick={() => setError('')}>
+                    Fermer
+                  </Button>
+                }
+              >
+                {error}
+              </Alert>
+            )}
+
+            {/* Étape courante */}
+            {renderStep()}
+
+            {/* Boutons de navigation (sauf pour l'étape 4 qui a son propre bouton) */}
+            {activeStep !== 3 && (
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
+                <Button
+                  variant="outlined"
+                  onClick={activeStep === 0 ? onCancel : handleBack}
+                  disabled={loading}
+                  sx={{
+                    background: 'linear-gradient(135deg, #B0B0B0 0%, #8E8E8E 100%)',
+                    borderRadius: '50px',
+                    padding: '10px 30px',
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+                    color: '#fff',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #9E9E9E 0%, #7A7A7A 100%)',
+                      boxShadow: '0 6px 18px rgba(0, 0, 0, 0.3)',
+                    },
+                  }}
+                >
+                  {activeStep === 0 ? 'Annuler' : 'Retour'}
+                </Button>
+
+                <Button
+                  variant="contained"
+                  onClick={handleNext}
+                  disabled={loading || !stepValidated.includes(activeStep)}
+                  sx={{
+                    background: 'linear-gradient(135deg, #2196F3 0%, #0D47A1 100%)',
+                    borderRadius: '50px',
+                    padding: '10px 30px',
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    boxShadow: '0 4px 14px rgba(33, 150, 243, 0.4)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #1E88E5 0%, #0D365F 100%)',
+                      boxShadow: '0 6px 20px rgba(33, 150, 243, 0.5)',
+                    },
+                    '&.Mui-disabled': {
+                      background: '#e0e0e0',
+                      color: '#9e9e9e',
+                    }
+                  }}
+                >
+                  Suivant
+                </Button>
+              </Box>
+            )}
+
+            {/* Indicateur de chargement global */}
+            {loading && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 3, gap: 2 }}>
+                <CircularProgress />
+                <Typography variant="body2" color="text.secondary">
+                  Traitement en cours...
+                </Typography>
+              </Box>
+            )}
+          </Card>
+        </Container>
+        <Snackbar
+          open={!!successMessage}
+          autoHideDuration={6000}
+          onClose={() => setSuccessMessage('')}
+          message={successMessage}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        />
+      </Box>
+    </Box>
   );
 };
 

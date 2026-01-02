@@ -12,6 +12,7 @@ export default function Layout({ children }) {
       sx={{ display: 'flex', height: '100vh', bgcolor: '#F8FAFC', overflow: 'hidden' }}
     >
       {/* Sidebar fixe */}
+      
       <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
       {/* Zone de droite (TopBar + Page) */}

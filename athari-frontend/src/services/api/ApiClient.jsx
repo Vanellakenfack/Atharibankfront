@@ -6,10 +6,12 @@ import axios from 'axios'
 const ApiClient = axios.create({
 // *** CORRECTION DE L'URL ***
     baseURL: 'http://127.0.0.1:8000/api', // Utilisez http, et 127.0.0.1 ou localhost
+    withCredentials: true, // Important pour les cookies et l'authentification
     //headers par defaut
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
     },
 });
 

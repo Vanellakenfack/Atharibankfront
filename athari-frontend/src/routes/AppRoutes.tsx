@@ -22,6 +22,11 @@ import ListeComptes from '../pages/compte/ListeComptes';
 import FraisCommissionPage from '../pages/FraisCommissionPage';
 import FraisApplicationPage from '../pages/FraisApplicationPage';
 import MataManagementPage from '../pages/MataManagementPage';
+import PlanComptableList from '../pages/plancomptable/PlanComptableList';
+import CategoryManager from '../pages/plancomptable/CategoryManager.jsx';
+import DatContractManager from '../pages/compte/DatContractManager.jsx';
+import DatTypeManager from '../pages/compte/DatTypeManager.jsx';
+// Ajoute "Link" dans l'importation existante
 
 const AppRoutes = () => {
   return (
@@ -80,6 +85,19 @@ const AppRoutes = () => {
         {/* Gestion des opérations MATA */}
         <Route path="/comptes/:compteId/mata/*" element={<MataManagementPage />} />
         <Route path="/mata" element={<MataManagementPage />} />
+        {/* Plan Comptable */}     
+           <Route path='/plan-comptable' element={<PlanComptableList />} />
+           <Route path='plan-comptable/categories' element={<CategoryManager/>} />
+
+     {/* Gestion des contrats DAT */}
+        <Route path='/dat/contracts' element={<DatContractManager/>} />
+        <Route path='/dat/types' element={<DatTypeManager/>} />
+
+            
+
+
+            
+
 
       </Route>
 

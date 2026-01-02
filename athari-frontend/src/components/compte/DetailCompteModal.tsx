@@ -16,27 +16,44 @@ import { Close as CloseIcon } from '@mui/icons-material';
 interface Compte {
   id: number;
   numero_compte: string;
-  solde: number;
-  solde_disponible: number;
-  solde_bloque: number;
+  solde: string | number;
+  solde_disponible?: number;
+  solde_bloque?: number;
   devise: string;
   statut: string;
   created_at: string;
   updated_at: string;
+  date_ouverture: string;
+  date_cloture: string | null;
   type_compte: {
-    libelle: string;
-    description: string;
-  };
-  client: {
-    nom: string;
-    prenom: string;
-    email: string;
-    telephone: string;
-  };
-  plan_comptable?: {
+    id: number;
     code: string;
     libelle: string;
+    description: string;
+    a_vue: number;
   };
+  client: {
+    id: number;
+    num_client: string;
+    nom: string;
+    prenom: string;
+    email?: string;
+    telephone: string;
+    type_client: string;
+  };
+  plan_comptable?: {
+    id: number;
+    code: string;
+    libelle: string;
+    categorie_id?: number;
+    nature_solde?: string;
+  };
+  gestionnaire_nom?: string;
+  gestionnaire_prenom?: string;
+  gestionnaire_code?: string;
+  notice_acceptee?: boolean;
+  date_acceptation_notice?: string;
+  signature_path?: string;
 }
 
 interface DetailCompteModalProps {
@@ -95,7 +112,9 @@ const DetailCompteModal: React.FC<DetailCompteModalProps> = ({ open, onClose, co
             />
             <TextField
               label="Solde"
-              value={compte.solde.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              value={typeof compte.solde === 'number' 
+                ? compte.solde.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                : parseFloat(compte.solde).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               fullWidth
               margin="normal"
               InputProps={{
@@ -150,8 +169,26 @@ const DetailCompteModal: React.FC<DetailCompteModalProps> = ({ open, onClose, co
           <Divider sx={{ mb: 2 }} />
           <Box display="grid" gridTemplateColumns="repeat(2, 1fr)" gap={2}>
             <TextField
+              label="Numéro client"
+              value={compte.client?.num_client || 'Non spécifié'}
+              fullWidth
+              margin="normal"
+              InputProps={{
+                readOnly: true,
+              }}
+            />
+            <TextField
+              label="Type de client"
+              value={compte.client?.type_client ? compte.client.type_client.charAt(0).toUpperCase() + compte.client.type_client.slice(1) : 'Non spécifié'}
+              fullWidth
+              margin="normal"
+              InputProps={{
+                readOnly: true,
+              }}
+            />
+            <TextField
               label="Nom"
-              value={compte.client.nom}
+              value={compte.client?.nom || 'Non spécifié'}
               fullWidth
               margin="normal"
               InputProps={{
@@ -160,7 +197,7 @@ const DetailCompteModal: React.FC<DetailCompteModalProps> = ({ open, onClose, co
             />
             <TextField
               label="Prénom"
-              value={compte.client.prenom}
+              value={compte.client?.prenom || 'Non spécifié'}
               fullWidth
               margin="normal"
               InputProps={{
@@ -169,7 +206,7 @@ const DetailCompteModal: React.FC<DetailCompteModalProps> = ({ open, onClose, co
             />
             <TextField
               label="Email"
-              value={compte.client.email || 'Non spécifié'}
+              value={compte.client?.email || 'Non spécifié'}
               fullWidth
               margin="normal"
               InputProps={{
@@ -178,7 +215,7 @@ const DetailCompteModal: React.FC<DetailCompteModalProps> = ({ open, onClose, co
             />
             <TextField
               label="Téléphone"
-              value={compte.client.telephone || 'Non spécifié'}
+              value={compte.client?.telephone || 'Non spécifié'}
               fullWidth
               margin="normal"
               InputProps={{
@@ -194,6 +231,44 @@ const DetailCompteModal: React.FC<DetailCompteModalProps> = ({ open, onClose, co
           </Typography>
           <Divider sx={{ mb: 2 }} />
           <Box display="grid" gridTemplateColumns="repeat(2, 1fr)" gap={2}>
+            <TextField
+              label="Date d'ouverture"
+              value={compte.date_ouverture ? formatDate(compte.date_ouverture) : 'Non spécifiée'}
+              fullWidth
+              margin="normal"
+              InputProps={{
+                readOnly: true,
+              }}
+            />
+            <TextField
+              label="Date de clôture"
+              value={compte.date_cloture ? formatDate(compte.date_cloture) : 'Non clôturé'}
+              fullWidth
+              margin="normal"
+              InputProps={{
+                readOnly: true,
+              }}
+            />
+            <TextField
+              label="Gestionnaire"
+              value={compte.gestionnaire_nom && compte.gestionnaire_prenom 
+                ? `${compte.gestionnaire_prenom} ${compte.gestionnaire_nom} (${compte.gestionnaire_code || 'N/A'})` 
+                : 'Non spécifié'}
+              fullWidth
+              margin="normal"
+              InputProps={{
+                readOnly: true,
+              }}
+            />
+            <TextField
+              label="Notice acceptée"
+              value={compte.notice_acceptee ? 'Oui' : 'Non'}
+              fullWidth
+              margin="normal"
+              InputProps={{
+                readOnly: true,
+              }}
+            />
             <TextField
               label="Date de création"
               value={formatDate(compte.created_at)}
