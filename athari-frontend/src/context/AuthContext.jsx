@@ -36,12 +36,12 @@ export const AuthProvider = ({ children }) => {
     setUser(userData);
   };
 
-  const logout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("authUser");
-    setIsAuthenticated(false);
-    setUser(null);
-  };
+const logout = () => {
+  localStorage.clear(); // Nettoie tout pour éviter les résidus
+  setIsAuthenticated(false);
+  setUser(null);
+  window.location.href = "/login"; // Force la redirection
+};
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, user, login, logout, loading }}>

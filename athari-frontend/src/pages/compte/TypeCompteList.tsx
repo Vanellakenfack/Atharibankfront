@@ -1,43 +1,76 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
   Paper, Button, IconButton, Chip, Typography, Box, CircularProgress,
   Dialog, DialogActions, DialogContent, DialogTitle, TextField, 
   FormControlLabel, Checkbox, InputAdornment, Snackbar, Alert,
-  Tooltip, Select, MenuItem, Pagination, FormControl, InputLabel, FormGroup,
+  Tooltip, Select, MenuItem, Pagination, FormControl, InputLabel,
   Tabs, Tab, Divider, Grid, Card, CardContent, CardHeader, List, ListItem, ListItemText
 } from '@mui/material';
-import { TabPanel } from '@mui/lab';
 import { useSnackbar } from 'notistack';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { LocalizationProvider, TimePicker, DatePicker } from '@mui/x-date-pickers';
-import frLocale from 'date-fns/locale/fr';
-import { format } from 'date-fns';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import SearchIcon from '@mui/icons-material/Search';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import CreditCardIcon from '@mui/icons-material/CreditCard';
-import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ReceiptIcon from '@mui/icons-material/Receipt';
-import SmsIcon from '@mui/icons-material/Sms';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import BlockIcon from '@mui/icons-material/Block';
-import CloseIcon from '@mui/icons-material/Close';
 import MoneyIcon from '@mui/icons-material/AttachMoney';
 import PercentIcon from '@mui/icons-material/Percent';
 import WarningIcon from '@mui/icons-material/Warning';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import CloseIcon from '@mui/icons-material/Close';
+import BlockIcon from '@mui/icons-material/Block';
 import ApiClient from '@/services/api/ApiClient';
 import Sidebar from '@/components/layout/Sidebar';
 import TopBar from '@/components/layout/TopBar';
+
+// Composant DetailItem réutilisable - DÉPLACÉ EN DEHORS DU COMPOSANT PRINCIPAL
+interface DetailItemProps {
+  label: string;
+  value: string | number | null | undefined;
+  color?: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' | string;
+  multiline?: boolean;
+}
+
+const DetailItem = ({ label, value, color = 'default', multiline = false }: DetailItemProps) => {
+  const displayValue = value === undefined || value === null ? 'Non défini' : value.toString();
+  
+  return (
+    <>
+      <ListItem sx={{ py: 1 }}>
+        <ListItemText 
+          primary={
+            <Typography variant="subtitle2" color="text.secondary">
+              {label}
+            </Typography>
+          }
+          secondary={
+            <Typography 
+              variant="body2" 
+              color={color === 'default' ? 'text.primary' : color}
+              sx={{ 
+                wordBreak: 'break-word',
+                whiteSpace: multiline ? 'pre-line' : 'normal',
+                overflow: 'visible'
+              }}
+            >
+              {displayValue}
+            </Typography>
+          }
+          secondaryTypographyProps={{
+            component: 'div'
+          }}
+        />
+      </ListItem>
+      <Divider component="li" />
+    </>
+  );
+};
 
 interface TypeCompte {
   id: number;
@@ -87,15 +120,26 @@ interface TypeCompte {
   chapitre_cloture_anticipe_id?: number | null;
   chapitre_id?: number | null;
   type_compte_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string;
+  a_vue?: boolean;
+  observations?: string;
+  chapitre_defaut_id?: number | null;
+  compte_attente_produits_id?: number | null;
+  retrait_anticipe_autorise?: boolean;
+  validation_retrait_anticipe?: boolean;
+  duree_blocage_min?: number | null;
+  duree_blocage_max?: number | null;
+  minimum_compte_actif?: boolean;
+  minimum_compte?: number | null;
 }
 
 const TypeCompteList = () => {
-  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [typesCompte, setTypesCompte] = useState<TypeCompte[]>([]);
   const [filteredTypes, setFilteredTypes] = useState<TypeCompte[]>([]);
   const [loading, setLoading] = useState(true);
-  const queryClient = useQueryClient();
   const [openEditModal, setOpenEditModal] = useState(false);
   const [editingType, setEditingType] = useState<TypeCompte | null>(null);
   const [activeTab, setActiveTab] = useState(0);
@@ -147,14 +191,6 @@ const TypeCompteList = () => {
   const penaliteActif = watch('penalite_actif');
   const fraisClotureActif = watch('frais_cloture_anticipe_actif');
   
-  // Fonction utilitaire pour les onglets
-  function a11yProps(index: number) {
-    return {
-      id: `simple-tab-${index}`,
-      'aria-controls': `simple-tabpanel-${index}`,
-    };
-  }
-  
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
@@ -168,13 +204,54 @@ const TypeCompteList = () => {
     typeId: null as number | null,
     typeName: ''
   });
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [selectedType, setSelectedType] = useState<TypeCompte | null>(null);
 
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
+  // Fonction pour ouvrir la modale de visualisation
+  const handleOpenViewModal = (type: TypeCompte) => {
+    setSelectedType(type);
+    setViewModalOpen(true);
+  };
+
+  // Fonction pour fermer la modale de visualisation
+  const handleCloseViewModal = () => {
+    setViewModalOpen(false);
+    setSelectedType(null);
+  };
+
+  // Fonction utilitaire pour les onglets
+  function a11yProps(index: number) {
+    return {
+      id: `simple-tab-${index}`,
+      'aria-controls': `simple-tabpanel-${index}`,
+    };
+  }
+
+  // Composant TabPanel personnalisé
+  function TabPanel(props: { children?: React.ReactNode; value: number; index: number }) {
+    const { children, value, index } = props;
+    return (
+      <div
+        role="tabpanel"
+        hidden={value !== index}
+        id={`simple-tabpanel-${index}`}
+        aria-labelledby={`simple-tab-${index}`}
+      >
+        {value === index && (
+          <Box sx={{ pt: 3 }}>
+            {children}
+          </Box>
+        )}
+      </div>
+    );
+  }
+
   // Récupération des données avec useQuery
-  const { data: typesCompteData, refetch } = useQuery<TypeCompte[]>({
+  const { refetch } = useQuery<TypeCompte[]>({
     queryKey: ['typesCompte'],
     queryFn: async () => {
       const response = await ApiClient.get('/types-comptes');
@@ -194,7 +271,7 @@ const TypeCompteList = () => {
         return Object.values(obj).filter(v => v !== null && typeof v === 'object');
       };
       
-      let data = [];
+      let data: any[] = [];
       if (response.data) {
         data = extractArrays(response.data);
         if (!Array.isArray(data) || data.length === 0) {
@@ -235,8 +312,7 @@ const TypeCompteList = () => {
         throw error;
       }
     },
-    onSuccess: (data) => {
-      console.log('Mutation réussie, données:', data);
+    onSuccess: () => {
       enqueueSnackbar('✅ Type de compte mis à jour avec succès', { 
         variant: 'success',
         anchorOrigin: {
@@ -404,7 +480,7 @@ const TypeCompteList = () => {
           return Object.values(obj).filter((v: any) => v !== null && typeof v === 'object');
         };
         
-        let data = [];
+        let data: any[] = [];
         if (response.data) {
           data = extractArrays(response.data);
           if (!Array.isArray(data) || data.length === 0) {
@@ -451,17 +527,6 @@ const TypeCompteList = () => {
     setPage(0);
   }, [searchTerm, typesCompte]);
 
-  // Gestion du changement de page
-  const handleChangePage = (event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  // Gestion du changement du nombre de lignes par page
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
   // Gestion de l'édition
   const handleEditClick = (type: TypeCompte) => {
     console.log('Modification du type de compte:', type);
@@ -484,6 +549,34 @@ const TypeCompteList = () => {
     setEditingType(type);
     setOpenEditModal(true);
     setActiveTab(0);
+  };
+
+  // Fonction pour réactiver un type de compte
+  const handleReactivate = async (typeId: number, typeName: string) => {
+    try {
+      await ApiClient.put(`/types-comptes/${typeId}`, { actif: true });
+      setTypesCompte(typesCompte.map(t => 
+        t.id === typeId ? { ...t, actif: true } : t
+      ));
+      enqueueSnackbar(`✅ Type de compte "${typeName}" réactivé avec succès`, { 
+        variant: 'success',
+        anchorOrigin: {
+          vertical: 'top',
+          horizontal: 'right',
+        },
+        autoHideDuration: 6000,
+      });
+    } catch (error) {
+      console.error('Erreur lors de la réactivation', error);
+      enqueueSnackbar('❌ Erreur lors de la réactivation du type de compte', { 
+        variant: 'error',
+        anchorOrigin: {
+          vertical: 'top',
+          horizontal: 'right',
+        },
+        autoHideDuration: 6000,
+      });
+    }
   };
 
   // Gestion de la désactivation
@@ -607,22 +700,22 @@ const TypeCompteList = () => {
           <Paper elevation={3} sx={{ width: '100%', overflow: 'hidden', borderRadius: 2 }}>
             <TableContainer sx={{ maxHeight: 'calc(100vh - 250px)' }}>
               <Table stickyHeader size="small">
-                <TableHead  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>
+                <TableHead sx={{ bgcolor: 'primary.main' }}>
                   <TableRow>
-                    <TableCell  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>Code</TableCell>
-                    <TableCell  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>Libellé</TableCell>
-                    <TableCell  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>Description</TableCell>
-                    <TableCell align="center"  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>MATA</TableCell>
-                    <TableCell align="center"  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>Durée</TableCell>
-                    <TableCell align="center"  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>Islamique</TableCell>
-                    <TableCell align="center"  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>Statut</TableCell>
-                    <TableCell align="center"  sx={{ bgcolor: "linear-gradient(90deg, #2196F3 0%, #21CBF3 100%)"  }}>Actions</TableCell>
+                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Code</TableCell>
+                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Libellé</TableCell>
+                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Description</TableCell>
+                    <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold' }}>MATA</TableCell>
+                    <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold' }}>Durée</TableCell>
+                    <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold' }}>Islamique</TableCell>
+                    <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold' }}>Statut</TableCell>
+                    <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {filteredTypes
                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((type, index) => (
+                    .map((type) => (
                       <TableRow 
                         key={type.id}
                         sx={{ 
@@ -678,6 +771,15 @@ const TypeCompteList = () => {
                           />
                         </TableCell>
                         <TableCell align="center">
+                          <Tooltip title="Voir les détails">
+                            <IconButton 
+                              onClick={() => handleOpenViewModal(type)}
+                              size="small"
+                              sx={{ '&:hover': { color: 'info.main' } }}
+                            >
+                              <VisibilityIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title="Modifier">
                             <IconButton 
                               onClick={() => handleEditClick(type)}
@@ -704,32 +806,7 @@ const TypeCompteList = () => {
                           ) : (
                             <Tooltip title="Réactiver">
                               <IconButton
-                                onClick={async () => {
-                                  try {
-                                    await ApiClient.put(`/types-comptes/${type.id}`, { actif: true });
-                                    setTypesCompte(typesCompte.map(t => 
-                                      t.id === type.id ? { ...t, actif: true } : t
-                                    ));
-                                    enqueueSnackbar(`✅ Type de compte "${type.libelle}" réactivé avec succès`, { 
-                                      variant: 'success',
-                                      anchorOrigin: {
-                                        vertical: 'top',
-                                        horizontal: 'right',
-                                      },
-                                      autoHideDuration: 6000,
-                                    });
-                                  } catch (error) {
-                                    console.error('Erreur lors de la réactivation', error);
-                                    enqueueSnackbar('❌ Erreur lors de la réactivation du type de compte', { 
-                                      variant: 'error',
-                                      anchorOrigin: {
-                                        vertical: 'top',
-                                        horizontal: 'right',
-                                      },
-                                      autoHideDuration: 6000,
-                                    });
-                                  }
-                                }}
+                                onClick={() => handleReactivate(type.id, type.libelle)}
                                 color="primary"
                                 size="small"
                               >
@@ -847,7 +924,7 @@ const TypeCompteList = () => {
                 </Box>
 
                 {/* Onglet Général */}
-                <Box hidden={activeTab !== 0} sx={{ pt: 3 }}>
+                <TabPanel value={activeTab} index={0}>
                   <Controller
                     name="code"
                     control={control}
@@ -911,10 +988,10 @@ const TypeCompteList = () => {
                       />
                     )}
                   />
-                </Box>
+                </TabPanel>
 
                 {/* Onglet Frais & Commissions */}
-                <Box hidden={activeTab !== 1} sx={{ pt: 3 }}>
+                <TabPanel value={activeTab} index={1}>
                   <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                     <MoneyIcon sx={{ mr: 1 }} />
                     Frais d'ouverture
@@ -1062,10 +1139,10 @@ const TypeCompteList = () => {
                       )}
                     />
                   </Box>
-                </Box>
+                </TabPanel>
 
                 {/* Onglet Intérêts */}
-                <Box hidden={activeTab !== 2} sx={{ pt: 3 }}>
+                <TabPanel value={activeTab} index={2}>
                   <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                     <AccountBalanceIcon sx={{ mr: 1 }} />
                     Paramètres des intérêts
@@ -1153,10 +1230,10 @@ const TypeCompteList = () => {
                       />
                     )}
                   />
-                </Box>
+                </TabPanel>
 
                 {/* Onglet Pénalités */}
-                <Box hidden={activeTab !== 3} sx={{ pt: 3 }}>
+                <TabPanel value={activeTab} index={3}>
                   <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                     <WarningIcon sx={{ mr: 1 }} />
                     Paramètres des pénalités
@@ -1259,7 +1336,7 @@ const TypeCompteList = () => {
                       />
                     </Box>
                   </Box>
-                </Box>
+                </TabPanel>
               </DialogContent>
               
               <DialogActions sx={{ p: 3, justifyContent: 'space-between' }}>
@@ -1345,18 +1422,375 @@ const TypeCompteList = () => {
               <Button 
                 onClick={() => setDeleteModal({ ...deleteModal, open: false })}
                 variant="outlined"
-                fullWidth
+                color="inherit"
               >
                 Annuler
               </Button>
               <Button 
                 onClick={handleDelete}
-                color="warning"
-                variant="contained"
-                fullWidth
-                startIcon={<DeleteIcon />}
+                variant="contained" 
+                color="error"
+                startIcon={<BlockIcon />}
               >
                 Désactiver
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Modal de visualisation des détails */}
+          <Dialog 
+            open={viewModalOpen} 
+            onClose={handleCloseViewModal}
+            maxWidth="lg"
+            fullWidth
+            scroll="paper"
+          >
+            <DialogTitle sx={{ 
+              backgroundColor: 'primary.main',
+              color: 'white',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              position: 'sticky',
+              top: 0,
+              zIndex: 1
+            }}>
+              <Box>
+                <Typography variant="h6" component="div">
+                  Détails du type de compte: {selectedType?.libelle}
+                </Typography>
+                <Typography variant="subtitle2">
+                  Code: {selectedType?.code} | Créé le: {selectedType?.created_at ? new Date(selectedType.created_at).toLocaleDateString() : 'N/A'}
+                </Typography>
+              </Box>
+              <IconButton 
+                edge="end" 
+                color="inherit" 
+                onClick={handleCloseViewModal}
+                aria-label="fermer"
+              >
+                <CloseIcon />
+              </IconButton>
+            </DialogTitle>
+            <DialogContent dividers>
+              {selectedType && (
+                <Grid container spacing={3}>
+                  {/* Colonne 1: Informations de base */}
+                  <Grid item xs={12} md={6}>
+                    <Card variant="outlined" sx={{ mb: 3 }}>
+                      <CardHeader 
+                        title="Informations générales" 
+                        titleTypographyProps={{ variant: 'h6' }}
+                        sx={{ bgcolor: 'grey.100' }}
+                      />
+                      <CardContent>
+                        <List dense>
+                          <DetailItem label="Code" value={selectedType.code} />
+                          <DetailItem label="Libellé" value={selectedType.libelle} />
+                          <DetailItem label="Description" value={selectedType.description} />
+                          <DetailItem 
+                            label="À vue" 
+                            value={selectedType.a_vue ? 'Oui' : 'Non'} 
+                            color={selectedType.a_vue ? 'success' : 'default'}
+                          />
+                          <DetailItem 
+                            label="Compte MATA" 
+                            value={selectedType.est_mata ? 'Oui' : 'Non'} 
+                            color={selectedType.est_mata ? 'primary' : 'default'}
+                          />
+                          <DetailItem 
+                            label="Nécessite durée" 
+                            value={selectedType.necessite_duree ? 'Oui' : 'Non'} 
+                            color={selectedType.necessite_duree ? 'info' : 'default'}
+                          />
+                          <DetailItem 
+                            label="Statut" 
+                            value={selectedType.actif ? 'Actif' : 'Inactif'} 
+                            color={selectedType.actif ? 'success' : 'error'}
+                          />
+                          <DetailItem 
+                            label="ID Chapitre par défaut" 
+                            value={selectedType.chapitre_defaut_id || 'Non défini'}
+                          />
+                        </List>
+                      </CardContent>
+                    </Card>
+
+                    {/* Frais et commissions */}
+                    <Card variant="outlined" sx={{ mb: 3 }}>
+                      <CardHeader 
+                        title="Frais et commissions" 
+                        titleTypographyProps={{ variant: 'h6' }}
+                        sx={{ bgcolor: 'grey.100' }}
+                      />
+                      <CardContent>
+                        <List dense>
+                          {selectedType.frais_ouverture_actif && (
+                            <>
+                              <DetailItem 
+                                label="Frais d'ouverture" 
+                                value={`${selectedType.frais_ouverture || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre frais d'ouverture" 
+                                value={selectedType.chapitre_frais_ouverture_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+                          
+                          {selectedType.frais_carnet_actif && (
+                            <>
+                              <DetailItem 
+                                label="Frais de carnet" 
+                                value={`${selectedType.frais_carnet || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre frais carnet" 
+                                value={selectedType.chapitre_frais_carnet_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {selectedType.frais_renouvellement_actif && (
+                            <>
+                              <DetailItem 
+                                label="Frais renouvellement carnet" 
+                                value={`${selectedType.frais_renouvellement_carnet || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre renouvellement" 
+                                value={selectedType.chapitre_renouvellement_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {selectedType.frais_perte_actif && (
+                            <>
+                              <DetailItem 
+                                label="Frais perte carnet" 
+                                value={`${selectedType.frais_perte_carnet || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre perte" 
+                                value={selectedType.chapitre_perte_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {selectedType.commission_retrait_actif && (
+                            <>
+                              <DetailItem 
+                                label="Commission retrait" 
+                                value={`${selectedType.commission_retrait || 0}%`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre commission retrait" 
+                                value={selectedType.chapitre_commission_retrait_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {selectedType.commission_sms_actif && (
+                            <>
+                              <DetailItem 
+                                label="Commission SMS" 
+                                value={`${selectedType.commission_sms || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre commission SMS" 
+                                value={selectedType.chapitre_commission_sms_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {selectedType.commission_mensuelle_actif && (
+                            <>
+                              <DetailItem 
+                                label="Seuil commission" 
+                                value={`${selectedType.seuil_commission || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="Commission si > seuil" 
+                                value={`${selectedType.commission_si_superieur || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="Commission si < seuil" 
+                                value={`${selectedType.commission_si_inferieur || 0} FCFA`} 
+                              />
+                            </>
+                          )}
+                        </List>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* Colonne 2: Paramètres avancés */}
+                  <Grid item xs={12} md={6}>
+                    {/* Paramètres d'intérêts */}
+                    {selectedType.interets_actifs && (
+                      <Card variant="outlined" sx={{ mb: 3 }}>
+                        <CardHeader 
+                          title="Paramètres d'intérêts" 
+                          titleTypographyProps={{ variant: 'h6' }}
+                          sx={{ bgcolor: 'grey.100' }}
+                        />
+                        <CardContent>
+                          <List dense>
+                            <DetailItem 
+                              label="Taux d'intérêt annuel" 
+                              value={`${selectedType.taux_interet_annuel || 0}%`} 
+                            />
+                            <DetailItem 
+                              label="Fréquence calcul intérêt" 
+                              value={selectedType.frequence_calcul_interet || 'Non défini'} 
+                            />
+                            <DetailItem 
+                              label="Heure calcul intérêt" 
+                              value={selectedType.heure_calcul_interet || 'Non défini'} 
+                            />
+                            <DetailItem 
+                              label="ID Chapitre intérêts créditeurs" 
+                              value={selectedType.chapitre_interet_credit_id || 'Non défini'}
+                            />
+                            <DetailItem 
+                              label="Capitalisation intérêts" 
+                              value={selectedType.capitalisation_interets ? 'Oui' : 'Non'}
+                              color={selectedType.capitalisation_interets ? 'success' : 'default'}
+                            />
+                          </List>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Frais et pénalités */}
+                    <Card variant="outlined" sx={{ mb: 3 }}>
+                      <CardHeader 
+                        title="Frais et pénalités" 
+                        titleTypographyProps={{ variant: 'h6' }}
+                        sx={{ bgcolor: 'grey.100' }}
+                      />
+                      <CardContent>
+                        <List dense>
+                          {selectedType.frais_deblocage_actif && (
+                            <>
+                              <DetailItem 
+                                label="Frais de déblocage" 
+                                value={`${selectedType.frais_deblocage || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre frais déblocage" 
+                                value={selectedType.chapitre_frais_deblocage_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {selectedType.penalite_actif && (
+                            <>
+                              <DetailItem 
+                                label="Pénalité retrait anticipé" 
+                                value={`${selectedType.penalite_retrait_anticipe || 0}%`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre pénalité" 
+                                value={selectedType.chapitre_penalite_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {selectedType.frais_cloture_anticipe_actif && (
+                            <>
+                              <DetailItem 
+                                label="Frais clôture anticipée" 
+                                value={`${selectedType.frais_cloture_anticipe || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre clôture anticipée" 
+                                value={selectedType.chapitre_cloture_anticipe_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {selectedType.minimum_compte_actif && (
+                            <DetailItem 
+                              label="Solde minimum" 
+                              value={`${selectedType.minimum_compte || 0} FCFA`} 
+                            />
+                          )}
+
+                          <DetailItem 
+                            label="ID Compte attente produits" 
+                            value={selectedType.compte_attente_produits_id || 'Non défini'}
+                          />
+
+                          <DetailItem 
+                            label="Retrait anticipé autorisé" 
+                            value={selectedType.retrait_anticipe_autorise ? 'Oui' : 'Non'}
+                            color={selectedType.retrait_anticipe_autorise ? 'success' : 'default'}
+                          />
+
+                          <DetailItem 
+                            label="Validation retrait anticipé" 
+                            value={selectedType.validation_retrait_anticipe ? 'Oui' : 'Non'}
+                            color={selectedType.validation_retrait_anticipe ? 'success' : 'default'}
+                          />
+
+                          <DetailItem 
+                            label="Durée blocage min (jours)" 
+                            value={selectedType.duree_blocage_min || 'Non défini'} 
+                          />
+
+                          <DetailItem 
+                            label="Durée blocage max (jours)" 
+                            value={selectedType.duree_blocage_max || 'Non défini'} 
+                          />
+                        </List>
+                      </CardContent>
+                    </Card>
+
+                    {/* Métadonnées */}
+                    <Card variant="outlined">
+                      <CardHeader 
+                        title="Métadonnées" 
+                        titleTypographyProps={{ variant: 'h6' }}
+                        sx={{ bgcolor: 'grey.100' }}
+                      />
+                      <CardContent>
+                        <List dense>
+                          <DetailItem 
+                            label="Observations" 
+                            value={selectedType.observations || 'Aucune observation'} 
+                            multiline
+                          />
+                          <DetailItem 
+                            label="Date de création" 
+                            value={selectedType.created_at ? new Date(selectedType.created_at).toLocaleString() : 'Inconnue'} 
+                          />
+                          <DetailItem 
+                            label="Dernière mise à jour" 
+                            value={selectedType.updated_at ? new Date(selectedType.updated_at).toLocaleString() : 'Jamais modifié'} 
+                          />
+                          {selectedType.deleted_at && (
+                            <DetailItem 
+                              label="Date de suppression" 
+                              value={new Date(selectedType.deleted_at).toLocaleString()}
+                              color="error"
+                            />
+                          )}
+                        </List>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+              )}
+            </DialogContent>
+            <DialogActions sx={{ p: 2, borderTop: 1, borderColor: 'divider', position: 'sticky', bottom: 0, bgcolor: 'background.paper' }}>
+              <Button 
+                onClick={handleCloseViewModal} 
+                color="primary"
+                variant="contained"
+                startIcon={<CloseIcon />}
+              >
+                Fermer
               </Button>
             </DialogActions>
           </Dialog>
@@ -1370,9 +1804,10 @@ const TypeCompteList = () => {
           >
             <Alert 
               onClose={handleCloseSnackbar} 
-              severity={snackbar.severity}
-              variant="filled"
+              severity={snackbar.severity} 
               sx={{ width: '100%' }}
+              elevation={6}
+              variant="filled"
             >
               {snackbar.message}
             </Alert>

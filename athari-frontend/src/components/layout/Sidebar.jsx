@@ -17,7 +17,8 @@ import {
   FileText,
   FileType,
   BookOpen,
-  List
+  List,
+  House
 } from 'lucide-react';
 import { useAuth } from "../../context/AuthContext";
 
@@ -27,6 +28,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
   const navigate = useNavigate();
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showDATMenu, setShowDATMenu] = useState(false);
+  const [showPlanComptable, setShowPlanComptable] = useState(false);
+
   const [showAccountMenu, setShowAccountMenu] = useState(false);
 
   const items = [
@@ -36,7 +39,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     { id: 'logs', icon: ShieldCheck, label: 'Logs d\'audit', path: '/log' },
     { id: 'analytics', icon: TrendingUp, label: 'Analyses', path: '/analytics' },
     { id: 'Performance', icon: Zap, label: 'Performance', path: '/performance' },
-    { id: 'Plan-comptable', icon: FileChartLine, label: 'Plan comptable', path: '/plan-comptable' },
   ];
 
   const activeGradient = 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)';
@@ -112,6 +114,71 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
           );
         })}
 
+        {/* MENU Plan-comptable */}
+        <div className="mb-2">
+          <div 
+            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+              location.pathname.startsWith('/plan-comptable') ? 'text-white' : 'text-secondary hover-bg-light'
+            }`}
+            style={{ 
+              background: location.pathname.startsWith('/plan-comptable') ? activeGradient : 'transparent',
+              cursor: 'pointer'
+            }}
+            onClick={() => setShowPlanComptable(!showPlanComptable)}
+          >
+            <div className="d-flex align-items-center gap-3">
+              <FileChartLine size={20} />
+              {sidebarOpen && <span className="small fw-bold">Plan comptable</span>}
+            </div>
+            {sidebarOpen && (
+              <ChevronDown 
+                size={16} 
+                className={`transition-all ${showPlanComptable ? 'rotate-180' : ''}`}
+                style={{ transition: 'transform 0.2s ease' }}
+              />
+            )}
+          </div>
+          
+          {/* Sous-menu plan-comptable */}
+          {showPlanComptable && sidebarOpen && (
+            <div className="ms-4 mt-1">
+              <Link
+                to="/plan-comptable"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  location.pathname === '/plan-comptable' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/plan-comptable' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileText size={16} />
+                Plan comptable
+              </Link>
+                      
+              <Link
+                to="/plan-comptable/categories"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                  location.pathname === '/plan-comptable/categories' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/plan-comptable/categories' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileType size={16} />
+                Categories Plan comptable
+              </Link>
+            </div>
+          )}
+        </div>
+        
         {/* MENU DAT - SAISIE DAT ET TYPE DAT */}
         <div className="mb-2">
           <div 
@@ -271,7 +338,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
           {/* Sous-menu Paramètres */}
           {showSettingsMenu && sidebarOpen && (
             <div className="ms-4 mt-1">
-
               <Link
                 to="/users/roles"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
@@ -289,7 +355,27 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
                 Roles des utilisaters
               </Link>
 
+          {/* Agence */}
 
+              <Link
+                to="/agence"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  location.pathname === '/agence' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/agence' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <House size={16} />
+                Agences
+              </Link>
+
+
+                {/* Liste des Type de comptes */}
               <Link
                 to="/Liste-type-de-compte"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${

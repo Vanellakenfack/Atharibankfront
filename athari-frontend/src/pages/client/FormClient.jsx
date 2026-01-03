@@ -41,28 +41,34 @@ const schemas = [
   Yup.object({}),
 ];
 
+
 const CITY_DATA = {
-  Douala: ["Akwa", "Bonapriso", "Deïdo", "Bali", "Makepe", "Bonanjo"],
-  Yaoundé: ["Essos", "Mokolo", "Biyem-Assi", "Mvog-Ada", "Nkolbisson", "Bastos"],
-  Bafoussam: ["Tamdja", "Banengo", "Djeleng", "Nkong-Zem"],
-  Bamenda: ["Mankon", "Nkwen", "Bali", "Bafut"],
+  Douala: ["Akwa", "Bonapriso", "Deïdo", "Bali", "Makepe", "Bonanjo", "Logbessou", "Kotto", "Logpom", "Lendi", "Nyalla", "Ndogpassi", "Bepanda", "Bonamoussadi", "Ange Raphaël", "Ndoti", "New Bell", "Bassa", "Nylon", "Cité des Palmiers", "Bonabéri", "Sodiko", "Boanda", "Mabanda", "Yassa", "Japoma"],
+  Yaoundé: ["Bastos", "Essos", "Mokolo", "Biyem-Assi", "Mvog-Ada", "Nkolbisson", "Ekounou", "Ngousso", "Santa Barbara", "Etoudi", "Mballa II", "Emana", "Messassi", "Olembe", "Nlongkak", "Etoa-Meki", "Mvog-Mbi", "Obili", "Ngoa-Ekelle", "Damase", "Mendong", "Simbock", "Efoulan", "Nsam", "Ahala", "Kondengui"],
+  Bafoussam: ["Tamdja", "Banengo", "Djeleng", "Nkong-Zem", "Koptchou", "Famla", "Houkaha", "Kouékong", "Ndiangdam", "Kamkop", "Toungang", "Tocket", "Diadam", "Baleng"],
+  Bamenda: ["Mankon", "Nkwen", "Bali", "Bafut", "Up-Station", "Old Church", "Mile 2", "Mile 3", "Mile 4", "Cow Street", "Abakwa", "Mulang", "Below Fongu"],
+  Garoua: ["Lainde", "Yelwa", "Roumdé Adjia", "Djamboutou", "Nassarao", "Pitoa", "Poumpoumré", "Foulberé", "Louti", "Gashiga"],
+  Maroua: ["Kakataré", "Doursoungo", "Douggoï", "Domayo", "Pitoaré", "Ouro-Tchédé", "Djarengol", "Baouliwol", "Zokok"],
+  Ngaoundéré: ["Baladji I", "Baladji II", "Joli Soir", "Dang", "Bamyanga", "Sabongari", "Mboum", "Yelwa", "Haoussa"],
+  Limbe: ["Down Beach", "Bota", "Middle Farms", "Mile 4", "New Town", "Ngeme", "Cassava Farms", "Man O' War Bay"],
+  Buea: ["Molyko", "Mile 17", "Check Point", "Bonduma", "Great Soppo", "Bokwango", "Buea Town", "Bolifamba"],
+  Bertoua: ["Enia", "Yadémé", "Kpokolota", "Ndokayo", "Monou", "Tigaza", "Bonis"],
+  Ebolowa: ["Mekalat", "Angalé", "Biyébe", "New Bell", "Nko'ovos", "Ebolowa Si II"],
+  Kribi: ["Dôme", "Mboa Manga", "Talla", "Nziou", "Bwanjo", "Mpangou", "Londji"],
+  Nkongsamba: ["Baré", "Quartier 1", "Quartier 2", "Quartier 3", "Ekel-Ko", "Mbaressoumtou"],
+  Dschang: ["Foréké", "Foto", "Keleng", "Tsinfing", "Apouh", "Mingmeto"]
 };
 
 export default function FormClient() {
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
+
+  // 1. Déclarer tous les useState en premier
   const [activeStep, setActiveStep] = useState(0);
   const [agencies, setAgencies] = useState([]);
+  const [generatedNumClient, setGeneratedNumClient] = useState("EN ATTENTE...");
 
-  useEffect(() => {
-    ApiClient.get("/agencies")
-      .then((res) => {
-        const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
-        setAgencies(list);
-      })
-      .catch((err) => console.error("Erreur agences:", err));
-  }, []);
-
+  // 2. Initialiser useForm (pour obtenir 'watch')
   const { control, handleSubmit, trigger, watch, formState: { errors } } = useForm({
     defaultValues: {
       type_client: "physique", num_agence: "", nom_prenoms: "", sexe: "",
@@ -71,7 +77,7 @@ export default function FormClient() {
       date_naissance: "", lieu_naissance: "", nom_mere: "", nom_pere: "",
       profession: "", employeur: "", situation_familiale: "", regime_matrimonial: "",
       nom_epoux: "", date_naissance_epoux: "", lieu_naissance_epoux: "",
-      fonction_epoux: "", adresse_epoux: "", numero_epoux: "",photo: "", // <--- Ajoutez ceci
+      fonction_epoux: "", adresse_epoux: "", numero_epoux: "", photo: "",
       nationalite: "Camerounaise", pays_residence: "Cameroun",
       Qualite: "", gestionnaire: "", profil: "", autre_preciser: "",
       client_checkbox: true, signataire: false, mantaire: false,
@@ -82,7 +88,33 @@ export default function FormClient() {
     shouldUnregister: false, 
   });
 
+  // 3. Déclarer les variables 'watch' APRES useForm
+  const selectedAgency = watch("num_agence");
   const selectedVille = watch("adresse_ville");
+
+  // 4. Utiliser les useEffect
+  useEffect(() => {
+    ApiClient.get("/agencies")
+      .then((res) => {
+        const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        setAgencies(list);
+      })
+      .catch((err) => console.error("Erreur agences:", err));
+  }, []);
+
+  useEffect(() => {
+    if (selectedAgency) {
+      ApiClient.get(`/agencies/${selectedAgency}/next-number`)
+        .then((res) => setGeneratedNumClient(res.data.next_number))
+        .catch((err) => {
+          console.error("Erreur génération numéro:", err);
+          setGeneratedNumClient("ERREUR");
+        });
+    } else {
+      setGeneratedNumClient("AUTO-GÉNÉRÉ");
+    }
+  }, [selectedAgency]);
+
   const quartiersOptions = useMemo(() => (selectedVille ? CITY_DATA[selectedVille] || [] : []), [selectedVille]);
 
 const onSubmit = async (data) => {
@@ -206,7 +238,9 @@ return (
                       </FormControl>
                     )} />
                   </Grid>
-                  <Grid item xs={12} md={4}><TextField fullWidth size="small" label="ID Client" value="AUTO-GÉNÉRÉ" disabled variant="filled" /></Grid>
+                    <Grid item xs={12} md={4}>
+                        <TextField fullWidth size="small" label="ID Client" value={generatedNumClient} disabled variant="filled" InputProps={{ readOnly: true, style: { fontWeight: 'bold' } }} />
+                      </Grid>
                   <Grid item xs={12} md={4}>
                     <Controller name="type_client" control={control} render={({ field }) => (
                       <FormControl fullWidth size="small"><InputLabel>Type</InputLabel>

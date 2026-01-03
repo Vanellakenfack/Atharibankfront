@@ -89,10 +89,10 @@ export default function PlanComptableList() {
     try {
       if (editMode) {
         // Mode Modification
-        await ApiClient.put(`/plan_comptable/comptes/${currentAccountId}`, newAccount);
+        await ApiClient.put(`/plan-comptable/comptes/${currentAccountId}`, newAccount);
       } else {
         // Mode Création
-        await ApiClient.post("/plan_comptable/comptes", newAccount);
+        await ApiClient.post("/plan-comptable/comptes", newAccount);
       }
       fetchInitialData(); 
       handleClose();
