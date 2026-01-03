@@ -1,42 +1,94 @@
-import React, { useState } from 'react'
-import 'bootstrap/dist/css/bootstrap.min.css'
-import '../../assets/css/dash.css'
-import { BarChart3, TrendingUp, Users, Zap, ArrowUpRight, ArrowDownRight, Wallet, PlusCircle } from 'lucide-react'
-import Sidebar from '../../components/layout/Sidebar'
-import TopBar from '../../components/layout/TopBar'
-
+import React, { useState, useEffect } from 'react';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import '../../assets/css/dash.css';
+import { 
+  BarChart3, TrendingUp, Users, Zap, ArrowUpRight, 
+  ArrowDownRight, Wallet, PlusCircle 
+} from 'lucide-react';
+import Sidebar from '../../components/layout/Sidebar';
+import TopBar from '../../components/layout/TopBar';
 import TitanicPie from '../../components/charts/TitanicPie';
+import ApiClient from '../../services/api/ApiClient'; // Import de votre client API
 
 export default function App() {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [activeNav, setActiveNav] = useState('overview')
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeNav, setActiveNav] = useState('overview');
+  
+  // État pour stocker les statistiques réelles de la BD
+  const [statsData, setStatsData] = useState({
+    totalClients: 0,
+    totalComptes: 0,
+    actifs: 0,
+    performance: 0,
+    loading: true
+  });
 
-  // Stats avec des dégradés raffinés
+  // Récupération des données au montage du composant
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        // Remplacez '/dashboard/stats' par votre véritable route API Laravel
+        const response = await ApiClient.get('/dashboard/stats');
+        const data = response.data;
+
+        setStatsData({
+          totalClients: data.total_clients || 0,
+          totalComptes: data.total_comptes || 0,
+          actifs: data.actifs_en_direct || 0,
+          performance: data.performance || 98.5,
+          loading: false
+        });
+      } catch (error) {
+        console.error("Erreur lors de la récupération des stats:", error);
+        setStatsData(prev => ({ ...prev, loading: false }));
+      }
+    };
+
+    fetchStats();
+  }, []);
+
+  // Configuration des cartes avec les données dynamiques
   const stats = [
     { 
-      icon: Users, label: 'Total Utilisateurs', value: '12,543', change: '+12.5%', 
-      gradient: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', trend: 'up' 
+      icon: Users, 
+      label: 'Total Clients', 
+      value: statsData.loading ? "..." : statsData.totalClients.toLocaleString(), 
+      change: '+12.5%', 
+      gradient: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', 
+      trend: 'up' 
     },
     { 
-      icon: Wallet, label: 'Nombre Comptes', value: '45,231', change: '+8.2%', 
-      gradient: 'linear-gradient(135deg, #3b82f6 0%, #2dd4bf 100%)', trend: 'up' 
+      icon: Wallet, 
+      label: 'Nombre Comptes', 
+      value: statsData.loading ? "..." : statsData.totalComptes.toLocaleString(), 
+      change: '+8.2%', 
+      gradient: 'linear-gradient(135deg, #3b82f6 0%, #2dd4bf 100%)', 
+      trend: 'up' 
     },
     { 
-      icon: Zap, label: 'Actifs en direct', value: '3,421', change: '+23.1%', 
-      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', trend: 'up' 
+      icon: Zap, 
+      label: 'Actifs en direct', 
+      value: statsData.loading ? "..." : statsData.actifs.toLocaleString(), 
+      change: '+23.1%', 
+      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', 
+      trend: 'up' 
     },
     { 
-      icon: TrendingUp, label: 'Performance', value: '98.5%', change: '+2.3%', 
-      gradient: 'linear-gradient(135deg, #ec4899 0%, #ef4444 100%)', trend: 'up' 
+      icon: TrendingUp, 
+      label: 'Performance', 
+      value: statsData.loading ? "..." : `${statsData.performance}%`, 
+      change: '+2.3%', 
+      gradient: 'linear-gradient(135deg, #ec4899 0%, #ef4444 100%)', 
+      trend: 'up' 
     },
-  ]
+  ];
 
   const recentTransactions = [
     { id: 101, client: 'martin Jean', amount: 150000, type: 'Dépôt', date: '13 Jan, 14:32', status: 'Validé' },
     { id: 102, client: 'boubp Sophie', amount: 75000, type: 'Retrait', date: '13 Jan, 13:15', status: 'Validé' },
     { id: 103, client: 'siewe Pierre', amount: 250000, type: 'Dépôt', date: '13 Jan, 11:45', status: 'En attente' },
     { id: 104, client: 'gnandeu Marie', amount: 125000, type: 'Retrait', date: '13 Jan, 10:20', status: 'Validé' },
-  ]
+  ];
 
   return (
     <div className={`dashboard-container d-flex vh-100 bg-white text-dark ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
@@ -46,18 +98,18 @@ export default function App() {
         <TopBar sidebarOpen={sidebarOpen} />
 
         <div className="dashboard-content p-4 overflow-auto">
-          {/* Header avec action rapide */}
+          {/* Header */}
           <div className="d-flex justify-content-between align-items-center mb-4">
             <div>
               <h2 className="fw-bold mb-0">Tableau de bord</h2>
-              <p className="text-muted small">Aperçu de votre activité aujourd'hui</p>
+              <p className="text-muted small">Données en temps réel de la base de données</p>
             </div>
             <button className="btn btn-primary d-flex align-items-center gap-2 rounded-3 shadow-sm px-3">
               <PlusCircle size={18} /> Nouvelle opération
             </button>
           </div>
 
-          {/* Stats Cards avec Dégradés */}
+          {/* Cartes de Stats Dynamiques */}
           <div className="row g-3 mb-4">
             {stats.map((stat, i) => (
               <div key={i} className="col-12 col-md-6 col-lg-3">
@@ -80,7 +132,7 @@ export default function App() {
           </div>
 
           <div className="row g-4">
-            {/* Graphique modernisé */}
+            {/* Graphique */}
             <div className="col-12 col-lg-8">
               <div className="card border-0 shadow-sm rounded-4">
                 <div className="card-body p-4">
@@ -89,16 +141,15 @@ export default function App() {
                     <select className="form-select form-select-sm w-auto border-0 bg-light">
                       <option>7 derniers jours</option>
                     </select>
-                     
                   </div>
-                  <div className="bg-light rounded-4 p-4" style={{ height: 'auto' }}>
+                  <div className="bg-light rounded-4 p-4">
                      <TitanicPie />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Transactions épurées */}
+            {/* Transactions */}
             <div className="col-12 col-lg-4">
               <div className="card border-0 shadow-sm rounded-4 h-100">
                 <div className="card-body p-4">
@@ -125,5 +176,5 @@ export default function App() {
         </div>
       </div>
     </div>
-  )
+  );
 }
