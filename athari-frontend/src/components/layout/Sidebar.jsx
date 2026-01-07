@@ -32,6 +32,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
 
   const [showAccountMenu, setShowAccountMenu] = useState(false);
 
+  const [showReporting, setShowReporting] = useState(false);
+
   const items = [
     { id: 'overview', icon: BarChart3, label: 'Tableau de bord', path: '/dashboard' },
     { id: 'users', icon: Users, label: 'Utilisateurs', path: '/users/management' },
@@ -53,6 +55,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
   const isDATPATH = location.pathname.startsWith('/dat');
   const isAccountPATH = location.pathname === '/compte' || location.pathname === '/liste-des-comptes';
   const isTypeComptePATH = location.pathname === '/Liste-type-de-compte' || location.pathname === '/Ajout-type-de-compte';
+  const isReportingPATH = location.pathname === '/' || location.pathname === '/';
 
   return (
     <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'} border-end bg-white`} 
@@ -304,6 +307,71 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               >
                 <List size={16} />
                 Liste des comptes
+              </Link>
+            </div>
+          )}
+        </div>
+        
+                {/* MENU reporting */}
+        <div className="mb-2">
+          <div 
+            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+              isReportingPATH ? 'text-white' : 'text-secondary hover-bg-light'
+            }`}
+            style={{ 
+              background: isReportingPATH ? activeGradient : 'transparent',
+              cursor: 'pointer'
+            }}
+            onClick={() => setShowReporting(!showReporting)}
+          >
+            <div className="d-flex align-items-center gap-3">
+              <BookOpen size={20} />
+              {sidebarOpen && <span className="small fw-bold">Reporting</span>}
+            </div>
+            {sidebarOpen && (
+              <ChevronDown 
+                size={16} 
+                className={`transition-all ${showReporting ? 'rotate-180' : ''}`}
+                style={{ transition: 'transform 0.2s ease' }}
+              />
+            )}
+          </div>
+          
+          {/* Sous-menu Compte */}
+          {showReporting && sidebarOpen && (
+            <div className="ms-4 mt-1">
+              <Link
+                to="/Journal-Comptable"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  location.pathname === '/Journal-Comptable' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/Journal-Comptable' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <BookOpen size={16} />
+                Journal-Comptable
+              </Link>
+              
+              <Link
+                to="/"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                  location.pathname === '/' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <List size={16} />
+                Reporting 2
               </Link>
             </div>
           )}

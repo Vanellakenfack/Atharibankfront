@@ -9,9 +9,10 @@ import {
   Box,
   Typography,
   Divider,
-  IconButton
+  IconButton,
+  Chip
 } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
+import { Close as CloseIcon, Business, Person } from '@mui/icons-material';
 
 interface Compte {
   id: number;
@@ -35,8 +36,9 @@ interface Compte {
   client: {
     id: number;
     num_client: string;
-    nom: string;
-    prenom: string;
+    nom?: string;
+    prenom?: string;
+    raison_sociale?: string;
     email?: string;
     telephone: string;
     type_client: string;
@@ -62,6 +64,17 @@ interface DetailCompteModalProps {
   compte: Compte | null;
 }
 
+// Fonction utilitaire pour obtenir le nom du client selon son type
+const getClientName = (client: Compte['client']): string => {
+  if (!client) return 'Client inconnu';
+  
+  if (client.type_client === 'physique') {
+    return `${client.physique.nom_prenoms}`.trim() || 'Nom non défini';
+  } else {
+    return client.morale.raison_sociale || 'Raison sociale non définie';
+  }
+};
+
 const DetailCompteModal: React.FC<DetailCompteModalProps> = ({ open, onClose, compte }) => {
   if (!compte) return null;
 
@@ -75,11 +88,30 @@ const DetailCompteModal: React.FC<DetailCompteModalProps> = ({ open, onClose, co
     });
   };
 
+  const formatCurrency = (amount: number | string, currency: string) => {
+    const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    return new Intl.NumberFormat('fr-FR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(numericAmount || 0) + ' ' + currency;
+  };
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">Détails du compte</Typography>
+          <Box display="flex" alignItems="center" gap={1}>
+            <Typography variant="h6">Détails du compte</Typography>
+            {compte.client?.type_client && (
+              <Chip
+                icon={compte.client.type_client === 'moral' ? <Business /> : <Person />}
+                label={compte.client.type_client === 'moral' ? 'Client moral' : 'Client physique'}
+                size="small"
+                color={compte.client.type_client === 'moral' ? 'primary' : 'secondary'}
+                variant="outlined"
+              />
+            )}
+          </Box>
           <IconButton onClick={onClose} size="small">
             <CloseIcon />
           </IconButton>
@@ -112,9 +144,7 @@ const DetailCompteModal: React.FC<DetailCompteModalProps> = ({ open, onClose, co
             />
             <TextField
               label="Solde"
-              value={typeof compte.solde === 'number' 
-                ? compte.solde.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                : parseFloat(compte.solde).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              value={formatCurrency(compte.solde, compte.devise)}
               fullWidth
               margin="normal"
               InputProps={{
@@ -123,7 +153,7 @@ const DetailCompteModal: React.FC<DetailCompteModalProps> = ({ open, onClose, co
             />
             <TextField
               label="Solde disponible"
-              value={compte.solde_disponible?.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || 'N/A'}
+              value={compte.solde_disponible ? formatCurrency(compte.solde_disponible, compte.devise) : 'N/A'}
               fullWidth
               margin="normal"
               InputProps={{
@@ -179,31 +209,28 @@ const DetailCompteModal: React.FC<DetailCompteModalProps> = ({ open, onClose, co
             />
             <TextField
               label="Type de client"
-              value={compte.client?.type_client ? compte.client.type_client.charAt(0).toUpperCase() + compte.client.type_client.slice(1) : 'Non spécifié'}
+              value={compte.client?.type_client ? 
+                compte.client.type_client.charAt(0).toUpperCase() + compte.client.type_client.slice(1) 
+                : 'Non spécifié'}
               fullWidth
               margin="normal"
               InputProps={{
                 readOnly: true,
               }}
             />
+            
+            
+            {/* Champ Nom complet pour les deux types */}
             <TextField
-              label="Nom"
-              value={compte.client?.nom || 'Non spécifié'}
+              label={compte.client?.type_client === 'moral' ? 'Nom du client' : 'Nom complet'}
+              value={getClientName(compte.client)}
               fullWidth
               margin="normal"
               InputProps={{
                 readOnly: true,
               }}
             />
-            <TextField
-              label="Prénom"
-              value={compte.client?.prenom || 'Non spécifié'}
-              fullWidth
-              margin="normal"
-              InputProps={{
-                readOnly: true,
-              }}
-            />
+            
             <TextField
               label="Email"
               value={compte.client?.email || 'Non spécifié'}
@@ -292,22 +319,23 @@ const DetailCompteModal: React.FC<DetailCompteModalProps> = ({ open, onClose, co
       </DialogContent>
       <DialogActions>
         <Button 
-              onClick={onClose} 
-              sx={{
-                  background: 'linear-gradient(135deg, #2b56e2e7 0%, #110ddeff 100%)',
-                  borderRadius: '50px',
-                  padding: '10px 30px',
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  color: '#ffff',
-                  '&.Mui-disabled': {
-                    background: '#e0e0e0',
-                    color: '#ffff',
-                    boxShadow: 'none'
-                  }
-              }}
-                variant="outlined">
+          onClick={onClose} 
+          sx={{
+            background: 'linear-gradient(135deg, #2b56e2e7 0%, #110ddeff 100%)',
+            borderRadius: '50px',
+            padding: '10px 30px',
+            fontSize: '1rem',
+            fontWeight: 600,
+            textTransform: 'none',
+            color: '#ffff',
+            '&.Mui-disabled': {
+              background: '#e0e0e0',
+              color: '#ffff',
+              boxShadow: 'none'
+            }
+          }}
+          variant="contained"
+        >
           Fermer
         </Button>
       </DialogActions>

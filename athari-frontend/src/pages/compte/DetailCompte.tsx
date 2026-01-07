@@ -89,11 +89,14 @@ const AccountDetails = ({ account, onBack, onEdit, hasPermission }) => {
               <Divider sx={{ mb: 2 }} />
               <Grid container spacing={2}>
                 <Grid item xs={6}>
-                  <Typography variant="body2" color="textSecondary">Nom complet</Typography>
-                  <Typography variant="body1">
-                    {account.client?.nom} {account.client?.prenom}
+                  <Typography variant="body2" color="textSecondary">
+                      {account.client?.type_client === 'physique' ? 'Nom complet' : 'Raison Sociale'}
                   </Typography>
-                </Grid>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      {/* L'accesseur nom_complet suffit à lui seul */}
+                      {account.client?.nom_complet || 'Chargement...'}
+                  </Typography>
+              </Grid>
                 <Grid item xs={6}>
                   <Typography variant="body2" color="textSecondary">CNI</Typography>
                   <Typography variant="body1">{account.client?.cni}</Typography>

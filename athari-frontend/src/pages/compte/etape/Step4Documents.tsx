@@ -1,4 +1,3 @@
-// src/pages/compte/etape/Step4Documents.tsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -53,6 +52,7 @@ interface Step4DocumentsProps {
   onChange: (field: 'documents' | 'engagementAccepted' | 'clientSignature', value: any) => void;
   formData: CompteData;
   onSave: (result: any) => void;
+  onPrevious: () => void;
   mode?: 'create' | 'edit';
 }
 
@@ -63,6 +63,7 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
   onChange,
   formData,
   onSave,
+  onPrevious,
   mode = 'create'
 }) => {
   const [uploading, setUploading] = useState(false);
@@ -467,7 +468,24 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
 
         {/* Bouton d'enregistrement final */}
         <Grid item xs={12}>
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3, gap: 2 }}>
+            <Button
+              variant="outlined"
+              onClick={onPrevious}
+              disabled={saving}
+              sx={{
+                color: '#2e787d',
+                borderColor: '#2e787d',
+                '&:hover': {
+                  backgroundColor: 'rgba(46, 120, 125, 0.04)',
+                  borderColor: '#1a4c4f',
+                },
+                padding: '12px 30px',
+                fontSize: '1rem',
+              }}
+            >
+              Retour
+            </Button>
             <Button
               variant="contained"
               onClick={handleSaveCompte}
@@ -480,6 +498,10 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                 fontSize: '1rem',
                 '&:hover': {
                   background: 'linear-gradient(135deg, #43A047 0%, #1B5E20 100%)',
+                },
+                '&:disabled': {
+                  background: '#e0e0e0',
+                  color: '#9e9e9e'
                 }
               }}
             >

@@ -59,15 +59,16 @@ const StyledConnector = styled('div')({
     minWidth: '50px',
     borderRadius: '3px',
     transition: 'all 0.3s ease',
-    borderTopWidth: 3,
-    borderColor: '#e0e0e0',
   },
   '& .MuiStepConnector-root': {
     top: '20px',
     left: 'calc(-50% + 20px)',
     right: 'calc(50% + 20px)',
   },
- 
+  '& .MuiStepConnector-line': {
+    borderTopWidth: 3,
+    borderColor: '#e0e0e0',
+  },
   '& .MuiStepConnector-line.Mui-active, & .MuiStepConnector-line.Mui-completed': {
     borderColor: 'transparent',
     background: 'linear-gradient(90deg, #6a11cb, #4a6cf7)',
@@ -368,6 +369,7 @@ const AccountForm: React.FC<AccountFormProps> = ({
             onChange={updateFormData}
             formData={formData}
             onSave={handleSaveSuccess}
+            onPrevious={handleBack}  // Ajout de la prop manquante
             mode={mode}
           />
         );

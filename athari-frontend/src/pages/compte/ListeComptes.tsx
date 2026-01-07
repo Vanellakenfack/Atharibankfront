@@ -15,6 +15,18 @@ const getIsoCurrency = (customCurrency: string): string => {
   // Retourne le code ISO correspondant ou 'XOF' par défaut
   return currencyMap[customCurrency?.toUpperCase()] || 'XOF';
 };
+
+// Fonction utilitaire pour obtenir le nom du client selon son type
+const getClientName = (client: any): string => {
+  if (!client) return 'Client inconnu';
+  
+  if (client.type_client === 'physique') {
+    return `${client.physique.nom_prenoms}`.trim() || 'Nom non défini';
+  } else {
+    return client.morale.raison_sociale || 'Raison sociale non définie';
+  }
+};
+
 import {
   Box,
   Typography,
@@ -66,8 +78,12 @@ interface Compte {
     libelle: string;
   };
   client: {
-    nom: string;
-    prenom: string;
+    id: number;
+    type_client: 'moral' | 'physique';
+    raison_sociale?: string;
+    nom?: string;
+    prenom?: string;
+    nom_complet?: string;
   };
   created_at: string;
 }
@@ -119,7 +135,7 @@ const ListeComptes: React.FC = () => {
   const [comptes, setComptes] = useState<Compte[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [searchTerm, setSearchTerm] = useState<string>('');// on recherche par numero_compte nom ou prenom du client libelle de type de compte.
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedCompte, setSelectedCompte] = useState<Compte | null>(null);
   const [openDetail, setOpenDetail] = useState<boolean>(false);
   const [openEdit, setOpenEdit] = useState<boolean>(false);
@@ -128,7 +144,7 @@ const ListeComptes: React.FC = () => {
   const [order, setOrder] = useState<'asc' | 'desc'>('asc');
   const [orderBy, setOrderBy] = useState<string>('numero_compte');
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10); // 10 éléments par défaut
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -155,17 +171,13 @@ const ListeComptes: React.FC = () => {
         const response = await compteService.getComptes();
         console.log('Réponse de l\'API:', response);
         
-        // S'assurer que nous avons bien un tableau
         let comptesData = [];
         
         if (Array.isArray(response)) {
-          // Si la réponse est déjà un tableau
           comptesData = response;
         } else if (response && response.data && Array.isArray(response.data)) {
-          // Si la réponse est un objet avec une propriété data qui est un tableau
           comptesData = response.data;
         } else if (response && response.data && response.data.data && Array.isArray(response.data.data)) {
-          // Si la réponse est un objet avec data.data qui est un tableau
           comptesData = response.data.data;
         }
         
@@ -178,7 +190,7 @@ const ListeComptes: React.FC = () => {
           message: 'Erreur lors du chargement des comptes',
           severity: 'error'
         });
-        setComptes([]); // S'assurer que comptes est un tableau vide en cas d'erreur
+        setComptes([]);
       } finally {
         setLoading(false);
       }
@@ -191,13 +203,13 @@ const ListeComptes: React.FC = () => {
   const filteredComptes = (comptes || []).filter(compte => {
     try {
       const searchTermLower = searchTerm.toLowerCase();
-      const nomComplet = `${compte?.client?.prenom || ''} ${compte?.client?.nom || ''}`.toLowerCase();
+      const clientName = getClientName(compte?.client).toLowerCase();
       const typeCompte = compte?.type_compte?.libelle?.toLowerCase() || '';
       const numCompte = compte?.numero_compte?.toLowerCase() || '';
       
       return (
         numCompte.includes(searchTermLower) ||
-        nomComplet.includes(searchTermLower) ||
+        clientName.includes(searchTermLower) ||
         typeCompte.includes(searchTermLower)
       );
     } catch (error) {
@@ -426,12 +438,15 @@ const ListeComptes: React.FC = () => {
                                       fontSize: '0.875rem'
                                     }}
                                   >
-                                    {`${compte.client?.prenom?.[0] || ''}${compte.client?.nom?.[0] || ''}`.toUpperCase()}
+                                    {getClientName(compte.client).charAt(0).toUpperCase()}
                                   </Avatar>
                                   <Box>
                                     <Typography variant="body2" sx={{ fontWeight: 600, color: '#1E293B' }}>
-                                      {`${compte.client?.prenom || ''} ${compte.client?.nom || ''}`.trim()}
+                                      {getClientName(compte.client)}
                                     </Typography>
+                                    {/*<Typography variant="caption" sx={{ color: '#64748B' }}>
+                                      {compte.client?.type_client === 'physique' ? 'Client moral' : 'Client physique'}
+                                    </Typography>*/}
                                   </Box>
                                 </Box>
                               </StyledTableCell>

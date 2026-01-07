@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useChapitres } from '../../hooks/useChapitres';
+import type { Chapitre } from '../../hooks/useChapitres';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Alert,
@@ -19,7 +20,13 @@ import {
   Container,
   MenuItem,
   Autocomplete,
-  Paper
+  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Chip
 } from '@mui/material';
 import Sidebar from '../../components/layout/Sidebar';
 import TopBar from '../../components/layout/TopBar';
@@ -27,201 +34,163 @@ import { Grid } from '@mui/material';
 import { 
   Save as SaveIcon, 
   ArrowBack as ArrowBackIcon, 
-  ToggleOn as ToggleOnIcon,
-  ToggleOff as ToggleOffIcon,
   AccountBalance as AccountBalanceIcon,
   Settings as SettingsIcon,
   Receipt as ReceiptIcon,
   AccountTree as AccountTreeIcon,
   Info as InfoIcon,
   Percent as PercentIcon,
-  AccessTime as AccessTimeIcon,
   Money as MoneyIcon,
-  Warning as WarningIcon
+  Warning as WarningIcon,
+  CheckCircle as CheckCircleIcon,
+  Search as SearchIcon,
+  FilterList as FilterListIcon
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useSnackbar } from 'notistack';
-import ApiClient  from '../../services/api/ApiClient'
+import ApiClient from '../../services/api/ApiClient';
 import { useMutation } from "@tanstack/react-query";
 
-// Schéma de validation amélioré pour les décimales
+// Schéma de validation - SEULS code et libelle sont obligatoires
 const fraisCommissionSchema = yup.object().shape({
-
-  // Champs obligatoires
+  // Champs obligatoires SEULEMENT
   code: yup.string().required('Le code est requis'),
   libelle: yup.string().required('Le libellé est requis'),
   
-  // Champs du gestionnaire
-  gestionnaire_nom: yup.string().required('Le nom du gestionnaire est requis'),
-  gestionnaire_prenom: yup.string().required('Le prénom du gestionnaire est requis'),
-  gestionnaire_code: yup.string().required('Le code du gestionnaire est requis'),
-  
-  // Onglet Général
-  type_compte_id: yup.string().required('Le type de compte est requis'),
+  // Tous les autres champs sont facultatifs
+  type_compte_id: yup.string().nullable(),
   chapitre_id: yup.number().nullable(),
   description: yup.string().nullable(),
   
-  // Frais et Commissions
-  // Frais ouverture
+  // Frais et Commissions - tous facultatifs
   frais_ouverture: yup.number()
     .min(0, 'Doit être positif')
     .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value)
-    .test('decimal', 'Maximum 2 décimales', value => 
-      value === null || value === undefined || /^\d+(\.\d{1,2})?$/.test(value.toString())
-    ),
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
   frais_ouverture_actif: yup.boolean().default(false),
   chapitre_frais_ouverture_id: yup.number().nullable(),
   
-  // Frais carnet
   frais_carnet: yup.number()
     .min(0, 'Doit être positif')
     .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value)
-    .test('decimal', 'Maximum 2 décimales', value => 
-      value === null || value === undefined || /^\d+(\.\d{1,2})?$/.test(value.toString())
-    ),
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
   frais_carnet_actif: yup.boolean().default(false),
   chapitre_frais_carnet_id: yup.number().nullable(),
   
-  // Frais renouvellement carnet
   frais_renouvellement_carnet: yup.number()
     .min(0, 'Doit être positif')
     .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value)
-    .test('decimal', 'Maximum 2 décimales', value => 
-      value === null || value === undefined || /^\d+(\.\d{1,2})?$/.test(value.toString())
-    ),
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
   frais_renouvellement_actif: yup.boolean().default(false),
   chapitre_renouvellement_id: yup.number().nullable(),
   
-  // Frais perte carnet
   frais_perte_carnet: yup.number()
     .min(0, 'Doit être positif')
     .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value)
-    .test('decimal', 'Maximum 2 décimales', value => 
-      value === null || value === undefined || /^\d+(\.\d{1,2})?$/.test(value.toString())
-    ),
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
   frais_perte_actif: yup.boolean().default(false),
   chapitre_perte_id: yup.number().nullable(),
   
-  // Commission mensuelle
   commission_mensuelle_actif: yup.boolean().default(false),
   seuil_commission: yup.number()
     .min(0, 'Doit être positif')
     .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value)
-    .test('decimal', 'Maximum 2 décimales', value => 
-      value === null || value === undefined || /^\d+(\.\d{1,2})?$/.test(value.toString())
-    ),
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
   commission_si_superieur: yup.number()
     .min(0, 'Doit être positif')
     .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value)
-    .test('decimal', 'Maximum 2 décimales', value => 
-      value === null || value === undefined || /^\d+(\.\d{1,2})?$/.test(value.toString())
-    ),
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
   commission_si_inferieur: yup.number()
     .min(0, 'Doit être positif')
     .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value)
-    .test('decimal', 'Maximum 2 décimales', value => 
-      value === null || value === undefined || /^\d+(\.\d{1,2})?$/.test(value.toString())
-    ),
+    .transform((value, originalValue) => originalValue === '' ? null : value),
   
-  // Commission retrait
   commission_retrait: yup.number()
     .min(0, 'Doit être positif')
     .max(100, 'Maximum 100%')
     .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value)
-    .test('decimal', 'Maximum 2 décimales', value => 
-      value === null || value === undefined || /^\d+(\.\d{1,2})?$/.test(value.toString())
-    ),
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
   commission_retrait_actif: yup.boolean().default(false),
   chapitre_commission_retrait_id: yup.number().nullable(),
   
-  // Commission SMS
   commission_sms: yup.number()
     .min(0, 'Doit être positif')
     .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value)
-    .test('decimal', 'Maximum 2 décimales', value => 
-      value === null || value === undefined || /^\d+(\.\d{1,2})?$/.test(value.toString())
-    ),
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
   commission_sms_actif: yup.boolean().default(false),
   chapitre_commission_sms_id: yup.number().nullable(),
   
-  // Intérêts
+  // Intérêts - tous facultatifs
   taux_interet_annuel: yup.number()
     .min(0, 'Doit être positif')
     .max(100, 'Maximum 100%')
     .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value)
-    .test('decimal', 'Maximum 2 décimales', value => 
-      value === null || value === undefined || /^\d+(\.\d{1,2})?$/.test(value.toString())
-    ),
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
   interets_actifs: yup.boolean().default(false),
   frequence_calcul_interet: yup.string().nullable(),
   heure_calcul_interet: yup.string().nullable(),
   chapitre_interet_credit_id: yup.number().nullable(),
   capitalisation_interets: yup.boolean().default(false),
   
-  // Frais déblocage
+  // Frais déblocage - tous facultatifs
   frais_deblocage: yup.number()
     .min(0, 'Doit être positif')
     .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value)
-    .test('decimal', 'Maximum 2 décimales', value => 
-      value === null || value === undefined || /^\d+(\.\d{1,2})?$/.test(value.toString())
-    ),
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
   frais_deblocage_actif: yup.boolean().default(false),
   chapitre_frais_deblocage_id: yup.number().nullable(),
   
-  // Pénalités
+  // Pénalités - tous facultatifs
   penalite_retrait_anticipe: yup.number()
     .min(0, 'Doit être positif')
     .max(100, 'Maximum 100%')
     .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value)
-    .test('decimal', 'Maximum 2 décimales', value => 
-      value === null || value === undefined || /^\d+(\.\d{1,2})?$/.test(value.toString())
-    ),
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
   penalite_actif: yup.boolean().default(false),
   chapitre_penalite_id: yup.number().nullable(),
+  
   frais_cloture_anticipe: yup.number()
     .min(0, 'Doit être positif')
     .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value)
-    .test('decimal', 'Maximum 2 décimales', value => 
-      value === null || value === undefined || /^\d+(\.\d{1,2})?$/.test(value.toString())
-    ),
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
   frais_cloture_anticipe_actif: yup.boolean().default(false),
   chapitre_cloture_anticipe_id: yup.number().nullable(),
   
-  // Avancé
+  // Avancé - tous facultatifs
   minimum_compte: yup.number()
     .min(0, 'Doit être positif')
     .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value)
-    .test('decimal', 'Maximum 2 décimales', value => 
-      value === null || value === undefined || /^\d+(\.\d{1,2})?$/.test(value.toString())
-    ),
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
   minimum_compte_actif: yup.boolean().default(false),
-  // compte_attente_produits_id: yup.number().nullable(),
   retrait_anticipe_autorise: yup.boolean().default(false),
   validation_retrait_anticipe: yup.boolean().default(false),
+  
   duree_blocage_min: yup.number()
     .min(0, 'Doit être positif')
-    .nullable(),
+    .nullable()
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
   duree_blocage_max: yup.number()
     .min(0, 'Doit être positif')
-    .nullable(),
+    .nullable()
+    .transform((value, originalValue) => originalValue === '' ? null : value),
   
-  // Observations
+  // Observations - facultatif
   observations: yup.string().nullable()
 });
 
@@ -266,100 +235,254 @@ const SectionTitle = ({ title, icon: Icon }: { title: string, icon?: any }) => (
   </Box>
 );
 
+// Composant mémoïsé pour les champs de chapitres avec largeur augmentée
+const ChapterField = React.memo(({
+  name,
+  label,
+  control,
+  chapitres,
+  isSubmitting,
+  disabled = false
+}: {
+  name: keyof TypeCompteFormData;
+  label: string;
+  control: any;
+  chapitres: Chapitre[];
+  isSubmitting: boolean;
+  disabled?: boolean;
+}) => {
+  // Options formatées pour l'autocomplete
+  const chapterOptions = useMemo(() => {
+    return chapitres.map(chapitre => ({
+      ...chapitre,
+      displayText: `${chapitre.code} - ${chapitre.libelle}`
+    }));
+  }, [chapitres]);
+
+  return (
+    <Box sx={{ minWidth: 250 }}>
+      <Controller
+        name={name}
+        control={control}
+        render={({ field, fieldState: { error } }) => {
+          const selectedValue = field.value 
+            ? chapterOptions.find(c => c.id === field.value)
+            : null;
+
+          return (
+            <Autocomplete
+              options={chapterOptions}
+              getOptionLabel={(option) => option?.displayText || ''}
+              isOptionEqualToValue={(option, value) => 
+                option && value ? option.id === value.id : false
+              }
+              value={selectedValue}
+              onChange={(_, newValue) => {
+                field.onChange(newValue ? newValue.id : null);
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label={label}
+                  variant="outlined"
+                  size="small"
+                  error={!!error}
+                  helperText={error?.message || 'Tapez pour rechercher...'}
+                  disabled={disabled || isSubmitting}
+                  placeholder="Rechercher un chapitre..."
+                  sx={{ minWidth: 250 }}
+                  InputProps={{
+                    ...params.InputProps,
+                    startAdornment: (
+                      <React.Fragment>
+                        <SearchIcon sx={{ color: 'action.active', mr: 1, my: 0.5 }} />
+                        {params.InputProps.startAdornment}
+                      </React.Fragment>
+                    ),
+                  }}
+                />
+              )}
+              renderOption={(props, option) => (
+                <li {...props} key={option.id}>
+                  <Box sx={{ width: '100%' }}>
+                    <Typography variant="body2" fontWeight="medium">
+                      {option.code} - {option.libelle}
+                    </Typography>
+                    {option.categorie && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                        <FilterListIcon fontSize="small" sx={{ mr: 0.5, fontSize: '0.75rem' }} />
+                        <Typography variant="caption" color="text.secondary">
+                          {option.categorie.nom}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </li>
+              )}
+              filterOptions={(options, { inputValue }) => {
+                if (!inputValue.trim()) return options;
+                
+                const searchTerm = inputValue.toLowerCase();
+                return options.filter(option => 
+                  option.code.toLowerCase().includes(searchTerm) ||
+                  option.libelle.toLowerCase().includes(searchTerm) ||
+                  (option.categorie?.nom?.toLowerCase()?.includes(searchTerm) || false)
+                );
+              }}
+              loading={chapitres.length === 0}
+              loadingText="Chargement des chapitres..."
+              noOptionsText={
+                chapitres.length === 0 
+                  ? "Aucun chapitre disponible" 
+                  : "Aucun chapitre correspondant"
+              }
+              fullWidth
+              clearOnBlur={false}
+              blurOnSelect
+              sx={{ minWidth: 250 }}
+            />
+          );
+        }}
+      />
+    </Box>
+  );
+});
+
+ChapterField.displayName = 'ChapterField';
+
 const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
   const { id } = useParams<{ id?: string }>();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
   const [activeTab, setActiveTab] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const [createdTypeCompte, setCreatedTypeCompte] = useState<any>(null);
 
-  const [typeComptes] = useState<any[]>([
-    { id: 1, libelle: 'Compte Courant' },
-    { id: 2, libelle: 'Compte Épargne' },
-    { id: 3, libelle: 'Compte Terme' }
-  ]);
-
-  const { chapitres } = useChapitres();
+  const { chapitres, loading: loadingChapitres, error: chapitresError, totalChapitres } = useChapitres();
 
   // Fonction pour soumettre le formulaire
   const saveTypeCompte = async (data: any) => {
     try {
-      // Formater les données avant envoi
+      console.log('Données envoyées à l\'API:', data);
+      
+      // Formater les données avant envoi - OPTION 1: Envoyer 0 au lieu de null
       const formData = {
         ...data,
-        // Convertir les valeurs vides en null
-        frais_ouverture: data.frais_ouverture || null,
-        frais_carnet: data.frais_carnet || null,
-        frais_renouvellement_carnet: data.frais_renouvellement_carnet || null,
-        frais_perte_carnet: data.frais_perte_carnet || null,
-        seuil_commission: data.seuil_commission || null,
-        commission_si_superieur: data.commission_si_superieur || null,
-        commission_si_inferieur: data.commission_si_inferieur || null,
-        commission_retrait: data.commission_retrait || null,
-        commission_sms: data.commission_sms || null,
-        taux_interet_annuel: data.taux_interet_annuel || null,
-        frais_deblocage: data.frais_deblocage || null,
-        penalite_retrait_anticipe: data.penalite_retrait_anticipe || null,
-        frais_cloture_anticipe: data.frais_cloture_anticipe || null,
-        minimum_compte: data.minimum_compte || null,
-        duree_blocage_min: data.duree_blocage_min || null,
-        duree_blocage_max: data.duree_blocage_max || null,
+        // Convertir les valeurs null en 0 pour les champs qui ne peuvent pas être null
+        frais_ouverture: data.frais_ouverture || 0,
+        frais_carnet: data.frais_carnet || 0,
+        frais_renouvellement_carnet: data.frais_renouvellement_carnet || 0,
+        frais_perte_carnet: data.frais_perte_carnet || 0,
+        seuil_commission: data.seuil_commission || 0,
+        commission_si_superieur: data.commission_si_superieur || 0,
+        commission_si_inferieur: data.commission_si_inferieur || 0,
+        commission_retrait: data.commission_retrait || 0,
+        commission_sms: data.commission_sms || 0,
+        taux_interet_annuel: data.taux_interet_annuel || 0,
+        frais_deblocage: data.frais_deblocage || 0,
+        penalite_retrait_anticipe: data.penalite_retrait_anticipe || 0,
+        frais_cloture_anticipe: data.frais_cloture_anticipe || 0,
+        minimum_compte: data.minimum_compte || 0,
+        duree_blocage_min: data.duree_blocage_min || 0,
+        duree_blocage_max: data.duree_blocage_max || 0,
       };
 
       const response = await ApiClient.post('/types-comptes/creer', formData);
       return response.data;
     } catch (error: any) {
-      throw error.response?.data || error.message;
+      console.error('Erreur API:', error);
+      
+      // Extraire le message d'erreur de la réponse
+      let errorMessage = 'Erreur lors de la création du type de compte';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Afficher les détails de l'erreur SQL si disponible
+      if (error.response?.data?.errors) {
+        console.error('Erreurs de validation:', error.response.data.errors);
+      }
+      
+      throw new Error(errorMessage);
     }
   };
 
-  // Configuration de la mutation pour la création
-  const { mutate: createTypeCompte, isLoading: isCreating } = useMutation({
+  // Configuration de la mutation
+  const { mutate: createTypeCompte, isPending: isSubmitting } = useMutation({
     mutationFn: saveTypeCompte,
     onSuccess: (data) => {
-      enqueueSnackbar('Type de compte créé avec succès', { variant: 'success' });
-      navigate('/types-comptes'); // Rediriger vers la liste des types de comptes
+      console.log('Succès de la création:', data);
+      
+      // Stocker les données créées pour les afficher dans la modal
+      setCreatedTypeCompte(data);
+      
+      // Ouvrir la modal de confirmation au lieu de rediriger immédiatement
+      setSuccessModalOpen(true);
+      
+      // Notification toast
+      enqueueSnackbar('Type de compte créé avec succès', { 
+        variant: 'success',
+        anchorOrigin: {
+          vertical: 'top',
+          horizontal: 'right'
+        }
+      });
     },
     onError: (error: any) => {
+      console.error('Erreur de mutation:', error);
       const errorMessage = error?.message || 'Une erreur est survenue lors de la création du type de compte';
-      enqueueSnackbar(errorMessage, { variant: 'error' });
-
-      // Afficher les erreurs de validation si elles existent
-      if (error?.errors) {
-        Object.values(error.errors).forEach((messages: any) => {
-          if (Array.isArray(messages)) {
-            messages.forEach((message) => {
-              enqueueSnackbar(message, { variant: 'error' });
-            });
-          }
-        });
-      }
-    },
-    onSettled: () => {
-      setIsSubmitting(false);
+      setSubmitError(errorMessage);
+      enqueueSnackbar(errorMessage, { 
+        variant: 'error',
+        anchorOrigin: {
+          vertical: 'top',
+          horizontal: 'right'
+        }
+      });
     }
   });
 
-  // Fonction de soumission du formulaire
-  const onSubmit = (data: any) => {
-    setIsSubmitting(true);
-    setSubmitError(null);
-    createTypeCompte(data, {
-      onSettled: () => {
-        setIsSubmitting(false);
-      }
-    });
+  // Fonction pour fermer la modal et rediriger
+  const handleCloseSuccessModal = () => {
+    setSuccessModalOpen(false);
+    navigate('/Liste-type-de-compte');
   };
 
-  const { control, handleSubmit, formState: { errors }, watch, setValue } = useForm<TypeCompteFormData>({
+  // Fonction pour rester sur la page (créer un nouveau type de compte)
+  const handleStayAndCreateNew = () => {
+    setSuccessModalOpen(false);
+    // Réinitialiser le formulaire
+    reset();
+    // Réinitialiser les autres états si nécessaire
+    setCreatedTypeCompte(null);
+    setSubmitError(null);
+    setActiveTab(0);
+  };
+
+  const { 
+    control, 
+    handleSubmit, 
+    formState: { errors }, 
+    watch, 
+    setValue,
+    reset
+  } = useForm<TypeCompteFormData>({
     resolver: yupResolver(fraisCommissionSchema),
+    mode: 'onChange',
     defaultValues: {
+      // Champs obligatoires
+      code: '',
+      libelle: '',
+      
       // Onglet Général
       type_compte_id: '',
       chapitre_id: null,
+      description: '',
 
       // Frais et Commissions
       frais_ouverture: null,
@@ -427,7 +550,26 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
     }
   });
 
-  // Fonction utilitaire pour les champs numériques avec décimales
+  // Fonction pour soumettre le formulaire
+  const onSubmit = async (data: TypeCompteFormData) => {
+    console.log('Données du formulaire:', data);
+    
+    try {
+      // Vérification des champs obligatoires seulement
+      if (!data.code || !data.libelle) {
+        setSubmitError('Veuillez remplir les champs obligatoires (Code et Libellé)');
+        return;
+      }
+
+      // Appel de la mutation
+      createTypeCompte(data);
+    } catch (error) {
+      console.error('Erreur lors de la soumission:', error);
+      setSubmitError('Une erreur est survenue lors de la soumission du formulaire');
+    }
+  };
+
+  // Fonction utilitaire pour les champs numériques
   const renderNumberField = useCallback((
     fieldName: keyof TypeCompteFormData,
     label: string,
@@ -436,35 +578,38 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
     step: string = "0.01"
   ) => {
     return (
-      <Controller
-        name={fieldName}
-        control={controlParam}
-        render={({ field, fieldState: { error } }) => (
-          <TextField
-            {...field}
-            type="number"
-            label={label}
-            fullWidth
-            variant="outlined"
-            size="small"
-            error={!!error}
-            helperText={error?.message}
-            disabled={isSubmitting}
-            InputProps={{
-              endAdornment: adornment,
-              inputProps: { 
-                min: 0,
-                step: step
-              }
-            }}
-            value={field.value === null || field.value === undefined ? '' : field.value}
-            onChange={(e) => {
-              const value = e.target.value === '' ? null : parseFloat(e.target.value);
-              field.onChange(value);
-            }}
-          />
-        )}
-      />
+      <Box sx={{ minWidth: 250 }}>
+        <Controller
+          name={fieldName}
+          control={controlParam}
+          render={({ field, fieldState: { error } }) => (
+            <TextField
+              {...field}
+              type="number"
+              label={label}
+              fullWidth
+              variant="outlined"
+              size="small"
+              error={!!error}
+              helperText={error?.message}
+              disabled={isSubmitting}
+              sx={{ minWidth: 250 }}
+              InputProps={{
+                endAdornment: adornment,
+                inputProps: { 
+                  min: 0,
+                  step: step
+                }
+              }}
+              value={field.value === null || field.value === undefined ? '' : field.value}
+              onChange={(e) => {
+                const value = e.target.value === '' ? null : parseFloat(e.target.value);
+                field.onChange(value);
+              }}
+            />
+          )}
+        />
+      </Box>
     );
   }, [isSubmitting]);
 
@@ -476,46 +621,16 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
     disabled: boolean = false
   ) => {
     return (
-      <Controller
-        name={fieldName}
-        control={controlParam}
-        render={({ field, fieldState: { error } }) => (
-          <Autocomplete
-            options={chapitres}
-            getOptionLabel={(option) => 
-              option ? `${option.code} - ${option.libelle}` : ''
-            }
-            isOptionEqualToValue={(option, value) => option.id === value.id}
-            value={chapitres.find(c => c.id === field.value) || null}
-            onChange={(_, newValue) => {
-              field.onChange(newValue ? newValue.id : null);
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label={label}
-                variant="outlined"
-                size="small"
-                error={!!error}
-                helperText={error?.message}
-                disabled={disabled || isSubmitting || !chapitres.length}
-                placeholder="Sélectionnez un chapitre..."
-              />
-            )}
-            renderOption={(props, option) => (
-              <li {...props}>
-                <Box>
-                  <Typography variant="body2">
-                    <strong>{option.code}</strong> - {option.libelle}
-                  </Typography>
-                </Box>
-              </li>
-            )}
-            fullWidth
-          />
-        )}
-      />
-
+      <Box sx={{ minWidth: 250 }}>
+        <ChapterField
+          name={fieldName}
+          label={label}
+          control={controlParam}
+          chapitres={chapitres}
+          isSubmitting={isSubmitting}
+          disabled={disabled}
+        />
+      </Box>
     );
   }, [chapitres, isSubmitting]);
 
@@ -546,7 +661,9 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                   <MuiSwitch
                     {...field}
                     checked={field.value}
+                    onChange={(e) => field.onChange(e.target.checked)}
                     color="primary"
+                    disabled={isSubmitting}
                   />
                 )}
               />
@@ -563,48 +680,54 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                 {field.type === 'number' ? (
                   renderNumberField(field.name, field.label, control, field.adornment, field.step)
                 ) : field.type === 'select' && field.options ? (
-                  <Controller
-                    name={field.name}
-                    control={control}
-                    render={({ field: selectField }) => (
-                      <TextField
-                        {...selectField}
-                        select
-                        label={field.label}
-                        fullWidth
-                        variant="outlined"
-                        size="small"
-                        disabled={isSubmitting}
-                      >
-                        {field.options.map((option) => (
-                          <MenuItem key={option.value} value={option.value}>
-                            {option.label}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    )}
-                  />
+                  <Box sx={{ minWidth: 250 }}>
+                    <Controller
+                      name={field.name}
+                      control={control}
+                      render={({ field: selectField }) => (
+                        <TextField
+                          {...selectField}
+                          select
+                          label={field.label}
+                          fullWidth
+                          variant="outlined"
+                          size="small"
+                          disabled={isSubmitting}
+                          sx={{ minWidth: 250 }}
+                        >
+                          {field.options.map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                              {option.label}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      )}
+                    />
+                  </Box>
                 ) : field.type === 'chapter' ? (
                   renderChapterField(field.name, field.label, control, !isActive)
                 ) : (
-                  <Controller
-                    name={field.name}
-                    control={control}
-                    render={({ field: textField, fieldState: { error } }) => (
-                      <TextField
-                        {...textField}
-                        label={field.label}
-                        fullWidth
-                        variant="outlined"
-                        size="small"
-                        error={!!error}
-                        helperText={error?.message}
-                        disabled={isSubmitting}
-                        multiline={field.type === 'text'}
-                        rows={field.type === 'text' ? 4 : 1}
-                      />
-                    )}
-                  />
+                  <Box sx={{ minWidth: 250 }}>
+                    <Controller
+                      name={field.name}
+                      control={control}
+                      render={({ field: textField, fieldState: { error } }) => (
+                        <TextField
+                          {...textField}
+                          label={field.label}
+                          fullWidth
+                          variant="outlined"
+                          size="small"
+                          error={!!error}
+                          helperText={error?.message}
+                          disabled={isSubmitting}
+                          multiline={field.type === 'text'}
+                          rows={field.type === 'text' ? 4 : 1}
+                          sx={{ minWidth: 250 }}
+                        />
+                      )}
+                    />
+                  </Box>
                 )}
               </Grid>
             ))}
@@ -640,6 +763,33 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
 
         {/* Conteneur principal */}
         <Container maxWidth="lg" sx={{ py: 4, flex: 1 }}>
+          {/* Indicateur de chargement des chapitres */}
+          {loadingChapitres && (
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
+              <CircularProgress size={20} sx={{ mr: 2 }} />
+              <Typography variant="body2">
+                Chargement des chapitres... ({totalChapitres} trouvés)
+              </Typography>
+            </Box>
+          )}
+
+          {chapitresError && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {chapitresError}
+            </Alert>
+          )}
+
+          {!loadingChapitres && chapitres.length > 0 && (
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+              <Chip 
+                label={`${totalChapitres} chapitres disponibles`}
+                color="primary"
+                size="small"
+                variant="outlined"
+              />
+            </Box>
+          )}
+
           <Card sx={{ p: 3, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
             {/* En-tête de la page */}
             <Box sx={{ 
@@ -671,6 +821,7 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                 variant="outlined"
                 startIcon={<ArrowBackIcon />}
                 onClick={() => navigate(-1)}
+                disabled={isSubmitting}
                 sx={{ 
                   textTransform: 'none',
                   borderRadius: '8px',
@@ -685,7 +836,11 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
             <Divider sx={{ mb: 3 }} />
 
             {submitError && (
-              <Alert severity="error" sx={{ mb: 3 }}>
+              <Alert 
+                severity="error" 
+                sx={{ mb: 3 }}
+                onClose={() => setSubmitError(null)}
+              >
                 {submitError}
               </Alert>
             )}
@@ -737,63 +892,108 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
               {/* Onglet Général */}
               <TabPanel value={activeTab} index={0}>
                 <Grid container spacing={3}>
-                  <Grid item xs={12} md={6}>
-                    <Controller
-                      name="type_compte_id"
-                      control={control}
-                      render={({ field, fieldState: { error } }) => (
-                        <TextField
-                          {...field}
-                          label="Type de compte"
-                          fullWidth
-                          variant="outlined"
-                          size="small"
-                          error={!!error}
-                          helperText={error?.message || ' '}
-                          disabled={isSubmitting}
-                          placeholder="Entrez le type de compte"
-                        />
-                      )}
-                    />
+                  {/* Code - Champ OBLIGATOIRE */}
+                  <Grid item xs={12} md={4}>
+                    <Box sx={{ minWidth: 250 }}>
+                      <Controller
+                        name="code"
+                        control={control}
+                        render={({ field, fieldState: { error } }) => (
+                          <TextField
+                            {...field}
+                            label="Code *"
+                            fullWidth
+                            variant="outlined"
+                            size="small"
+                            error={!!error}
+                            helperText={error?.message}
+                            disabled={isSubmitting}
+                            required
+                            sx={{ minWidth: 250 }}
+                          />
+                        )}
+                      />
+                    </Box>
+                  </Grid>
+                  
+                  {/* Libellé - Champ OBLIGATOIRE */}
+                  <Grid item xs={12} md={8}>
+                    <Box sx={{ minWidth: 250 }}>
+                      <Controller
+                        name="libelle"
+                        control={control}
+                        render={({ field, fieldState: { error } }) => (
+                          <TextField
+                            {...field}
+                            label="Libellé *"
+                            fullWidth
+                            variant="outlined"
+                            size="small"
+                            error={!!error}
+                            helperText={error?.message}
+                            disabled={isSubmitting}
+                            required
+                            sx={{ minWidth: 250 }}
+                          />
+                        )}
+                      />
+                    </Box>
                   </Grid>
 
+                  {/* Type de compte - Champ FACULTATIF */}
+                  <Grid item xs={12} md={6}>
+                    <Box sx={{ minWidth: 250 }}>
+                      <Controller
+                        name="type_compte_id"
+                        control={control}
+                        render={({ field, fieldState: { error } }) => (
+                          <TextField
+                            {...field}
+                            label="Type de compte"
+                            fullWidth
+                            variant="outlined"
+                            size="small"
+                            error={!!error}
+                            helperText={error?.message}
+                            disabled={isSubmitting}
+                            placeholder="Entrez le type de compte"
+                            sx={{ minWidth: 250 }}
+                          />
+                        )}
+                      />
+                    </Box>
+                  </Grid>
+
+                  {/* Chapitre principal - Champ FACULTATIF */}
                   <Grid item xs={12} md={6}>
                     {renderChapterField('chapitre_id', 'Chapitre principal', control)}
                   </Grid>
-                  <Grid container spacing={2}>
-  <Grid item xs={12} md={4}>
-    <Controller
-      name="code"
-      control={control}
-      render={({ field }) => (
-        <TextField
-          {...field}
-          label="Code *"
-          error={!!errors.code}
-          helperText={errors.code?.message}
-          fullWidth
-        />
-      )}
-    />
-  </Grid>
-  
-  <Grid item xs={12} md={8}>
-    <Controller
-      name="libelle"
-      control={control}
-      render={({ field }) => (
-        <TextField
-          {...field}
-          label="Libellé *"
-          error={!!errors.libelle}
-          helperText={errors.libelle?.message}
-          fullWidth
-        />
-        
-      )}
-    />
-  </Grid>
-</Grid>
+
+                  {/* Description */}
+                  <Grid item xs={12}>
+                    <Box sx={{ minWidth: 250 }}>
+                      <Controller
+                        name="description"
+                        control={control}
+                        render={({ field, fieldState: { error } }) => (
+                          <TextField
+                            {...field}
+                            label="Description"
+                            fullWidth
+                            multiline
+                            rows={3}
+                            variant="outlined"
+                            size="small"
+                            error={!!error}
+                            helperText={error?.message}
+                            disabled={isSubmitting}
+                            placeholder="Description du type de compte"
+                            sx={{ minWidth: 250 }}
+                          />
+                        )}
+                      />
+                    </Box>
+                  </Grid>
                 </Grid>
               </TabPanel>
 
@@ -811,7 +1011,7 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                         name: 'frais_ouverture', 
                         label: 'Montant des frais d\'ouverture', 
                         type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
+                        adornment: <InputAdornment position="end">FCFA</InputAdornment>
                       },
                       { 
                         name: 'chapitre_frais_ouverture_id', 
@@ -827,7 +1027,7 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                         name: 'frais_carnet', 
                         label: 'Montant des frais de carnet', 
                         type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
+                        adornment: <InputAdornment position="end">FCFA</InputAdornment>
                       },
                       { 
                         name: 'chapitre_frais_carnet_id', 
@@ -843,7 +1043,7 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                         name: 'frais_renouvellement_carnet', 
                         label: 'Montant des frais de renouvellement', 
                         type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
+                        adornment: <InputAdornment position="end">FCFA</InputAdornment>
                       },
                       { 
                         name: 'chapitre_renouvellement_id', 
@@ -859,7 +1059,7 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                         name: 'frais_perte_carnet', 
                         label: 'Montant des frais de perte', 
                         type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
+                        adornment: <InputAdornment position="end">FCFA</InputAdornment>
                       },
                       { 
                         name: 'chapitre_perte_id', 
@@ -871,28 +1071,28 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
 
                   {/* Section Commission mensuelle */}
                   <Grid item xs={12}>
-                    <SectionTitle title=" frais d'entretien de compte" icon={PercentIcon} />
+                    <SectionTitle title="frais d'entretien de compte" icon={PercentIcon} />
                   </Grid>
 
                   <Grid item xs={12}>
-                    {renderToggleSection('commission_mensuelle_actif', ' frais d\'entretien de compte', [
+                    {renderToggleSection('commission_mensuelle_actif', 'frais d\'entretien de compte', [
                       { 
                         name: 'seuil_commission', 
                         label: 'Seuil de commission', 
                         type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
+                        adornment: <InputAdornment position="end">FCFA</InputAdornment>
                       },
                       { 
                         name: 'commission_si_superieur', 
                         label: 'Commission si supérieur au seuil', 
                         type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
+                        adornment: <InputAdornment position="end">FCFA</InputAdornment>
                       },
                       { 
                         name: 'commission_si_inferieur', 
                         label: 'Commission si inférieur au seuil', 
                         type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
+                        adornment: <InputAdornment position="end">FCFA</InputAdornment>
                       }
                     ])}
                   </Grid>
@@ -908,7 +1108,7 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                         name: 'commission_retrait', 
                         label: 'Taux de commission', 
                         type: 'number',
-                        adornment: <InputAdornment position="start">%</InputAdornment>,
+                        adornment: <InputAdornment position="end">%</InputAdornment>,
                         step: "0.01"
                       },
                       { 
@@ -930,7 +1130,7 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                         name: 'commission_sms', 
                         label: 'Montant commission SMS', 
                         type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
+                        adornment: <InputAdornment position="end">FCFA</InputAdornment>
                       },
                       { 
                         name: 'chapitre_commission_sms_id', 
@@ -956,7 +1156,7 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                         name: 'taux_interet_annuel', 
                         label: 'Taux d\'intérêt annuel', 
                         type: 'number',
-                        adornment: <InputAdornment position="start">%</InputAdornment>,
+                        adornment: <InputAdornment position="end">%</InputAdornment>,
                         step: "0.01"
                       },
                       { 
@@ -964,9 +1164,9 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                         label: 'Fréquence de calcul', 
                         type: 'select',
                         options: [
-                          { value: 'JOURNALIER', label: 'JOURNALIER' },
+                          { value: 'JOURNALIER', label: 'Journalier' },
                           { value: 'MENSUEL', label: 'Mensuel' },
-                          { value: 'ANNUEL', label: 'ANNUEL' }
+                          { value: 'ANNUEL', label: 'Annuel' }
                         ]
                       },
                       { 
@@ -995,7 +1195,9 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                                   <MuiSwitch
                                     {...field}
                                     checked={field.value}
+                                    onChange={(e) => field.onChange(e.target.checked)}
                                     color="primary"
+                                    disabled={isSubmitting}
                                   />
                                 )}
                               />
@@ -1018,7 +1220,7 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                         name: 'frais_deblocage', 
                         label: 'Montant des frais de déblocage', 
                         type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
+                        adornment: <InputAdornment position="end">FCFA</InputAdornment>
                       },
                       { 
                         name: 'chapitre_frais_deblocage_id', 
@@ -1039,7 +1241,7 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                         name: 'penalite_retrait_anticipe', 
                         label: 'Taux de pénalité', 
                         type: 'number',
-                        adornment: <InputAdornment position="start">%</InputAdornment>,
+                        adornment: <InputAdornment position="end">%</InputAdornment>,
                         step: "0.01"
                       },
                       { 
@@ -1056,7 +1258,7 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                         name: 'frais_cloture_anticipe', 
                         label: 'Montant des frais de clôture', 
                         type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
+                        adornment: <InputAdornment position="end">FCFA</InputAdornment>
                       },
                       { 
                         name: 'chapitre_cloture_anticipe_id', 
@@ -1082,18 +1284,9 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                         name: 'minimum_compte', 
                         label: 'Montant minimum', 
                         type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
+                        adornment: <InputAdornment position="end">FCFA</InputAdornment>
                       }
                     ])}
-                  </Grid>
-
-                  {/* Section Compte attente 
-                  <Grid item xs={12}>
-                    <SectionTitle title="Compte d'attente" />
-                  </Grid>*/}
-
-                  <Grid item xs={12}>
-                    {/* renderChapterField('compte_attente_produits_id', 'Compte d\'attente des produits', control) */}
                   </Grid>
 
                   {/* Section Retraits anticipés */}
@@ -1113,7 +1306,9 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                                 <MuiSwitch
                                   {...field}
                                   checked={field.value}
+                                  onChange={(e) => field.onChange(e.target.checked)}
                                   color="primary"
+                                  disabled={isSubmitting}
                                 />
                               )}
                             />
@@ -1135,7 +1330,9 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                                       <MuiSwitch
                                         {...field}
                                         checked={field.value}
+                                        onChange={(e) => field.onChange(e.target.checked)}
                                         color="primary"
+                                        disabled={isSubmitting}
                                       />
                                     )}
                                   />
@@ -1163,24 +1360,27 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                   </Grid>
 
                   <Grid item xs={12}>
-                    <Controller
-                      name="observations"
-                      control={control}
-                      render={({ field, fieldState: { error } }) => (
-                        <TextField
-                          {...field}
-                          label="Observations"
-                          fullWidth
-                          multiline
-                          rows={4}
-                          variant="outlined"
-                          error={!!error}
-                          helperText={error?.message}
-                          disabled={isSubmitting}
-                          placeholder="Ajoutez des notes ou observations supplémentaires..."
-                        />
-                      )}
-                    />
+                    <Box sx={{ minWidth: 250 }}>
+                      <Controller
+                        name="observations"
+                        control={control}
+                        render={({ field, fieldState: { error } }) => (
+                          <TextField
+                            {...field}
+                            label="Observations"
+                            fullWidth
+                            multiline
+                            rows={4}
+                            variant="outlined"
+                            error={!!error}
+                            helperText={error?.message}
+                            disabled={isSubmitting}
+                            placeholder="Ajoutez des notes ou observations supplémentaires..."
+                            sx={{ minWidth: 250 }}
+                          />
+                        )}
+                      />
+                    </Box>
                   </Grid>
                 </Grid>
               </TabPanel>
@@ -1202,13 +1402,7 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                     textTransform: 'none',
                     px: 3,
                     py: 1,
-                    borderRadius: '8px',
-                    borderColor: '#d1d5db',
-                    color: '#4b5563',
-                    '&:hover': {
-                      borderColor: '#9ca3af',
-                      backgroundColor: 'rgba(0, 0, 0, 0.04)'
-                    }
+                    borderRadius: '8px'
                   }}
                 >
                   Annuler
@@ -1237,6 +1431,84 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
           </Card>
         </Container>
       </Box>
+
+      {/* Modal de confirmation de succès */}
+      <Dialog
+        open={successModalOpen}
+        onClose={handleCloseSuccessModal}
+        aria-labelledby="success-dialog-title"
+        aria-describedby="success-dialog-description"
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle id="success-dialog-title" sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 2,
+          bgcolor: '#f0f9ff',
+          color: '#0369a1'
+        }}>
+          <CheckCircleIcon color="success" fontSize="large" />
+          <Typography variant="h6" component="span" sx={{ fontWeight: 600 }}>
+            Type de compte créé avec succès
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <DialogContentText id="success-dialog-description">
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body1" sx={{ mb: 1 }}>
+                Le type de compte a été créé avec succès.
+              </Typography>
+              {createdTypeCompte && (
+                <Box sx={{ mt: 2, p: 2, bgcolor: '#f8fafc', borderRadius: 1 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                    Détails du type de compte :
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>Code :</strong> {createdTypeCompte.code}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>Libellé :</strong> {createdTypeCompte.libelle}
+                  </Typography>
+                  {createdTypeCompte.type_compte_id && (
+                    <Typography variant="body2">
+                      <strong>Type :</strong> {createdTypeCompte.type_compte_id}
+                    </Typography>
+                  )}
+                </Box>
+              )}
+            </Box>
+            <Typography variant="body2" color="textSecondary">
+              Que souhaitez-vous faire maintenant ?
+            </Typography>
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button
+            onClick={handleStayAndCreateNew}
+            variant="outlined"
+            color="primary"
+            sx={{ 
+              textTransform: 'none',
+              px: 3
+            }}
+          >
+            Créer un autre type de compte
+          </Button>
+          <Button
+            onClick={handleCloseSuccessModal}
+            variant="contained"
+            color="primary"
+            autoFocus
+            sx={{ 
+              textTransform: 'none',
+              px: 4
+            }}
+          >
+            Voir la liste des types de compte
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

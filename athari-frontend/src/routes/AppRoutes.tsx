@@ -26,6 +26,7 @@ import PlanComptableList from '../pages/plancomptable/PlanComptableList';
 import CategoryManager from '../pages/plancomptable/CategoryManager.jsx';
 import DatContractManager from '../pages/compte/DatContractManager.jsx';
 import DatTypeManager from '../pages/compte/DatTypeManager.jsx';
+import JournalComptablePage from '../pages/journal/JournalComptablePage.js'
 // Ajoute "Link" dans l'importation existante
 
 const AppRoutes = () => {
@@ -93,7 +94,9 @@ const AppRoutes = () => {
         <Route path='/dat/contracts' element={<DatContractManager/>} />
         <Route path='/dat/types' element={<DatTypeManager/>} />
 
-            
+           <Route path='/Journal-Comptable' element={<JournalComptablePage/>} />
+
+                  
 
 
             

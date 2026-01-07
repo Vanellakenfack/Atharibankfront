@@ -1,657 +1,944 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { useChapitres } from '../../hooks/useChapitres';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { 
-  Alert,
-  TextField,
-  Button, 
-  Card, 
-  Typography, 
-  FormControlLabel,
-  Switch as MuiSwitch,
-  Box,
-  InputAdornment,
-  Tabs,
-  Tab,
-  FormGroup,
-  CircularProgress,
-  Divider,
-  Container,
-  MenuItem,
-  Autocomplete,
-  Paper,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
+  Paper, Button, IconButton, Chip, Typography, Box, CircularProgress,
+  Dialog, DialogActions, DialogContent, DialogTitle, TextField, 
+  FormControlLabel, Checkbox, InputAdornment, Snackbar, Alert,
+  Tooltip, Select, MenuItem, Pagination, FormControl, InputLabel,
+  Tabs, Tab, Divider, Grid, Card, CardContent, CardHeader, List, ListItem, ListItemText,
+  Autocomplete, LinearProgress
 } from '@mui/material';
-import Sidebar from '../../components/layout/Sidebar';
-import TopBar from '../../components/layout/TopBar';
-import { Grid } from '@mui/material';
-import { 
-  Save as SaveIcon, 
-  ArrowBack as ArrowBackIcon, 
-  AccountBalance as AccountBalanceIcon,
-  Settings as SettingsIcon,
-  Receipt as ReceiptIcon,
-  AccountTree as AccountTreeIcon,
-  Info as InfoIcon,
-  Percent as PercentIcon,
-  Money as MoneyIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon
-} from '@mui/icons-material';
+import { useSnackbar } from 'notistack';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { useSnackbar } from 'notistack';
-import ApiClient  from '../../services/api/ApiClient';
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from '@tanstack/react-query';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import SearchIcon from '@mui/icons-material/Search';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import MoneyIcon from '@mui/icons-material/AttachMoney';
+import PercentIcon from '@mui/icons-material/Percent';
+import WarningIcon from '@mui/icons-material/Warning';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import CloseIcon from '@mui/icons-material/Close';
+import BlockIcon from '@mui/icons-material/Block';
+import SaveIcon from '@mui/icons-material/Save';
+import CheckIcon from '@mui/icons-material/Check';
+import ApiClient from '@/services/api/ApiClient';
+import Sidebar from '@/components/layout/Sidebar';
+import TopBar from '@/components/layout/TopBar';
 
-// Schéma de validation - SEULS code et libelle sont obligatoires
-const fraisCommissionSchema = yup.object().shape({
-  // Champs obligatoires SEULEMENT
-  code: yup.string().required('Le code est requis'),
-  libelle: yup.string().required('Le libellé est requis'),
-  
-  // Tous les autres champs sont facultatifs
-  type_compte_id: yup.string().nullable(),
-  chapitre_id: yup.number().nullable(),
-  description: yup.string().nullable(),
-  
-  // Frais et Commissions - tous facultatifs
-  frais_ouverture: yup.number()
-    .min(0, 'Doit être positif')
-    .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value),
-  
-  frais_ouverture_actif: yup.boolean().default(false),
-  chapitre_frais_ouverture_id: yup.number().nullable(),
-  
-  frais_carnet: yup.number()
-    .min(0, 'Doit être positif')
-    .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value),
-  
-  frais_carnet_actif: yup.boolean().default(false),
-  chapitre_frais_carnet_id: yup.number().nullable(),
-  
-  frais_renouvellement_carnet: yup.number()
-    .min(0, 'Doit être positif')
-    .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value),
-  
-  frais_renouvellement_actif: yup.boolean().default(false),
-  chapitre_renouvellement_id: yup.number().nullable(),
-  
-  frais_perte_carnet: yup.number()
-    .min(0, 'Doit être positif')
-    .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value),
-  
-  frais_perte_actif: yup.boolean().default(false),
-  chapitre_perte_id: yup.number().nullable(),
-  
-  commission_mensuelle_actif: yup.boolean().default(false),
-  seuil_commission: yup.number()
-    .min(0, 'Doit être positif')
-    .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value),
-  
-  commission_si_superieur: yup.number()
-    .min(0, 'Doit être positif')
-    .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value),
-  
-  commission_si_inferieur: yup.number()
-    .min(0, 'Doit être positif')
-    .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value),
-  
-  commission_retrait: yup.number()
-    .min(0, 'Doit être positif')
-    .max(100, 'Maximum 100%')
-    .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value),
-  
-  commission_retrait_actif: yup.boolean().default(false),
-  chapitre_commission_retrait_id: yup.number().nullable(),
-  
-  commission_sms: yup.number()
-    .min(0, 'Doit être positif')
-    .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value),
-  
-  commission_sms_actif: yup.boolean().default(false),
-  chapitre_commission_sms_id: yup.number().nullable(),
-  
-  // Intérêts - tous facultatifs
-  taux_interet_annuel: yup.number()
-    .min(0, 'Doit être positif')
-    .max(100, 'Maximum 100%')
-    .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value),
-  
-  interets_actifs: yup.boolean().default(false),
-  frequence_calcul_interet: yup.string().nullable(),
-  heure_calcul_interet: yup.string().nullable(),
-  chapitre_interet_credit_id: yup.number().nullable(),
-  capitalisation_interets: yup.boolean().default(false),
-  
-  // Frais déblocage - tous facultatifs
-  frais_deblocage: yup.number()
-    .min(0, 'Doit être positif')
-    .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value),
-  
-  frais_deblocage_actif: yup.boolean().default(false),
-  chapitre_frais_deblocage_id: yup.number().nullable(),
-  
-  // Pénalités - tous facultatifs
-  penalite_retrait_anticipe: yup.number()
-    .min(0, 'Doit être positif')
-    .max(100, 'Maximum 100%')
-    .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value),
-  
-  penalite_actif: yup.boolean().default(false),
-  chapitre_penalite_id: yup.number().nullable(),
-  
-  frais_cloture_anticipe: yup.number()
-    .min(0, 'Doit être positif')
-    .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value),
-  
-  frais_cloture_anticipe_actif: yup.boolean().default(false),
-  chapitre_cloture_anticipe_id: yup.number().nullable(),
-  
-  // Avancé - tous facultatifs
-  minimum_compte: yup.number()
-    .min(0, 'Doit être positif')
-    .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value),
-  
-  minimum_compte_actif: yup.boolean().default(false),
-  retrait_anticipe_autorise: yup.boolean().default(false),
-  validation_retrait_anticipe: yup.boolean().default(false),
-  
-  duree_blocage_min: yup.number()
-    .min(0, 'Doit être positif')
-    .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value),
-  
-  duree_blocage_max: yup.number()
-    .min(0, 'Doit être positif')
-    .nullable()
-    .transform((value, originalValue) => originalValue === '' ? null : value),
-  
-  // Observations - facultatif
-  observations: yup.string().nullable()
-});
+// Composant DetailItem réutilisable
+interface DetailItemProps {
+  label: string;
+  value: string | number | null | undefined;
+  color?: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' | string;
+  multiline?: boolean;
+}
 
-type TypeCompteFormData = yup.InferType<typeof fraisCommissionSchema>;
+const DetailItem = ({ label, value, color = 'default', multiline = false }: DetailItemProps) => {
+  const displayValue = value === undefined || value === null ? 'Non défini' : value.toString();
+  
+  return (
+    <>
+      <ListItem sx={{ py: 1 }}>
+        <ListItemText 
+          primary={
+            <Typography variant="subtitle2" color="text.secondary">
+              {label}
+            </Typography>
+          }
+          secondary={
+            <Typography 
+              variant="body2" 
+              color={color === 'default' ? 'text.primary' : color}
+              sx={{ 
+                wordBreak: 'break-word',
+                whiteSpace: multiline ? 'pre-line' : 'normal',
+                overflow: 'visible'
+              }}
+            >
+              {displayValue}
+            </Typography>
+          }
+          secondaryTypographyProps={{
+            component: 'div'
+          }}
+        />
+      </ListItem>
+      <Divider component="li" />
+    </>
+  );
+};
 
-// Fonction utilitaire pour les propriétés d'accessibilité des onglets
-function a11yProps(index: number) {
-  return {
-    id: `frais-tab-${index}`,
-    'aria-controls': `frais-tabpanel-${index}`,
+interface TypeCompte {
+  id: number;
+  code: string;
+  libelle: string;
+  description: string | null;
+  est_mata: boolean;
+  necessite_duree: boolean;
+  est_islamique: boolean;
+  actif: boolean;
+  frais_ouverture?: number | null;
+  frais_ouverture_actif?: boolean;
+  chapitre_frais_ouverture_id?: number | null;
+  frais_carnet?: number | null;
+  frais_carnet_actif?: boolean;
+  chapitre_frais_carnet_id?: number | null;
+  frais_renouvellement_carnet?: number | null;
+  frais_renouvellement_actif?: boolean;
+  chapitre_renouvellement_id?: number | null;
+  frais_perte_carnet?: number | null;
+  frais_perte_actif?: boolean;
+  chapitre_perte_id?: number | null;
+  commission_mensuelle_actif?: boolean;
+  seuil_commission?: number | null;
+  commission_si_superieur?: number | null;
+  commission_si_inferieur?: number | null;
+  commission_retrait?: number | null;
+  commission_retrait_actif?: boolean;
+  chapitre_commission_retrait_id?: number | null;
+  commission_sms?: number | null;
+  commission_sms_actif?: boolean;
+  chapitre_commission_sms_id?: number | null;
+  taux_interet_annuel?: number | null;
+  interets_actifs?: boolean;
+  frequence_calcul_interet?: string | null;
+  heure_calcul_interet?: string | null;
+  chapitre_interet_credit_id?: number | null;
+  capitalisation_interets?: boolean;
+  frais_deblocage?: number | null;
+  frais_deblocage_actif?: boolean;
+  chapitre_frais_deblocage_id?: number | null;
+  penalite_retrait_anticipe?: number | null;
+  penalite_actif?: boolean;
+  chapitre_penalite_id?: number | null;
+  frais_cloture_anticipe?: number | null;
+  frais_cloture_anticipe_actif?: boolean;
+  chapitre_cloture_anticipe_id?: number | null;
+  chapitre_id?: number | null;
+  type_compte_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string;
+  a_vue?: boolean;
+  observations?: string;
+  chapitre_defaut_id?: number | null;
+  compte_attente_produits_id?: number | null;
+  retrait_anticipe_autorise?: boolean;
+  validation_retrait_anticipe?: boolean;
+  duree_blocage_min?: number | null;
+  duree_blocage_max?: number | null;
+  minimum_compte_actif?: boolean;
+  minimum_compte?: number | null;
+}
+
+// Interface pour les chapitres
+interface Chapitre {
+  id: number;
+  code: string;
+  libelle: string;
+  categorie?: {
+    id: number;
+    code: string;
+    nom: string;
   };
 }
 
-// Composant pour les onglets personnalisés
-function TabPanel(props: any) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`frais-tabpanel-${index}`}
-      aria-labelledby={`frais-tab-${index}`}
-      {...other}
-    >
-      {value === index && (
-        <Box sx={{ p: 2 }}>
-          {children}
-        </Box>
-      )}
-    </div>
-  );
-}
-
-// Composant pour les sections
-const SectionTitle = ({ title, icon: Icon }: { title: string, icon?: any }) => (
-  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, mt: 4 }}>
-    {Icon && <Icon color="primary" sx={{ mr: 1 }} />}
-    <Typography variant="h6" color="primary" sx={{ fontWeight: 600 }}>
-      {title}
-    </Typography>
-  </Box>
-);
-
-const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
-  const { id } = useParams<{ id?: string }>();
+const TypeCompteList = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const navigate = useNavigate();
-  const { enqueueSnackbar } = useSnackbar();
+  const [typesCompte, setTypesCompte] = useState<TypeCompte[]>([]);
+  const [filteredTypes, setFilteredTypes] = useState<TypeCompte[]>([]);
+  const [allChapitres, setAllChapitres] = useState<Chapitre[]>([]);
+  const [openEditModal, setOpenEditModal] = useState(false);
+  const [editingType, setEditingType] = useState<TypeCompte | null>(null);
   const [activeTab, setActiveTab] = useState(0);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [successModalOpen, setSuccessModalOpen] = useState(false);
-  const [createdTypeCompte, setCreatedTypeCompte] = useState<any>(null);
+  const { enqueueSnackbar, closeSnackbar } = useSnackbar();
+  
+  // États pour la confirmation
+  const [confirmModal, setConfirmModal] = useState({
+    open: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    confirmText: 'Confirmer',
+    confirmColor: 'primary' as 'primary' | 'error' | 'success' | 'warning'
+  });
+  
+  // États pour la modale de visualisation
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [selectedType, setSelectedType] = useState<TypeCompte | null>(null);
+  
+  // État pour le suivi du chargement des chapitres
+  const [chapitresLoadingInfo, setChapitresLoadingInfo] = useState({
+    loaded: 0,
+    total: 0,
+    isComplete: false,
+    page: 1
+  });
+  
+  // Schéma de validation
+  const schema = yup.object().shape({
+    code: yup.string().required('Le code est requis'),
+    libelle: yup.string().required('Le libellé est requis'),
+    description: yup.string().nullable(),
+    est_mata: yup.boolean().default(false),
+    necessite_duree: yup.boolean().default(false),
+    est_islamique: yup.boolean().default(false),
+    actif: yup.boolean().default(true),
+    frais_ouverture: yup.number().nullable(),
+    frais_ouverture_actif: yup.boolean().default(false),
+    chapitre_frais_ouverture_id: yup.number().nullable(),
+    frais_carnet: yup.number().nullable(),
+    frais_carnet_actif: yup.boolean().default(false),
+    chapitre_frais_carnet_id: yup.number().nullable(),
+    commission_retrait: yup.number().nullable(),
+    commission_retrait_actif: yup.boolean().default(false),
+    chapitre_commission_retrait_id: yup.number().nullable(),
+    interets_actifs: yup.boolean().default(false),
+    taux_interet_annuel: yup.number().nullable(),
+    chapitre_interet_credit_id: yup.number().nullable(),
+    capitalisation_interets: yup.boolean().default(false),
+    penalite_retrait_anticipe: yup.number().nullable(),
+    penalite_actif: yup.boolean().default(false),
+    chapitre_penalite_id: yup.number().nullable(),
+    frais_cloture_anticipe: yup.number().nullable(),
+    frais_cloture_anticipe_actif: yup.boolean().default(false),
+    chapitre_cloture_anticipe_id: yup.number().nullable(),
+    chapitre_defaut_id: yup.number().nullable(),
+  });
+  
+  const { control, handleSubmit, reset, formState: { errors }, setValue, watch } = useForm<TypeCompte>({
+    resolver: yupResolver(schema),
+    mode: 'onBlur',
+    defaultValues: {
+      description: '',
+      frais_ouverture: null,
+      frais_carnet: null,
+      commission_retrait: null,
+      taux_interet_annuel: null,
+      penalite_retrait_anticipe: null,
+      frais_cloture_anticipe: null,
+      chapitre_defaut_id: null,
+      chapitre_frais_ouverture_id: null,
+      chapitre_frais_carnet_id: null,
+      chapitre_commission_retrait_id: null,
+      chapitre_interet_credit_id: null,
+      chapitre_penalite_id: null,
+      chapitre_cloture_anticipe_id: null,
+      est_mata: false,
+      necessite_duree: false,
+      est_islamique: false,
+      actif: true,
+      frais_ouverture_actif: false,
+      frais_carnet_actif: false,
+      commission_retrait_actif: false,
+      interets_actifs: false,
+      penalite_actif: false,
+      frais_cloture_anticipe_actif: false,
+      capitalisation_interets: false,
+    }
+  });
+  
+  // Surveiller les valeurs spécifiques pour les dépendances
+  const fraisOuvertureActif = watch('frais_ouverture_actif');
+  const fraisCarnetActif = watch('frais_carnet_actif');
+  const commissionRetraitActif = watch('commission_retrait_actif');
+  const interetsActifs = watch('interets_actifs');
+  const penaliteActif = watch('penalite_actif');
+  const fraisClotureActif = watch('frais_cloture_anticipe_actif');
+  
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error'
+  });
 
-  const { chapitres } = useChapitres();
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
 
-  // Fonction pour soumettre le formulaire - OPTION 1
-  const saveTypeCompte = async (data: any) => {
-    try {
-      console.log('Données envoyées à l\'API:', data);
+  // Fonction pour ouvrir la modale de confirmation
+  const openConfirmModal = (
+    title: string, 
+    message: string, 
+    onConfirm: () => void,
+    confirmText = 'Confirmer',
+    confirmColor: 'primary' | 'error' | 'success' | 'warning' = 'primary'
+  ) => {
+    setConfirmModal({
+      open: true,
+      title,
+      message,
+      onConfirm,
+      confirmText,
+      confirmColor
+    });
+  };
+
+  // Fonction pour fermer la modale de confirmation
+  const closeConfirmModal = () => {
+    setConfirmModal({
+      ...confirmModal,
+      open: false
+    });
+  };
+
+  // Fonction utilitaire pour les onglets
+  function a11yProps(index: number) {
+    return {
+      id: `simple-tab-${index}`,
+      'aria-controls': `simple-tabpanel-${index}`,
+    };
+  }
+
+  // Composant TabPanel personnalisé
+  function TabPanel(props: { children?: React.ReactNode; value: number; index: number }) {
+    const { children, value, index } = props;
+    return (
+      <div
+        role="tabpanel"
+        hidden={value !== index}
+        id={`simple-tabpanel-${index}`}
+        aria-labelledby={`simple-tab-${index}`}
+      >
+        {value === index && (
+          <Box sx={{ pt: 3 }}>
+            {children}
+          </Box>
+        )}
+      </div>
+    );
+  }
+
+  // Récupération des types de compte avec react-query
+  const { data: typesData, isLoading: loadingTypes, refetch: refetchTypesCompte } = useQuery<TypeCompte[]>({
+    queryKey: ['typesCompte'],
+    queryFn: async () => {
+      const response = await ApiClient.get('/types-comptes');
       
-      // Formater les données avant envoi - OPTION 1: Envoyer 0 au lieu de null
-      const formData = {
-        ...data,
-        // Convertir les valeurs null en 0 pour les champs qui ne peuvent pas être null
-        frais_ouverture: data.frais_ouverture || 0,
-        frais_carnet: data.frais_carnet || 0,
-        frais_renouvellement_carnet: data.frais_renouvellement_carnet || 0,
-        frais_perte_carnet: data.frais_perte_carnet || 0,
-        seuil_commission: data.seuil_commission || 0,
-        commission_si_superieur: data.commission_si_superieur || 0,
-        commission_si_inferieur: data.commission_si_inferieur || 0,
-        commission_retrait: data.commission_retrait || 0,
-        commission_sms: data.commission_sms || 0,
-        taux_interet_annuel: data.taux_interet_annuel || 0,
-        frais_deblocage: data.frais_deblocage || 0,
-        penalite_retrait_anticipe: data.penalite_retrait_anticipe || 0,
-        frais_cloture_anticipe: data.frais_cloture_anticipe || 0,
-        minimum_compte: data.minimum_compte || 0,
-        duree_blocage_min: data.duree_blocage_min || 0,
-        duree_blocage_max: data.duree_blocage_max || 0,
+      const extractArrays = (obj: any): any[] => {
+        if (Array.isArray(obj)) return obj;
+        if (typeof obj !== 'object' || obj === null) return [];
+        
+        for (const key in obj) {
+          if (Array.isArray(obj[key])) {
+            return obj[key];
+          }
+          const nestedArray = extractArrays(obj[key]);
+          if (nestedArray.length > 0) return nestedArray;
+        }
+        
+        return Object.values(obj).filter(v => v !== null && typeof v === 'object');
+      };
+      
+      let data: any[] = [];
+      if (response.data) {
+        data = extractArrays(response.data);
+        if (!Array.isArray(data) || data.length === 0) {
+          data = Object.values(response.data);
+        }
+      }
+      
+      if (!Array.isArray(data)) {
+        data = [data];
+      }
+      
+      return data.filter((item: any) => item !== null && item !== undefined);
+    },
+    retry: 1,
+    refetchOnWindowFocus: false
+  });
+
+  // Charger TOUS les chapitres avec PAGINATION AUTOMATIQUE
+  const { data: chapitresData, isLoading: loadingChapitres, refetch: refetchChapitres } = useQuery<Chapitre[]>({
+    queryKey: ['chapitres'],
+    queryFn: async () => {
+      console.log('Début du chargement intelligent des chapitres avec pagination...');
+      setChapitresLoadingInfo({
+        loaded: 0,
+        total: 0,
+        isComplete: false,
+        page: 1
+      });
+      
+      const loadAllChapitres = async (): Promise<Chapitre[]> => {
+        let allChapitres: Chapitre[] = [];
+        let currentPage = 1;
+        const pageSize = 100; // Taille raisonnable par page
+        let totalPages = 1;
+        let lastSuccess = true;
+
+        try {
+          do {
+            console.log(`Chargement page ${currentPage}...`);
+            
+            setChapitresLoadingInfo(prev => ({
+              ...prev,
+              page: currentPage,
+              loaded: allChapitres.length
+            }));
+            
+            const response = await ApiClient.get('/plan-comptable/comptes', {
+              params: { page: currentPage, per_page: pageSize },
+              timeout: 15000 // Timeout de 15 secondes par page
+            });
+
+            const responseData = response.data;
+            let pageChapitres: Chapitre[] = [];
+
+            // Gestion des différents formats de réponse
+            if (Array.isArray(responseData)) {
+              // Format 1: Tableau direct
+              pageChapitres = responseData.map((item: any) => ({
+                id: item.id,
+                code: item.code,
+                libelle: item.libelle,
+                categorie: item.categorie
+              }));
+              lastSuccess = pageChapitres.length > 0;
+              totalPages = pageChapitres.length < pageSize ? currentPage : currentPage + 1;
+            } else if (responseData.data && Array.isArray(responseData.data)) {
+              // Format 2: Laravel standard { data: [], meta: {}, links: {} }
+              pageChapitres = responseData.data.map((item: any) => ({
+                id: item.id,
+                code: item.code,
+                libelle: item.libelle,
+                categorie: item.categorie
+              }));
+              lastSuccess = pageChapitres.length > 0;
+              
+              if (responseData.meta) {
+                totalPages = responseData.meta.last_page || 1;
+                // Mettre à jour le total estimé
+                setChapitresLoadingInfo(prev => ({
+                  ...prev,
+                  total: responseData.meta.total || prev.total
+                }));
+              } else {
+                totalPages = pageChapitres.length < pageSize ? currentPage : currentPage + 1;
+              }
+            } else if (responseData.results && Array.isArray(responseData.results)) {
+              // Format 3: Autre format paginé { results: [] }
+              pageChapitres = responseData.results.map((item: any) => ({
+                id: item.id,
+                code: item.code,
+                libelle: item.libelle,
+                categorie: item.categorie
+              }));
+              lastSuccess = pageChapitres.length > 0;
+              totalPages = pageChapitres.length < pageSize ? currentPage : currentPage + 1;
+            } else {
+              console.warn('Format de réponse inattendu à la page', currentPage, ':', responseData);
+              break;
+            }
+
+            if (pageChapitres.length === 0) {
+              console.log(`Page ${currentPage} vide, arrêt du chargement.`);
+              lastSuccess = false;
+              break;
+            }
+
+            allChapitres = [...allChapitres, ...pageChapitres];
+            console.log(`✓ Page ${currentPage}: ${pageChapitres.length} chapitres (total: ${allChapitres.length})`);
+            
+            // Mettre à jour les informations de chargement
+            setChapitresLoadingInfo(prev => ({
+              ...prev,
+              loaded: allChapitres.length,
+              page: currentPage
+            }));
+            
+            currentPage++;
+            
+            // Limite de sécurité: ne pas dépasser 50 pages (5,000 chapitres)
+            if (currentPage > 50) {
+              console.warn('Limite de sécurité atteinte (50 pages). Arrêt du chargement.');
+              break;
+            }
+
+          } while (lastSuccess && currentPage <= totalPages);
+
+          console.log(`✅ Chargement terminé: ${allChapitres.length} chapitres récupérés`);
+          
+          setChapitresLoadingInfo(prev => ({
+            ...prev,
+            loaded: allChapitres.length,
+            total: allChapitres.length,
+            isComplete: true
+          }));
+          
+          return allChapitres;
+
+        } catch (error: any) {
+          console.error('Erreur lors du chargement paginé:', error.message);
+          
+          // Si on a déjà récupéré des chapitres, les retourner
+          if (allChapitres.length > 0) {
+            console.log(`⚠️ Chargement interrompu. Retour de ${allChapitres.length} chapitres déjà récupérés`);
+            return allChapitres;
+          }
+          
+          // Fallback: essayer une seule requête avec une taille raisonnable
+          try {
+            console.log('Tentative de fallback avec per_page=200...');
+            const fallbackResponse = await ApiClient.get('/plan-comptable/comptes', {
+              params: { per_page: 200 },
+              timeout: 10000
+            });
+            
+            let fallbackChapitres: Chapitre[] = [];
+            
+            if (fallbackResponse.data?.data && Array.isArray(fallbackResponse.data.data)) {
+              fallbackChapitres = fallbackResponse.data.data.map((item: any) => ({
+                id: item.id,
+                code: item.code,
+                libelle: item.libelle,
+                categorie: item.categorie
+              }));
+            } else if (Array.isArray(fallbackResponse.data)) {
+              fallbackChapitres = fallbackResponse.data.map((item: any) => ({
+                id: item.id,
+                code: item.code,
+                libelle: item.libelle,
+                categorie: item.categorie
+              }));
+            }
+            
+            console.log(`✅ Fallback chargé: ${fallbackChapitres.length} chapitres`);
+            return fallbackChapitres;
+          } catch (fallbackError) {
+            console.error('❌ Erreur du fallback:', fallbackError);
+            throw new Error('Impossible de charger les chapitres');
+          }
+        }
       };
 
-      const response = await ApiClient.post('/types-comptes/creer', formData);
-      return response.data;
-    } catch (error: any) {
-      console.error('Erreur API:', error);
-      
-      // Extraire le message d'erreur de la réponse
-      let errorMessage = 'Erreur lors de la création du type de compte';
-      
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      // Afficher les détails de l'erreur SQL si disponible
-      if (error.response?.data?.errors) {
-        console.error('Erreurs de validation:', error.response.data.errors);
-      }
-      
-      throw new Error(errorMessage);
-    }
-  };
+      return loadAllChapitres();
+    },
+    retry: 1,
+    refetchOnWindowFocus: false,
+    // Temps de cache plus long pour les chapitres (5 minutes)
+    staleTime: 5 * 60 * 1000,
+  });
 
-  // Configuration de la mutation
-  const { mutate: createTypeCompte, isPending: isSubmitting } = useMutation({
-    mutationFn: saveTypeCompte,
-    onSuccess: (data) => {
-      console.log('Succès de la création:', data);
+  // Mutation pour la mise à jour du type de compte
+  const updateTypeCompteMutation = useMutation({
+    mutationFn: async (data: Partial<TypeCompte>) => {
+      console.log('Envoi de la requête de mise à jour avec:', data);
+      try {
+        const response = await ApiClient.put(`/types-comptes/${data.id}`, data);
+        console.log('Réponse de l\'API:', response);
+        return response.data;
+      } catch (error) {
+        console.error('Erreur dans la mutation:', error);
+        throw error;
+      }
+    },
+    onSuccess: (responseData, variables) => {
+      // Mettre à jour le tableau localement immédiatement
+      if (variables.id && typesData) {
+        const updatedTypes = typesData.map(type => 
+          type.id === variables.id 
+            ? { ...type, ...variables, updated_at: new Date().toISOString() }
+            : type
+        );
+        
+        setTypesCompte(updatedTypes);
+      }
       
-      // Stocker les données créées pour les afficher dans la modal
-      setCreatedTypeCompte(data);
+      // Recharger les données depuis le serveur
+      refetchTypesCompte();
       
-      // Ouvrir la modal de confirmation au lieu de rediriger immédiatement
-      setSuccessModalOpen(true);
-      
-      // Notification toast
-      enqueueSnackbar('Type de compte créé avec succès', { 
+      enqueueSnackbar('✅ Type de compte mis à jour avec succès', { 
         variant: 'success',
         anchorOrigin: {
           vertical: 'top',
-          horizontal: 'right'
-        }
+          horizontal: 'right',
+        },
+        autoHideDuration: 5000,
       });
+      
+      setOpenEditModal(false);
     },
     onError: (error: any) => {
-      console.error('Erreur de mutation:', error);
-      const errorMessage = error?.message || 'Une erreur est survenue lors de la création du type de compte';
-      setSubmitError(errorMessage);
-      enqueueSnackbar(errorMessage, { 
+      console.error('Erreur dans onError de la mutation:', error);
+      const errorMessage = error.response?.data?.message || 'Erreur lors de la mise à jour du type de compte';
+      enqueueSnackbar(`❌ ${errorMessage}`, { 
         variant: 'error',
         anchorOrigin: {
           vertical: 'top',
-          horizontal: 'right'
-        }
+          horizontal: 'right',
+        },
+        autoHideDuration: 10000,
       });
     }
   });
-
-  // Fonction pour fermer la modal et rediriger
-  const handleCloseSuccessModal = () => {
-    setSuccessModalOpen(false);
-    navigate('/Liste-type-de-compte');
-  };
-
-  // Fonction pour rester sur la page (créer un nouveau type de compte)
-  const handleStayAndCreateNew = () => {
-    setSuccessModalOpen(false);
-    // Réinitialiser le formulaire
-    reset();
-    // Réinitialiser les autres états si nécessaire
-    setCreatedTypeCompte(null);
-    setSubmitError(null);
-    setActiveTab(0);
-  };
-
-  const { 
-    control, 
-    handleSubmit, 
-    formState: { errors }, 
-    watch, 
-    setValue,
-    reset
-  } = useForm<TypeCompteFormData>({
-    resolver: yupResolver(fraisCommissionSchema),
-    mode: 'onChange',
-    defaultValues: {
-      // Champs obligatoires
-      code: '',
-      libelle: '',
-      
-      // Onglet Général
-      type_compte_id: '',
-      chapitre_id: null,
-      description: '',
-
-      // Frais et Commissions
-      frais_ouverture: null,
-      frais_ouverture_actif: false,
-      chapitre_frais_ouverture_id: null,
-
-      frais_carnet: null,
-      frais_carnet_actif: false,
-      chapitre_frais_carnet_id: null,
-
-      frais_renouvellement_carnet: null,
-      frais_renouvellement_actif: false,
-      chapitre_renouvellement_id: null,
-
-      frais_perte_carnet: null,
-      frais_perte_actif: false,
-      chapitre_perte_id: null,
-
-      commission_mensuelle_actif: false,
-      seuil_commission: null,
-      commission_si_superieur: null,
-      commission_si_inferieur: null,
-
-      commission_retrait: null,
-      commission_retrait_actif: false,
-      chapitre_commission_retrait_id: null,
-
-      commission_sms: null,
-      commission_sms_actif: false,
-      chapitre_commission_sms_id: null,
-
-      // Intérêts
-      taux_interet_annuel: null,
-      interets_actifs: false,
-      frequence_calcul_interet: 'MENSUEL',
-      heure_calcul_interet: '00:00',
-      chapitre_interet_credit_id: null,
-      capitalisation_interets: false,
-
-      // Frais déblocage
-      frais_deblocage: null,
-      frais_deblocage_actif: false,
-      chapitre_frais_deblocage_id: null,
-
-      // Pénalités
-      penalite_retrait_anticipe: null,
-      penalite_actif: false,
-      chapitre_penalite_id: null,
-
-      frais_cloture_anticipe: null,
-      frais_cloture_anticipe_actif: false,
-      chapitre_cloture_anticipe_id: null,
-
-      // Avancé
-      minimum_compte: null,
-      minimum_compte_actif: false,
-
-      retrait_anticipe_autorise: false,
-      validation_retrait_anticipe: false,
-      duree_blocage_min: null,
-      duree_blocage_max: null,
-
-      // Observations
-      observations: ''
-    }
-  });
-
-  // Fonction pour soumettre le formulaire
-  const onSubmit = async (data: TypeCompteFormData) => {
-    console.log('Données du formulaire:', data);
-    
-    try {
-      // Vérification des champs obligatoires seulement
-      if (!data.code || !data.libelle) {
-        setSubmitError('Veuillez remplir les champs obligatoires (Code et Libellé)');
-        return;
-      }
-
-      // Appel de la mutation
-      createTypeCompte(data);
-    } catch (error) {
-      console.error('Erreur lors de la soumission:', error);
-      setSubmitError('Une erreur est survenue lors de la soumission du formulaire');
-    }
-  };
-
-  // Fonction utilitaire pour les champs numériques
-  const renderNumberField = useCallback((
-    fieldName: keyof TypeCompteFormData,
-    label: string,
-    controlParam: any,
-    adornment?: React.ReactNode,
-    step: string = "0.01"
-  ) => {
-    return (
-      <Controller
-        name={fieldName}
-        control={controlParam}
-        render={({ field, fieldState: { error } }) => (
-          <TextField
-            {...field}
-            type="number"
-            label={label}
-            fullWidth
-            variant="outlined"
-            size="small"
-            error={!!error}
-            helperText={error?.message}
-            disabled={isSubmitting}
-            InputProps={{
-              endAdornment: adornment,
-              inputProps: { 
-                min: 0,
-                step: step
-              }
-            }}
-            value={field.value === null || field.value === undefined ? '' : field.value}
-            onChange={(e) => {
-              const value = e.target.value === '' ? null : parseFloat(e.target.value);
-              field.onChange(value);
-            }}
-          />
-        )}
-      />
-    );
-  }, [isSubmitting]);
-
-  // Fonction utilitaire pour les chapitres avec recherche - MODIFIÉE avec minWidth: 250
-  const renderChapterField = useCallback((
-    fieldName: keyof TypeCompteFormData,
-    label: string,
-    controlParam: any,
-    disabled: boolean = false
-  ) => {
-    return (
-      <Controller
-        name={fieldName}
-        control={controlParam}
-        render={({ field, fieldState: { error } }) => (
-          <Autocomplete
-            options={chapitres || []}
-            getOptionLabel={(option) => 
-              option ? `${option.code} - ${option.libelle}` : ''
-            }
-            isOptionEqualToValue={(option, value) => option.id === value.id}
-            value={chapitres?.find(c => c.id === field.value) || null}
-            onChange={(_, newValue) => {
-              field.onChange(newValue ? newValue.id : null);
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label={label}
-                variant="outlined"
-                size="small"
-                error={!!error}
-                helperText={error?.message}
-                disabled={disabled || isSubmitting || !chapitres?.length}
-                placeholder="Sélectionnez un chapitre..."
-                sx={{ minWidth: 250 }}
-              />
-            )}
-            renderOption={(props, option) => (
-              <li {...props}>
-                <Box>
-                  <Typography variant="body2">
-                    <strong>{option.code}</strong> - {option.libelle}
-                  </Typography>
-                </Box>
-              </li>
-            )}
-            fullWidth
-            sx={{ minWidth: 250 }}
-          />
-        )}
-      />
-    );
-  }, [chapitres, isSubmitting]);
-
-  // Fonction utilitaire pour les champs avec toggle
-  const renderToggleSection = useCallback((
-    toggleFieldName: keyof TypeCompteFormData,
-    toggleLabel: string,
-    fields: Array<{
-      name: keyof TypeCompteFormData,
-      label: string,
-      type: 'number' | 'select' | 'chapter' | 'text',
-      adornment?: React.ReactNode,
-      step?: string,
-      options?: Array<{ value: string, label: string }>
-    }>
-  ) => {
-    const isActive = watch(toggleFieldName);
-
-    return (
-      <Paper elevation={0} sx={{ p: 2, bgcolor: '#f9fafb', borderRadius: 1, mb: 3 }}>
-        <FormGroup>
-          <FormControlLabel
-            control={
-              <Controller
-                name={toggleFieldName}
-                control={control}
-                render={({ field }) => (
-                  <MuiSwitch
-                    {...field}
-                    checked={field.value}
-                    onChange={(e) => field.onChange(e.target.checked)}
-                    color="primary"
-                    disabled={isSubmitting}
-                  />
-                )}
-              />
-            }
-            label={toggleLabel}
-            sx={{ mb: isActive ? 2 : 0 }}
-          />
-        </FormGroup>
-
-        {isActive && (
-          <Grid container spacing={2} sx={{ pl: 3, mt: 1 }}>
-            {fields.map((field, index) => (
-              <Grid item xs={12} md={6} key={index}>
-                {field.type === 'number' ? (
-                  renderNumberField(field.name, field.label, control, field.adornment, field.step)
-                ) : field.type === 'select' && field.options ? (
-                  <Controller
-                    name={field.name}
-                    control={control}
-                    render={({ field: selectField }) => (
-                      <TextField
-                        {...selectField}
-                        select
-                        label={field.label}
-                        fullWidth
-                        variant="outlined"
-                        size="small"
-                        disabled={isSubmitting}
-                        sx={{ minWidth: 250 }}
-                      >
-                        {field.options.map((option) => (
-                          <MenuItem key={option.value} value={option.value}>
-                            {option.label}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    )}
-                  />
-                ) : field.type === 'chapter' ? (
-                  renderChapterField(field.name, field.label, control, !isActive)
-                ) : (
-                  <Controller
-                    name={field.name}
-                    control={control}
-                    render={({ field: textField, fieldState: { error } }) => (
-                      <TextField
-                        {...textField}
-                        label={field.label}
-                        fullWidth
-                        variant="outlined"
-                        size="small"
-                        error={!!error}
-                        helperText={error?.message}
-                        disabled={isSubmitting}
-                        multiline={field.type === 'text'}
-                        rows={field.type === 'text' ? 4 : 1}
-                      />
-                    )}
-                  />
-                )}
-              </Grid>
-            ))}
-          </Grid>
-        )}
-      </Paper>
-    );
-  }, [watch, control, renderNumberField, renderChapterField, isSubmitting]);
-
-  // Gestionnaire pour changer d'onglet
+  
+  // Gestion du changement d'onglet
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
+  
+  // Gestion de la soumission du formulaire avec confirmation
+  const handleSubmitWithConfirmation = (data: TypeCompte) => {
+    // Ouvrir la modale de confirmation
+    openConfirmModal(
+      'Confirmer la modification',
+      `Êtes-vous sûr de vouloir modifier le type de compte "${data.libelle}" (${data.code}) ?`,
+      () => {
+        // Fonction exécutée après confirmation
+        executeUpdate(data);
+      },
+      'Modifier',
+      'primary'
+    );
+  };
+
+  // Fonction qui exécute réellement la mise à jour
+  const executeUpdate = (data: TypeCompte) => {
+    console.log('Exécution de la mise à jour avec les données:', data);
+    
+    // Nettoyer les données null et les remplacer par undefined
+    const cleanData: Partial<TypeCompte> = {
+      id: editingType?.id,
+      code: data.code,
+      libelle: data.libelle,
+      description: data.description || '',
+      est_mata: data.est_mata,
+      necessite_duree: data.necessite_duree,
+      est_islamique: data.est_islamique,
+      actif: data.actif,
+      frais_ouverture_actif: data.frais_ouverture_actif,
+      frais_carnet_actif: data.frais_carnet_actif,
+      commission_retrait_actif: data.commission_retrait_actif,
+      interets_actifs: data.interets_actifs,
+      penalite_actif: data.penalite_actif,
+      frais_cloture_anticipe_actif: data.frais_cloture_anticipe_actif,
+      capitalisation_interets: data.capitalisation_interets,
+    };
+    
+    // Ajouter les chapitres seulement s'ils sont définis
+    if (data.chapitre_defaut_id !== null && data.chapitre_defaut_id !== undefined) {
+      cleanData.chapitre_defaut_id = data.chapitre_defaut_id;
+    }
+    
+    if (data.frais_ouverture_actif && data.chapitre_frais_ouverture_id) {
+      cleanData.chapitre_frais_ouverture_id = data.chapitre_frais_ouverture_id;
+    }
+    
+    if (data.frais_carnet_actif && data.chapitre_frais_carnet_id) {
+      cleanData.chapitre_frais_carnet_id = data.chapitre_frais_carnet_id;
+    }
+    
+    if (data.commission_retrait_actif && data.chapitre_commission_retrait_id) {
+      cleanData.chapitre_commission_retrait_id = data.chapitre_commission_retrait_id;
+    }
+    
+    if (data.interets_actifs && data.chapitre_interet_credit_id) {
+      cleanData.chapitre_interet_credit_id = data.chapitre_interet_credit_id;
+    }
+    
+    if (data.penalite_actif && data.chapitre_penalite_id) {
+      cleanData.chapitre_penalite_id = data.chapitre_penalite_id;
+    }
+    
+    if (data.frais_cloture_anticipe_actif && data.chapitre_cloture_anticipe_id) {
+      cleanData.chapitre_cloture_anticipe_id = data.chapitre_cloture_anticipe_id;
+    }
+    
+    // Ajouter les valeurs numériques seulement si elles sont définies et non nulles
+    if (data.frais_ouverture !== null && data.frais_ouverture !== undefined) {
+      cleanData.frais_ouverture = data.frais_ouverture;
+    }
+    
+    if (data.frais_carnet !== null && data.frais_carnet !== undefined) {
+      cleanData.frais_carnet = data.frais_carnet;
+    }
+    
+    if (data.commission_retrait !== null && data.commission_retrait !== undefined) {
+      cleanData.commission_retrait = data.commission_retrait;
+    }
+    
+    if (data.taux_interet_annuel !== null && data.taux_interet_annuel !== undefined) {
+      cleanData.taux_interet_annuel = data.taux_interet_annuel;
+    }
+    
+    if (data.frequence_calcul_interet) {
+      cleanData.frequence_calcul_interet = data.frequence_calcul_interet;
+    }
+    
+    if (data.penalite_retrait_anticipe !== null && data.penalite_retrait_anticipe !== undefined) {
+      cleanData.penalite_retrait_anticipe = data.penalite_retrait_anticipe;
+    }
+    
+    if (data.frais_cloture_anticipe !== null && data.frais_cloture_anticipe !== undefined) {
+      cleanData.frais_cloture_anticipe = data.frais_cloture_anticipe;
+    }
+    
+    updateTypeCompteMutation.mutate(cleanData);
+  };
+
+  // Mettre à jour les états quand les données sont chargées
+  useEffect(() => {
+    if (typesData) {
+      setTypesCompte(typesData);
+      setFilteredTypes(typesData);
+    }
+  }, [typesData]);
+
+  useEffect(() => {
+    if (chapitresData) {
+      setAllChapitres(chapitresData);
+    }
+  }, [chapitresData]);
+
+  // Gestion de la recherche
+  useEffect(() => {
+    const filtered = typesCompte.filter(type => {
+      if (!type) return false;
+      
+      const searchTermLower = searchTerm.toLowerCase();
+      const code = type.code ? type.code.toLowerCase() : '';
+      const libelle = type.libelle ? type.libelle.toLowerCase() : '';
+      
+      return code.includes(searchTermLower) || libelle.includes(searchTermLower);
+    });
+    
+    setFilteredTypes(filtered);
+    setPage(0);
+  }, [searchTerm, typesCompte]);
+
+  // Gestion de l'édition
+  const handleEditClick = (type: TypeCompte) => {
+    console.log('Modification du type de compte:', type);
+    
+    // Préparer les valeurs avec des valeurs par défaut pour éviter null
+    const preparedType = {
+      ...type,
+      description: type.description || '',
+      frais_ouverture: type.frais_ouverture || null,
+      frais_carnet: type.frais_carnet || null,
+      commission_retrait: type.commission_retrait || null,
+      taux_interet_annuel: type.taux_interet_annuel || null,
+      penalite_retrait_anticipe: type.penalite_retrait_anticipe || null,
+      frais_cloture_anticipe: type.frais_cloture_anticipe || null,
+      chapitre_defaut_id: type.chapitre_defaut_id || null,
+      chapitre_frais_ouverture_id: type.chapitre_frais_ouverture_id || null,
+      chapitre_frais_carnet_id: type.chapitre_frais_carnet_id || null,
+      chapitre_commission_retrait_id: type.chapitre_commission_retrait_id || null,
+      chapitre_interet_credit_id: type.chapitre_interet_credit_id || null,
+      chapitre_penalite_id: type.chapitre_penalite_id || null,
+      chapitre_cloture_anticipe_id: type.chapitre_cloture_anticipe_id || null,
+    };
+    
+    console.log('Valeurs préparées pour le formulaire:', preparedType);
+    
+    // Réinitialiser le formulaire avec les valeurs du type à modifier
+    reset(preparedType);
+    
+    setEditingType(type);
+    setOpenEditModal(true);
+    setActiveTab(0);
+  };
+
+  // Fonction pour réactiver un type de compte
+  const handleReactivate = async (typeId: number, typeName: string) => {
+    try {
+      await ApiClient.put(`/types-comptes/${typeId}`, { actif: true });
+      
+      // Mettre à jour le tableau localement immédiatement
+      setTypesCompte(typesCompte.map(t => 
+        t.id === typeId ? { ...t, actif: true, updated_at: new Date().toISOString() } : t
+      ));
+      
+      enqueueSnackbar(`✅ Type de compte "${typeName}" réactivé avec succès`, { 
+        variant: 'success',
+        anchorOrigin: {
+          vertical: 'top',
+          horizontal: 'right',
+        },
+        autoHideDuration: 6000,
+      });
+      
+      // Recharger les données
+      refetchTypesCompte();
+    } catch (error) {
+      console.error('Erreur lors de la réactivation', error);
+      enqueueSnackbar('❌ Erreur lors de la réactivation du type de compte', { 
+        variant: 'error',
+        anchorOrigin: {
+          vertical: 'top',
+          horizontal: 'right',
+        },
+        autoHideDuration: 6000,
+      });
+    }
+  };
+
+  // Gestion de la désactivation avec confirmation
+  const handleDelete = (typeId: number, typeName: string) => {
+    openConfirmModal(
+      'Confirmer la désactivation',
+      `Êtes-vous sûr de vouloir désactiver le type de compte "${typeName}" ?\n\nCette action est réversible.`,
+      async () => {
+        try {
+          await ApiClient.put(`/types-comptes/${typeId}`, { actif: false });
+          
+          // Mettre à jour le tableau localement immédiatement
+          setTypesCompte(typesCompte.map(type => 
+            type.id === typeId ? { ...type, actif: false, updated_at: new Date().toISOString() } : type
+          ));
+          
+          enqueueSnackbar(`✅ Type de compte "${typeName}" désactivé avec succès`, { 
+            variant: 'success',
+            anchorOrigin: {
+              vertical: 'top',
+              horizontal: 'right',
+            },
+            autoHideDuration: 6000,
+          });
+          
+          // Recharger les données
+          refetchTypesCompte();
+        } catch (error) {
+          console.error('Erreur lors de la désactivation', error);
+          enqueueSnackbar('❌ Erreur lors de la désactivation du type de compte', { 
+            variant: 'error',
+            anchorOrigin: {
+              vertical: 'top',
+              horizontal: 'right',
+            },
+            autoHideDuration: 6000,
+          });
+        }
+      },
+      'Désactiver',
+      'error'
+    );
+  };
+
+  // Composant pour le sélecteur de chapitre
+  const ChapitreSelect = ({ name, label, required = false, helperText = "" }: { 
+    name: keyof TypeCompte; 
+    label: string; 
+    required?: boolean;
+    helperText?: string;
+  }) => {
+    const value = watch(name) as number | null;
+    const selectedChapitre = value ? allChapitres.find(ch => ch.id === value) : null;
+
+    return (
+      <Controller
+        name={name}
+        control={control}
+        render={({ field, fieldState }) => (
+          <FormControl fullWidth margin="dense" sx={{ mb: 2 }}>
+            <Autocomplete
+              options={allChapitres}
+              value={selectedChapitre}
+              getOptionLabel={(option) => {
+                if (typeof option === 'string') return option;
+                return `${option.code} - ${option.libelle}`;
+              }}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              onChange={(event, newValue) => {
+                field.onChange(newValue ? newValue.id : null);
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label={label + (required ? " *" : "")}
+                  placeholder="Rechercher un chapitre..."
+                  error={!!fieldState.error}
+                  helperText={fieldState.error?.message || helperText}
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <React.Fragment>
+                        {loadingChapitres ? (
+                          <CircularProgress color="inherit" size={20} />
+                        ) : null}
+                        {params.InputProps.endAdornment}
+                      </React.Fragment>
+                    ),
+                  }}
+                />
+              )}
+              renderOption={(props, option) => (
+                <li {...props} key={option.id}>
+                  <Box>
+                    <Typography variant="body1">
+                      <strong>{option.code}</strong> - {option.libelle}
+                    </Typography>
+                    {option.categorie && (
+                      <Typography variant="caption" color="text.secondary">
+                        Catégorie: {option.categorie.code} - {option.categorie.nom}
+                      </Typography>
+                    )}
+                  </Box>
+                </li>
+              )}
+              loading={loadingChapitres}
+              loadingText="Chargement des chapitres..."
+              noOptionsText={
+                loadingChapitres 
+                  ? "Chargement..." 
+                  : allChapitres.length === 0 
+                    ? "Aucun chapitre disponible" 
+                    : "Aucun chapitre trouvé"
+              }
+              filterOptions={(options, state) => {
+                const inputValue = state.inputValue.toLowerCase().trim();
+                if (!inputValue) return options;
+                
+                return options.filter(option => 
+                  option.code.toLowerCase().includes(inputValue) ||
+                  option.libelle.toLowerCase().includes(inputValue) ||
+                  (option.categorie?.nom?.toLowerCase()?.includes(inputValue) || false)
+                );
+              }}
+              groupBy={(option) => option.categorie?.nom || 'Sans catégorie'}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+              💡 Tapez pour rechercher par code, libellé ou catégorie
+            </Typography>
+          </FormControl>
+        )}
+      />
+    );
+  };
+
+  if (loadingTypes) {
+    return (
+      <Box 
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '80vh',
+          width: '100%',
+        }}
+      >
+        <CircularProgress size={60} thickness={4} />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#F8FAFC' }}>
-      {/* Sidebar */}
+      {/* SIDEBAR */}
       <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-      {/* Contenu principal */}
+      {/* CONTENU PRINCIPAL */}
       <Box 
         component="main" 
         sx={{ 
@@ -662,694 +949,1302 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
           transition: 'width 0.3s ease'
         }}
       >
-        {/* TopBar */}
+        {/* TOPBAR */}
         <TopBar sidebarOpen={sidebarOpen} />
 
-        {/* Conteneur principal */}
-        <Container maxWidth="lg" sx={{ py: 4, flex: 1 }}>
-          <Card sx={{ p: 3, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-            {/* En-tête de la page */}
-            <Box sx={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              mb: 4,
-              pb: 2,
-              borderBottom: '1px solid #edf2f7'
-            }}>
-              <Box>
-                <Typography variant="h5" component="h1" sx={{ 
-                  fontWeight: 600, 
-                  color: '#1E293B',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1
-                }}>
-                  <AccountBalanceIcon color="primary" />
-                  {isEdit ? 'Modifier le type de compte' : 'Nouveau type de compte'}
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  {isEdit ? 'Modifiez les détails du type de compte' : 'Remplissez les informations pour créer un nouveau type de compte'}
-                </Typography>
+        {/* ZONE DE TRAVAIL */}
+        <Box sx={{ px: { xs: 2, md: 4 }, py: 4 }}>
+          <Paper elevation={3} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 2, mb: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="h5" component="h1" sx={{ fontWeight: 'bold' }}>Gestion des types de compte</Typography>
               </Box>
-
-              {/* Bouton de retour */}
-              <Button
-                variant="outlined"
-                startIcon={<ArrowBackIcon />}
-                onClick={() => navigate(-1)}
-                disabled={isSubmitting}
-                sx={{ 
-                  textTransform: 'none',
-                  borderRadius: '8px',
-                  px: 3,
-                  py: 1
-                }}
+              <Button 
+                variant="contained" 
+                startIcon={<AddIcon />}
+                component={Link}
+                to="/ajout-type-de-compte"
+                sx={{ whiteSpace: 'nowrap', minWidth: 'fit-content' }}
               >
-                Retour
+                Nouveau type
               </Button>
             </Box>
 
-            <Divider sx={{ mb: 3 }} />
-
-            {submitError && (
-              <Alert 
-                severity="error" 
-                sx={{ mb: 3 }}
-                onClose={() => setSubmitError(null)}
-              >
-                {submitError}
-              </Alert>
+            {/* Indicateur de chargement des chapitres */}
+            {loadingChapitres && (
+              <Box sx={{ mb: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <CircularProgress size={20} />
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2">
+                      {chapitresLoadingInfo.isComplete 
+                        ? `Chargement terminé: ${chapitresLoadingInfo.loaded} chapitres`
+                        : `Chargement des chapitres... (page ${chapitresLoadingInfo.page})`}
+                      {chapitresLoadingInfo.loaded > 0 && 
+                        !chapitresLoadingInfo.isComplete &&
+                        ` - ${chapitresLoadingInfo.loaded} chargés`}
+                    </Typography>
+                    {chapitresLoadingInfo.loaded > 0 && !chapitresLoadingInfo.isComplete && (
+                      <Box sx={{ mt: 1 }}>
+                        <LinearProgress 
+                          variant="determinate" 
+                          value={chapitresLoadingInfo.total > 0 
+                            ? Math.min((chapitresLoadingInfo.loaded / chapitresLoadingInfo.total) * 100, 100)
+                            : 0
+                          }
+                          sx={{ height: 6, borderRadius: 3 }}
+                        />
+                      </Box>
+                    )}
+                  </Box>
+                </Box>
+              </Box>
             )}
 
-            {/* Onglets */}
-            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-              <Tabs 
-                value={activeTab} 
-                onChange={handleTabChange}
-                aria-label="Onglets configuration"
-                textColor="primary"
-                indicatorColor="primary"
-                variant="scrollable"
-                scrollButtons="auto"
-              >
-                <Tab 
-                  label="Général" 
-                  {...a11yProps(0)} 
-                  icon={<SettingsIcon fontSize="small" />} 
-                  iconPosition="start"
-                  sx={{ minHeight: 48 }}
-                />
-                <Tab 
-                  label="Frais & Commissions" 
-                  {...a11yProps(1)} 
-                  icon={<ReceiptIcon fontSize="small" />} 
-                  iconPosition="start"
-                  sx={{ minHeight: 48 }}
-                />
-                <Tab 
-                  label="Intérêts" 
-                  {...a11yProps(2)} 
-                  icon={<AccountTreeIcon fontSize="small" />} 
-                  iconPosition="start"
-                  sx={{ minHeight: 48 }}
-                />
-                <Tab 
-                  label="Avancé" 
-                  {...a11yProps(3)} 
-                  icon={<InfoIcon fontSize="small" />} 
-                  iconPosition="start"
-                  sx={{ minHeight: 48 }}
-                />
-              </Tabs>
-            </Box>
+            {/* Barre de recherche */}
+            <TextField
+              fullWidth
+              variant="outlined"
+              size="small"
+              placeholder="Rechercher par code ou libellé..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+                sx: { 
+                  backgroundColor: 'background.paper',
+                  borderRadius: 1
+                }
+              }}
+            />
+          </Paper>
 
-            {/* Formulaire */}
-            <form onSubmit={handleSubmit(onSubmit)} noValidate>
-              {/* Onglet Général */}
-              <TabPanel value={activeTab} index={0}>
-                <Grid container spacing={3}>
-                  {/* Code - Champ OBLIGATOIRE */}
-                  <Grid item xs={12} md={4}>
-                    <Controller
-                      name="code"
-                      control={control}
-                      render={({ field, fieldState: { error } }) => (
-                        <TextField
-                          {...field}
-                          label="Code *"
-                          fullWidth
-                          variant="outlined"
-                          size="small"
-                          error={!!error}
-                          helperText={error?.message}
-                          disabled={isSubmitting}
-                          required
-                        />
-                      )}
-                    />
-                  </Grid>
-                  
-                  {/* Libellé - Champ OBLIGATOIRE */}
-                  <Grid item xs={12} md={8}>
-                    <Controller
-                      name="libelle"
-                      control={control}
-                      render={({ field, fieldState: { error } }) => (
-                        <TextField
-                          {...field}
-                          label="Libellé *"
-                          fullWidth
-                          variant="outlined"
-                          size="small"
-                          error={!!error}
-                          helperText={error?.message}
-                          disabled={isSubmitting}
-                          required
-                        />
-                      )}
-                    />
-                  </Grid>
-
-                  {/* Type de compte - Champ FACULTATIF */}
-                  <Grid item xs={12} md={6}>
-                    <Controller
-                      name="type_compte_id"
-                      control={control}
-                      render={({ field, fieldState: { error } }) => (
-                        <TextField
-                          {...field}
-                          label="Type de compte"
-                          fullWidth
-                          variant="outlined"
-                          size="small"
-                          error={!!error}
-                          helperText={error?.message}
-                          disabled={isSubmitting}
-                          placeholder="Entrez le type de compte"
-                        />
-                      )}
-                    />
-                  </Grid>
-
-                  {/* Chapitre principal - Champ FACULTATIF - MODIFIÉ avec minWidth: 250 */}
-                  <Grid item xs={12} md={6}>
-                    {renderChapterField('chapitre_id', 'Chapitre principal', control)}
-                  </Grid>
-                </Grid>
-              </TabPanel>
-
-              {/* Onglet Frais & Commissions */}
-              <TabPanel value={activeTab} index={1}>
-                <Grid container spacing={3}>
-                  {/* Section Frais */}
-                  <Grid item xs={12}>
-                    <SectionTitle title="Frais" icon={MoneyIcon} />
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    {renderToggleSection('frais_ouverture_actif', 'Frais d\'ouverture', [
-                      { 
-                        name: 'frais_ouverture', 
-                        label: 'Montant des frais d\'ouverture', 
-                        type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
-                      },
-                      { 
-                        name: 'chapitre_frais_ouverture_id', 
-                        label: 'Chapitre des frais d\'ouverture', 
-                        type: 'chapter' 
-                      }
-                    ])}
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    {renderToggleSection('frais_carnet_actif', 'Frais de carnet', [
-                      { 
-                        name: 'frais_carnet', 
-                        label: 'Montant des frais de carnet', 
-                        type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
-                      },
-                      { 
-                        name: 'chapitre_frais_carnet_id', 
-                        label: 'Chapitre des frais de carnet', 
-                        type: 'chapter' 
-                      }
-                    ])}
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    {renderToggleSection('frais_renouvellement_actif', 'Frais de renouvellement', [
-                      { 
-                        name: 'frais_renouvellement_carnet', 
-                        label: 'Montant des frais de renouvellement', 
-                        type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
-                      },
-                      { 
-                        name: 'chapitre_renouvellement_id', 
-                        label: 'Chapitre des frais de renouvellement', 
-                        type: 'chapter' 
-                      }
-                    ])}
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    {renderToggleSection('frais_perte_actif', 'Frais de perte de carnet', [
-                      { 
-                        name: 'frais_perte_carnet', 
-                        label: 'Montant des frais de perte', 
-                        type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
-                      },
-                      { 
-                        name: 'chapitre_perte_id', 
-                        label: 'Chapitre des frais de perte', 
-                        type: 'chapter' 
-                      }
-                    ])}
-                  </Grid>
-
-                  {/* Section Commission mensuelle */}
-                  <Grid item xs={12}>
-                    <SectionTitle title="frais d'entretien de compte" icon={PercentIcon} />
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    {renderToggleSection('commission_mensuelle_actif', 'frais d\'entretien de compte', [
-                      { 
-                        name: 'seuil_commission', 
-                        label: 'Seuil de commission', 
-                        type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
-                      },
-                      { 
-                        name: 'commission_si_superieur', 
-                        label: 'Commission si supérieur au seuil', 
-                        type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
-                      },
-                      { 
-                        name: 'commission_si_inferieur', 
-                        label: 'Commission si inférieur au seuil', 
-                        type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
-                      }
-                    ])}
-                  </Grid>
-
-                  {/* Section Commission retrait */}
-                  <Grid item xs={12}>
-                    <SectionTitle title="Commission de retrait" icon={PercentIcon} />
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    {renderToggleSection('commission_retrait_actif', 'Commission de retrait', [
-                      { 
-                        name: 'commission_retrait', 
-                        label: 'Taux de commission', 
-                        type: 'number',
-                        adornment: <InputAdornment position="start">%</InputAdornment>,
-                        step: "0.01"
-                      },
-                      { 
-                        name: 'chapitre_commission_retrait_id', 
-                        label: 'Chapitre de la commission', 
-                        type: 'chapter' 
-                      }
-                    ])}
-                  </Grid>
-
-                  {/* Section Commission SMS */}
-                  <Grid item xs={12}>
-                    <SectionTitle title="Commission SMS" icon={MoneyIcon} />
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    {renderToggleSection('commission_sms_actif', 'Commission SMS', [
-                      { 
-                        name: 'commission_sms', 
-                        label: 'Montant commission SMS', 
-                        type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
-                      },
-                      { 
-                        name: 'chapitre_commission_sms_id', 
-                        label: 'Chapitre commission SMS', 
-                        type: 'chapter' 
-                      }
-                    ])}
-                  </Grid>
-                </Grid>
-              </TabPanel>
-
-              {/* Onglet Intérêts */}
-              <TabPanel value={activeTab} index={2}>
-                <Grid container spacing={3}>
-                  {/* Section Intérêts */}
-                  <Grid item xs={12}>
-                    <SectionTitle title="Intérêts" icon={PercentIcon} />
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    {renderToggleSection('interets_actifs', 'Intérêts', [
-                      { 
-                        name: 'taux_interet_annuel', 
-                        label: 'Taux d\'intérêt annuel', 
-                        type: 'number',
-                        adornment: <InputAdornment position="start">%</InputAdornment>,
-                        step: "0.01"
-                      },
-                      { 
-                        name: 'frequence_calcul_interet', 
-                        label: 'Fréquence de calcul', 
-                        type: 'select',
-                        options: [
-                          { value: 'JOURNALIER', label: 'Journalier' },
-                          { value: 'MENSUEL', label: 'Mensuel' },
-                          { value: 'ANNUEL', label: 'Annuel' }
-                        ]
-                      },
-                      { 
-                        name: 'heure_calcul_interet', 
-                        label: 'Heure de calcul', 
-                        type: 'text' 
-                      },
-                      { 
-                        name: 'chapitre_interet_credit_id', 
-                        label: 'Chapitre des intérêts créditeurs', 
-                        type: 'chapter' 
-                      }
-                    ])}
-                  </Grid>
-
-                  {watch('interets_actifs') && (
-                    <Grid item xs={12}>
-                      <Paper elevation={0} sx={{ p: 2, bgcolor: '#f9fafb', borderRadius: 1, mb: 3 }}>
-                        <FormGroup>
-                          <FormControlLabel
-                            control={
-                              <Controller
-                                name="capitalisation_interets"
-                                control={control}
-                                render={({ field }) => (
-                                  <MuiSwitch
-                                    {...field}
-                                    checked={field.value}
-                                    onChange={(e) => field.onChange(e.target.checked)}
-                                    color="primary"
-                                    disabled={isSubmitting}
-                                  />
-                                )}
-                              />
-                            }
-                            label="Capitalisation des intérêts"
+          <Paper elevation={3} sx={{ width: '100%', overflow: 'hidden', borderRadius: 2 }}>
+            <TableContainer sx={{ maxHeight: 'calc(100vh - 250px)' }}>
+              <Table stickyHeader size="small">
+                <TableHead style={{ backgroundColor:'#3479efff'}}>
+                  <TableRow style={{ backgroundColor:'#3479efff'}}>
+                    <TableCell  sx={{ color: 'black', fontWeight: 'bold' }}>Code</TableCell>
+                    <TableCell  sx={{ color: 'black', fontWeight: 'bold' }}>Libellé</TableCell>
+                    <TableCell  sx={{ color: 'black', fontWeight: 'bold' }}>Description</TableCell>
+                    <TableCell  align="center" sx={{ color: 'black', fontWeight: 'bold' }}>MATA</TableCell>
+                    <TableCell  align="center" sx={{ color: 'black', fontWeight: 'bold' }}>Durée</TableCell>
+                    <TableCell  align="center" sx={{ color: 'black', fontWeight: 'bold' }}>Islamique</TableCell>
+                    <TableCell  align="center" sx={{ color: 'black', fontWeight: 'bold' }}>Statut</TableCell>
+                    <TableCell align="center" sx={{ color: 'black', fontWeight: 'bold' }}>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredTypes
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((type) => (
+                      <TableRow 
+                        key={type.id}
+                        sx={{ 
+                          opacity: type.actif ? 1 : 0.7,
+                          backgroundColor: type.actif ? 'inherit' : 'rgba(0, 0, 0, 0.04)'
+                        }}
+                      >
+                        <TableCell>{type.code} {!type.actif && '(Désactivé)'}</TableCell>
+                        <TableCell>{type.libelle}</TableCell>
+                        <TableCell sx={{ 
+                          maxWidth: '200px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>{type.description || '-'}</TableCell>
+                        <TableCell align="center">
+                          <Chip 
+                            label={type.est_mata ? 'Oui' : 'Non'} 
+                            size="small"
+                            color={type.est_mata ? 'primary' : 'default'}
+                            variant={type.est_mata ? 'filled' : 'outlined'}
                           />
-                        </FormGroup>
-                      </Paper>
-                    </Grid>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip 
+                            label={type.necessite_duree ? 'Oui' : 'Non'} 
+                            size="small"
+                            color={type.necessite_duree ? 'secondary' : 'default'}
+                            variant={type.necessite_duree ? 'filled' : 'outlined'}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip 
+                            label={type.est_islamique ? 'Oui' : 'Non'} 
+                            size="small"
+                            color={type.est_islamique ? 'success' : 'default'}
+                            variant={type.est_islamique ? 'filled' : 'outlined'}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip 
+                            label={type.actif ? 'Actif' : 'Inactif'} 
+                            color={type.actif ? 'success' : 'default'} 
+                            size="small"
+                            sx={{ 
+                              cursor: 'default',
+                              opacity: 0.8,
+                              '& .MuiChip-label': {
+                                paddingLeft: 1.5,
+                                paddingRight: 1.5
+                              }
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Tooltip title="Voir les détails">
+                            <IconButton 
+                              onClick={() => {
+                                setSelectedType(type);
+                                setViewModalOpen(true);
+                              }}
+                              size="small"
+                              sx={{ '&:hover': { color: 'info.main' } }}
+                            >
+                              <VisibilityIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Modifier">
+                            <IconButton 
+                              onClick={() => handleEditClick(type)}
+                              size="small"
+                              sx={{ '&:hover': { color: 'primary.main' } }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          {type.actif ? (
+                            <Tooltip title="Désactiver">
+                              <IconButton 
+                                onClick={() => handleDelete(type.id, type.libelle)}
+                                color="error"
+                                size="small"
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          ) : (
+                            <Tooltip title="Réactiver">
+                              <IconButton
+                                onClick={() => handleReactivate(type.id, type.libelle)}
+                                color="primary"
+                                size="small"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                  <path d="M3 3v5h5"/>
+                                  <path d="M12 7v5l3 3"/>
+                                </svg>
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  {filteredTypes.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                        <Typography variant="body2" color="textSecondary">
+                          Aucun type de compte trouvé
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
                   )}
+                </TableBody>
+              </Table>
+            </TableContainer>
 
-                  {/* Section Frais déblocage */}
-                  <Grid item xs={12}>
-                    <SectionTitle title="Frais de déblocage" icon={MoneyIcon} />
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    {renderToggleSection('frais_deblocage_actif', 'Frais de déblocage', [
-                      { 
-                        name: 'frais_deblocage', 
-                        label: 'Montant des frais de déblocage', 
-                        type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
+            {/* Pagination */}
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              p: 1.5,
+              borderTop: '1px solid',
+              borderColor: 'divider',
+              flexWrap: 'wrap',
+              gap: 2
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  {`${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, filteredTypes.length)} sur ${filteredTypes.length}`}
+                </Typography>
+              </Box>
+              
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Pagination 
+                  count={Math.ceil(filteredTypes.length / rowsPerPage)} 
+                  page={page + 1} 
+                  onChange={(event, value) => setPage(value - 1)} 
+                  color="primary" 
+                  shape="rounded"
+                />
+                
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Lignes:
+                  </Typography>
+                  <Select
+                    value={rowsPerPage}
+                    onChange={(e) => {
+                      setRowsPerPage(Number(e.target.value));
+                      setPage(0);
+                    }}
+                    size="small"
+                    sx={{
+                      '& .MuiSelect-select': {
+                        py: 0.5,
+                        px: 1,
+                        fontSize: '0.875rem',
                       },
-                      { 
-                        name: 'chapitre_frais_deblocage_id', 
-                        label: 'Chapitre des frais de déblocage', 
-                        type: 'chapter' 
-                      }
-                    ])}
-                  </Grid>
-
-                  {/* Section Pénalités */}
-                  <Grid item xs={12}>
-                    <SectionTitle title="Pénalités" icon={WarningIcon} />
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    {renderToggleSection('penalite_actif', 'Pénalité de retrait anticipé', [
-                      { 
-                        name: 'penalite_retrait_anticipe', 
-                        label: 'Taux de pénalité', 
-                        type: 'number',
-                        adornment: <InputAdornment position="start">%</InputAdornment>,
-                        step: "0.01"
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'divider',
                       },
-                      { 
-                        name: 'chapitre_penalite_id', 
-                        label: 'Chapitre des pénalités', 
-                        type: 'chapter' 
-                      }
-                    ])}
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    {renderToggleSection('frais_cloture_anticipe_actif', 'Frais de clôture anticipée', [
-                      { 
-                        name: 'frais_cloture_anticipe', 
-                        label: 'Montant des frais de clôture', 
-                        type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'text.secondary',
                       },
-                      { 
-                        name: 'chapitre_cloture_anticipe_id', 
-                        label: 'Chapitre des frais de clôture', 
-                        type: 'chapter' 
-                      }
-                    ])}
-                  </Grid>
-                </Grid>
-              </TabPanel>
+                    }}
+                  >
+                    {[5, 10, 25, 50].map((size) => (
+                      <MenuItem key={size} value={size}>
+                        {size}
+                      </MenuItem>
+                    ))}
+                </Select>
+                </Box>
+              </Box>
+            </Box>
+          </Paper>
 
-              {/* Onglet Avancé */}
-              <TabPanel value={activeTab} index={3}>
-                <Grid container spacing={3}>
-                  {/* Section Minimum de compte */}
-                  <Grid item xs={12}>
-                    <SectionTitle title="Minimum de compte" icon={MoneyIcon} />
-                  </Grid>
+          {/* Modal d'édition */}
+          <Dialog open={openEditModal} onClose={() => setOpenEditModal(false)} maxWidth="md" fullWidth>
+            <form onSubmit={handleSubmit(handleSubmitWithConfirmation)}>
+              <DialogTitle>
+                <Box display="flex" alignItems="center" gap={1}>
+                  <EditIcon color="primary" />
+                  <Typography variant="h6" component="span">
+                    Modifier le type de compte
+                  </Typography>
+                </Box>
+                {editingType && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    Code: <strong>{editingType.code}</strong>
+                  </Typography>
+                )}
+              </DialogTitle>
+              
+              <DialogContent>
+                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                  <Tabs value={activeTab} onChange={handleTabChange} aria-label="onglets type compte">
+                    <Tab label="Général" {...a11yProps(0)} />
+                    <Tab label="Frais & Commissions" {...a11yProps(1)} />
+                    <Tab label="Intérêts" {...a11yProps(2)} />
+                    <Tab label="Pénalités" {...a11yProps(3)} />
+                  </Tabs>
+                </Box>
 
-                  <Grid item xs={12}>
-                    {renderToggleSection('minimum_compte_actif', 'Minimum de compte', [
-                      { 
-                        name: 'minimum_compte', 
-                        label: 'Montant minimum', 
-                        type: 'number',
-                        adornment: <InputAdornment position="start">FCFA</InputAdornment>
-                      }
-                    ])}
-                  </Grid>
-
-                  {/* Section Retraits anticipés */}
-                  <Grid item xs={12}>
-                    <SectionTitle title="Retraits anticipés" />
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <Paper elevation={0} sx={{ p: 2, bgcolor: '#f9fafb', borderRadius: 1, mb: 3 }}>
-                      <FormGroup>
+                {/* Onglet Général */}
+                <TabPanel value={activeTab} index={0}>
+                  <Controller
+                    name="code"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        margin="dense"
+                        label="Code"
+                        fullWidth
+                        disabled
+                        sx={{ mb: 2 }}
+                      />
+                    )}
+                  />
+                  
+                  <Controller
+                    name="libelle"
+                    control={control}
+                    render={({ field, fieldState }) => (
+                      <TextField
+                        {...field}
+                        margin="dense"
+                        label="Libellé *"
+                        fullWidth
+                        error={!!fieldState.error}
+                        helperText={fieldState.error?.message}
+                        sx={{ mb: 2 }}
+                      />
+                    )}
+                  />
+                  
+                  <Controller
+                    name="description"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        margin="dense"
+                        label="Description"
+                        fullWidth
+                        multiline
+                        rows={3}
+                        value={field.value || ''}
+                        sx={{ mb: 2 }}
+                      />
+                    )}
+                  />
+                                    
+                  {/* Chapitre par défaut */}
+                  <ChapitreSelect 
+                    name="chapitre_defaut_id" 
+                    label="Chapitre par défaut"
+                    helperText="Chapitre à utiliser par défaut pour les opérations"
+                  />
+                  
+                  <Controller
+                    name="actif"
+                    control={control}
+                    render={({ field }) => (
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={field.value || false}
+                            onChange={(e) => field.onChange(e.target.checked)}
+                          />
+                        }
+                        label="Actif"
+                      />
+                    )}
+                  />
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2, ml: 1 }}>
+                    <Controller
+                      name="est_islamique"
+                      control={control}
+                      render={({ field }) => (
                         <FormControlLabel
                           control={
-                            <Controller
-                              name="retrait_anticipe_autorise"
-                              control={control}
-                              render={({ field }) => (
-                                <MuiSwitch
-                                  {...field}
-                                  checked={field.value}
-                                  onChange={(e) => field.onChange(e.target.checked)}
-                                  color="primary"
-                                  disabled={isSubmitting}
-                                />
-                              )}
+                            <Checkbox
+                              checked={field.value || false}
+                              onChange={(e) => field.onChange(e.target.checked)}
                             />
                           }
-                          label="Autoriser les retraits anticipés"
-                        />
-                      </FormGroup>
-
-                      {watch('retrait_anticipe_autorise') && (
-                        <Grid container spacing={2} sx={{ pl: 3, mt: 1 }}>
-                          <Grid item xs={12}>
-                            <FormGroup>
-                              <FormControlLabel
-                                control={
-                                  <Controller
-                                    name="validation_retrait_anticipe"
-                                    control={control}
-                                    render={({ field }) => (
-                                      <MuiSwitch
-                                        {...field}
-                                        checked={field.value}
-                                        onChange={(e) => field.onChange(e.target.checked)}
-                                        color="primary"
-                                        disabled={isSubmitting}
-                                      />
-                                    )}
-                                  />
-                                }
-                                label="Validation requise pour les retraits anticipés"
-                              />
-                            </FormGroup>
-                          </Grid>
-
-                          <Grid item xs={12} md={6}>
-                            {renderNumberField('duree_blocage_min', 'Durée blocage minimum (jours)', control, undefined, "1")}
-                          </Grid>
-
-                          <Grid item xs={12} md={6}>
-                            {renderNumberField('duree_blocage_max', 'Durée blocage maximum (jours)', control, undefined, "1")}
-                          </Grid>
-                        </Grid>
-                      )}
-                    </Paper>
-                  </Grid>
-
-                  {/* Section Observations */}
-                  <Grid item xs={12}>
-                    <SectionTitle title="Observations" />
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <Controller
-                      name="observations"
-                      control={control}
-                      render={({ field, fieldState: { error } }) => (
-                        <TextField
-                          {...field}
-                          label="Observations"
-                          fullWidth
-                          multiline
-                          rows={4}
-                          variant="outlined"
-                          error={!!error}
-                          helperText={error?.message}
-                          disabled={isSubmitting}
-                          placeholder="Ajoutez des notes ou observations supplémentaires..."
+                          label="Est Islamique"
                         />
                       )}
                     />
-                  </Grid>
-                </Grid>
-              </TabPanel>
+                    
+                    <Controller
+                      name="est_mata"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={field.value || false}
+                              onChange={(e) => field.onChange(e.target.checked)}
+                            />
+                          }
+                          label="Est MATA"
+                        />
+                      )}
+                    />
+                    
+                    <Controller
+                      name="a_vue"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={field.value || false}
+                              onChange={(e) => field.onChange(e.target.checked)}
+                            />
+                          }
+                          label="À vue"
+                        />
+                      )}
+                    />
+                  </Box>
 
-              {/* Boutons d'action */}
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'flex-end', 
-                gap: 2, 
-                mt: 4,
-                pt: 3,
-                borderTop: '1px solid #edf2f7'
-              }}>
-                <Button
-                  variant="outlined"
-                  onClick={() => navigate(-1)}
-                  disabled={isSubmitting}
-                  sx={{ 
-                    textTransform: 'none',
-                    px: 3,
-                    py: 1,
-                    borderRadius: '8px'
-                  }}
-                >
-                  Annuler
-                </Button>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  color="primary"
-                  disabled={isSubmitting}
-                  startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-                  sx={{ 
-                    textTransform: 'none',
-                    px: 4,
-                    py: 1,
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.2)',
-                    '&:hover': {
-                      boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.3)'
-                    }
-                  }}
-                >
-                  {isSubmitting ? 'Enregistrement...' : 'Enregistrer'}
-                </Button>
-              </Box>
-            </form>
-          </Card>
-        </Container>
-      </Box>
+                </TabPanel>
 
-      {/* Modal de confirmation de succès */}
-      <Dialog
-        open={successModalOpen}
-        onClose={handleCloseSuccessModal}
-        aria-labelledby="success-dialog-title"
-        aria-describedby="success-dialog-description"
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle id="success-dialog-title" sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 2,
-          bgcolor: '#f0f9ff',
-          color: '#0369a1'
-        }}>
-          <CheckCircleIcon color="success" fontSize="large" />
-          <Typography variant="h6" component="span" sx={{ fontWeight: 600 }}>
-            Type de compte créé avec succès
-          </Typography>
-        </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
-          <DialogContentText id="success-dialog-description">
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body1" sx={{ mb: 1 }}>
-                Le type de compte a été créé avec succès.
-              </Typography>
-              {createdTypeCompte && (
-                <Box sx={{ mt: 2, p: 2, bgcolor: '#f8fafc', borderRadius: 1 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                    Détails du type de compte :
+                {/* Onglet Frais & Commissions */}
+                <TabPanel value={activeTab} index={1}>
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <MoneyIcon sx={{ mr: 1 }} />
+                    Frais d'ouverture
                   </Typography>
-                  <Typography variant="body2">
-                    <strong>Code :</strong> {createdTypeCompte.code}
+                  
+                  <Box display="flex" gap={2} alignItems="center" mb={2}>
+                    <Controller
+                      name="frais_ouverture_actif"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={field.value || false}
+                              onChange={(e) => {
+                                field.onChange(e.target.checked);
+                                if (!e.target.checked) {
+                                  setValue('frais_ouverture', null);
+                                  setValue('chapitre_frais_ouverture_id', null);
+                                }
+                              }}
+                            />
+                          }
+                          label="Activer"
+                        />
+                      )}
+                    />
+                    
+                    <Controller
+                      name="frais_ouverture"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          margin="dense"
+                          label="Montant"
+                          type="number"
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                          }}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                          disabled={!fraisOuvertureActif}
+                          sx={{ flex: 1 }}
+                        />
+                      )}
+                    />
+                  </Box>
+                  
+                  {/* Chapitre pour frais d'ouverture */}
+                  <ChapitreSelect 
+                    name="chapitre_frais_ouverture_id" 
+                    label="Chapitre frais d'ouverture"
+                    helperText="Chapitre pour comptabiliser les frais d'ouverture"
+                  />
+
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <ReceiptIcon sx={{ mr: 1 }} />
+                    Frais de carnet
                   </Typography>
-                  <Typography variant="body2">
-                    <strong>Libellé :</strong> {createdTypeCompte.libelle}
+                  
+                  <Box display="flex" gap={2} alignItems="center" mb={2}>
+                    <Controller
+                      name="frais_carnet_actif"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={field.value || false}
+                              onChange={(e) => {
+                                field.onChange(e.target.checked);
+                                if (!e.target.checked) {
+                                  setValue('frais_carnet', null);
+                                  setValue('chapitre_frais_carnet_id', null);
+                                }
+                              }}
+                            />
+                          }
+                          label="Activer"
+                        />
+                      )}
+                    />
+                    
+                    <Controller
+                      name="frais_carnet"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          margin="dense"
+                          label="Montant"
+                          type="number"
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                          }}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                          disabled={!fraisCarnetActif}
+                          sx={{ flex: 1 }}
+                        />
+                      )}
+                    />
+                  </Box>
+                  
+                  {/* Chapitre pour frais de carnet */}
+                  <ChapitreSelect 
+                    name="chapitre_frais_carnet_id" 
+                    label="Chapitre frais de carnet"
+                    helperText="Chapitre pour comptabiliser les frais de carnet"
+                  />
+
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <PercentIcon sx={{ mr: 1 }} />
+                    Commission de retrait
                   </Typography>
-                  {createdTypeCompte.type_compte_id && (
-                    <Typography variant="body2">
-                      <strong>Type :</strong> {createdTypeCompte.type_compte_id}
+                  
+                  <Box display="flex" gap={2} alignItems="center" mb={2}>
+                    <Controller
+                      name="commission_retrait_actif"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={field.value || false}
+                              onChange={(e) => {
+                                field.onChange(e.target.checked);
+                                if (!e.target.checked) {
+                                  setValue('commission_retrait', null);
+                                  setValue('chapitre_commission_retrait_id', null);
+                                }
+                              }}
+                            />
+                          }
+                          label="Activer"
+                        />
+                      )}
+                    />
+                    
+                    <Controller
+                      name="commission_retrait"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          margin="dense"
+                          label="Pourcentage"
+                          type="number"
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                          }}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                          disabled={!commissionRetraitActif}
+                          sx={{ flex: 1 }}
+                        />
+                      )}
+                    />
+                  </Box>
+                  
+                  {/* Chapitre pour commission de retrait */}
+                  <ChapitreSelect 
+                    name="chapitre_commission_retrait_id" 
+                    label="Chapitre commission de retrait"
+                    helperText="Chapitre pour comptabiliser les commissions de retrait"
+                  />
+                </TabPanel>
+
+                {/* Onglet Intérêts */}
+                <TabPanel value={activeTab} index={2}>
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <AccountBalanceIcon sx={{ mr: 1 }} />
+                    Paramètres des intérêts
+                  </Typography>
+                  
+                  <Controller
+                    name="interets_actifs"
+                    control={control}
+                    render={({ field }) => (
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={field.value || false}
+                            onChange={(e) => {
+                              field.onChange(e.target.checked);
+                              if (!e.target.checked) {
+                                setValue('taux_interet_annuel', null);
+                                setValue('capitalisation_interets', false);
+                                setValue('chapitre_interet_credit_id', null);
+                              }
+                            }}
+                          />
+                        }
+                        label="Activer les intérêts"
+                        sx={{ mb: 2, display: 'block' }}
+                      />
+                    )}
+                  />
+                  
+                  <Box display="flex" gap={2} sx={{ mb: 2 }}>
+                    <Controller
+                      name="taux_interet_annuel"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          margin="dense"
+                          label="Taux d'intérêt annuel"
+                          type="number"
+                          fullWidth
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                          }}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                          disabled={!interetsActifs}
+                        />
+                      )}
+                    />
+                    
+                    <Controller
+                      name="frequence_calcul_interet"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControl fullWidth margin="dense">
+                          <InputLabel>Fréquence de calcul</InputLabel>
+                          <Select
+                            {...field}
+                            label="Fréquence de calcul"
+                            value={field.value || ''}
+                            disabled={!interetsActifs}
+                          >
+                            <MenuItem value="JOURNALIER">Journalier</MenuItem>
+                            <MenuItem value="MENSUEL">Mensuel</MenuItem>
+                            <MenuItem value="ANNUEL">Annuel</MenuItem>
+                          </Select>
+                        </FormControl>
+                      )}
+                    />
+                  </Box>
+                  
+                  <Controller
+                    name="capitalisation_interets"
+                    control={control}
+                    render={({ field }) => (
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={field.value || false}
+                            onChange={(e) => field.onChange(e.target.checked)}
+                            disabled={!interetsActifs}
+                          />
+                        }
+                        label="Capitalisation des intérêts"
+                        sx={{ display: 'block', mb: 2 }}
+                      />
+                    )}
+                  />
+                  
+                  {/* Chapitre pour intérêts créditeurs */}
+                  <ChapitreSelect 
+                    name="chapitre_interet_credit_id" 
+                    label="Chapitre intérêts créditeurs"
+                    helperText="Chapitre pour comptabiliser les intérêts créditeurs"
+                  />
+                </TabPanel>
+
+                {/* Onglet Pénalités */}
+                <TabPanel value={activeTab} index={3}>
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <WarningIcon sx={{ mr: 1 }} />
+                    Paramètres des pénalités
+                  </Typography>
+                  
+                  <Box mb={3}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Pénalité de retrait anticipé
                     </Typography>
+                    <Box display="flex" gap={2} alignItems="center" mb={2}>
+                      <Controller
+                        name="penalite_actif"
+                        control={control}
+                        render={({ field }) => (
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={field.value || false}
+                                onChange={(e) => {
+                                  field.onChange(e.target.checked);
+                                  if (!e.target.checked) {
+                                    setValue('penalite_retrait_anticipe', null);
+                                    setValue('chapitre_penalite_id', null);
+                                  }
+                                }}
+                              />
+                            }
+                            label="Activer"
+                          />
+                        )}
+                      />
+                      
+                      <Controller
+                        name="penalite_retrait_anticipe"
+                        control={control}
+                        render={({ field }) => (
+                          <TextField
+                            {...field}
+                            margin="dense"
+                            label="Taux de pénalité"
+                            type="number"
+                            InputProps={{
+                              endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                            }}
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                            disabled={!penaliteActif}
+                            sx={{ flex: 1 }}
+                          />
+                        )}
+                      />
+                    </Box>
+                    
+                    {/* Chapitre pour pénalité */}
+                    <ChapitreSelect 
+                      name="chapitre_penalite_id" 
+                      label="Chapitre pénalité de retrait"
+                      helperText="Chapitre pour comptabiliser les pénalités de retrait anticipé"
+                    />
+                  </Box>
+                  
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Box>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Frais de clôture anticipée
+                    </Typography>
+                    <Box display="flex" gap={2} alignItems="center" mb={2}>
+                      <Controller
+                        name="frais_cloture_anticipe_actif"
+                        control={control}
+                        render={({ field }) => (
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={field.value || false}
+                                onChange={(e) => {
+                                  field.onChange(e.target.checked);
+                                  if (!e.target.checked) {
+                                    setValue('frais_cloture_anticipe', null);
+                                    setValue('chapitre_cloture_anticipe_id', null);
+                                  }
+                                }}
+                              />
+                            }
+                            label="Activer"
+                          />
+                        )}
+                      />
+                      
+                      <Controller
+                        name="frais_cloture_anticipe"
+                        control={control}
+                        render={({ field }) => (
+                          <TextField
+                            {...field}
+                            margin="dense"
+                            label="Montant"
+                            type="number"
+                            InputProps={{
+                              endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                            }}
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                            disabled={!fraisClotureActif}
+                            sx={{ flex: 1 }}
+                          />
+                        )}
+                      />
+                    </Box>
+                    
+                    {/* Chapitre pour frais de clôture anticipée */}
+                    <ChapitreSelect 
+                      name="chapitre_cloture_anticipe_id" 
+                      label="Chapitre frais de clôture anticipée"
+                      helperText="Chapitre pour comptabiliser les frais de clôture anticipée"
+                    />
+                  </Box>
+                </TabPanel>
+              </DialogContent>
+              
+              <DialogActions sx={{ p: 3, justifyContent: 'space-between' }}>
+                <Box>
+                  {activeTab > 0 && (
+                    <Button 
+                      onClick={() => setActiveTab(activeTab - 1)}
+                      variant="outlined"
+                      sx={{ mr: 1 }}
+                    >
+                      Précédent
+                    </Button>
+                  )}
+                  {activeTab < 3 && (
+                    <Button 
+                      onClick={() => setActiveTab(activeTab + 1)}
+                      variant="contained"
+                      color="primary"
+                    >
+                      Suivant
+                    </Button>
                   )}
                 </Box>
+                
+                <Box>
+                  <Button 
+                    onClick={() => setOpenEditModal(false)} 
+                    variant="outlined"
+                    sx={{ mr: 1 }}
+                  >
+                    Annuler
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    variant="contained" 
+                    color="primary"
+                    disabled={updateTypeCompteMutation.isPending}
+                    startIcon={updateTypeCompteMutation.isPending ? <CircularProgress size={20} /> : <SaveIcon />}
+                  >
+                    {updateTypeCompteMutation.isPending ? 'Enregistrement...' : 'Enregistrer'}
+                  </Button>
+                </Box>
+              </DialogActions>
+            </form>
+          </Dialog>
+
+          {/* Modal de confirmation générique */}
+          <Dialog
+            open={confirmModal.open}
+            onClose={closeConfirmModal}
+            maxWidth="sm"
+            fullWidth
+          >
+            <DialogTitle>
+              <Box display="flex" alignItems="center" gap={1}>
+                <WarningIcon color="warning" />
+                <Typography variant="h6">
+                  {confirmModal.title}
+                </Typography>
+              </Box>
+            </DialogTitle>
+            
+            <DialogContent>
+              <Alert 
+                severity={confirmModal.confirmColor === 'error' ? 'warning' : 'info'} 
+                sx={{ mb: 2 }}
+              >
+                {confirmModal.message}
+              </Alert>
+              
+              <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Cliquez sur "Confirmer" pour valider cette action.
+                </Typography>
+              </Box>
+            </DialogContent>
+            
+            <DialogActions sx={{ p: 3, gap: 1 }}>
+              <Button 
+                onClick={closeConfirmModal}
+                variant="outlined"
+                color="inherit"
+              >
+                Annuler
+              </Button>
+              <Button 
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  closeConfirmModal();
+                }}
+                variant="contained" 
+                color={confirmModal.confirmColor}
+                startIcon={<CheckIcon />}
+              >
+                {confirmModal.confirmText}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Modal de visualisation des détails */}
+          <Dialog 
+            open={viewModalOpen} 
+            onClose={() => setViewModalOpen(false)}
+            maxWidth="lg"
+            fullWidth
+            scroll="paper"
+          >
+            <DialogTitle sx={{ 
+              backgroundColor: 'primary.main',
+              color: 'white',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              position: 'sticky',
+              top: 0,
+              zIndex: 1
+            }}>
+              <Box>
+                <Typography variant="h6" component="div">
+                  Détails du type de compte: {selectedType?.libelle}
+                </Typography>
+                <Typography variant="subtitle2">
+                  Code: {selectedType?.code} | Créé le: {selectedType?.created_at ? new Date(selectedType.created_at).toLocaleDateString() : 'N/A'}
+                </Typography>
+              </Box>
+              <IconButton 
+                edge="end" 
+                color="inherit" 
+                onClick={() => setViewModalOpen(false)}
+                aria-label="fermer"
+              >
+                <CloseIcon />
+              </IconButton>
+            </DialogTitle>
+            <DialogContent dividers>
+              {selectedType && (
+                <Grid container spacing={3}>
+                  {/* Colonne 1: Informations de base */}
+                  <Grid item xs={12} md={6}>
+                    <Card variant="outlined" sx={{ mb: 3 }}>
+                      <CardHeader 
+                        title="Informations générales" 
+                        titleTypographyProps={{ variant: 'h6' }}
+                        sx={{ bgcolor: 'grey.100' }}
+                      />
+                      <CardContent>
+                        <List dense>
+                          <DetailItem label="Code" value={selectedType.code} />
+                          <DetailItem label="Libellé" value={selectedType.libelle} />
+                          <DetailItem label="Description" value={selectedType.description} />
+                          <DetailItem 
+                            label="À vue" 
+                            value={selectedType.a_vue ? 'Oui' : 'Non'} 
+                            color={selectedType.a_vue ? 'success' : 'default'}
+                          />
+                          <DetailItem 
+                            label="Compte MATA" 
+                            value={selectedType.est_mata ? 'Oui' : 'Non'} 
+                            color={selectedType.est_mata ? 'primary' : 'default'}
+                          />
+                          <DetailItem 
+                            label="Nécessite durée" 
+                            value={selectedType.necessite_duree ? 'Oui' : 'Non'} 
+                            color={selectedType.necessite_duree ? 'info' : 'default'}
+                          />
+                          <DetailItem 
+                            label="Statut" 
+                            value={selectedType.actif ? 'Actif' : 'Inactif'} 
+                            color={selectedType.actif ? 'success' : 'error'}
+                          />
+                          <DetailItem 
+                            label="ID Chapitre par défaut" 
+                            value={selectedType.chapitre_defaut_id || 'Non défini'}
+                          />
+                        </List>
+                      </CardContent>
+                    </Card>
+
+                    {/* Frais et commissions */}
+                    <Card variant="outlined" sx={{ mb: 3 }}>
+                      <CardHeader 
+                        title="Frais et commissions" 
+                        titleTypographyProps={{ variant: 'h6' }}
+                        sx={{ bgcolor: 'grey.100' }}
+                      />
+                      <CardContent>
+                        <List dense>
+                          {selectedType.frais_ouverture_actif && (
+                            <>
+                              <DetailItem 
+                                label="Frais d'ouverture" 
+                                value={`${selectedType.frais_ouverture || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre frais d'ouverture" 
+                                value={selectedType.chapitre_frais_ouverture_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+                          
+                          {selectedType.frais_carnet_actif && (
+                            <>
+                              <DetailItem 
+                                label="Frais de carnet" 
+                                value={`${selectedType.frais_carnet || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre frais carnet" 
+                                value={selectedType.chapitre_frais_carnet_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {selectedType.frais_renouvellement_actif && (
+                            <>
+                              <DetailItem 
+                                label="Frais renouvellement carnet" 
+                                value={`${selectedType.frais_renouvellement_carnet || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre renouvellement" 
+                                value={selectedType.chapitre_renouvellement_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {selectedType.frais_perte_actif && (
+                            <>
+                              <DetailItem 
+                                label="Frais perte carnet" 
+                                value={`${selectedType.frais_perte_carnet || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre perte" 
+                                value={selectedType.chapitre_perte_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {selectedType.commission_retrait_actif && (
+                            <>
+                              <DetailItem 
+                                label="Commission retrait" 
+                                value={`${selectedType.commission_retrait || 0}%`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre commission retrait" 
+                                value={selectedType.chapitre_commission_retrait_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {selectedType.commission_sms_actif && (
+                            <>
+                              <DetailItem 
+                                label="Commission SMS" 
+                                value={`${selectedType.commission_sms || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre commission SMS" 
+                                value={selectedType.chapitre_commission_sms_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {selectedType.commission_mensuelle_actif && (
+                            <>
+                              <DetailItem 
+                                label="Seuil commission" 
+                                value={`${selectedType.seuil_commission || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="Commission si > seuil" 
+                                value={`${selectedType.commission_si_superieur || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="Commission si < seuil" 
+                                value={`${selectedType.commission_si_inferieur || 0} FCFA`} 
+                              />
+                            </>
+                          )}
+                        </List>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* Colonne 2: Paramètres avancés */}
+                  <Grid item xs={12} md={6}>
+                    {/* Paramètres d'intérêts */}
+                    {selectedType.interets_actifs && (
+                      <Card variant="outlined" sx={{ mb: 3 }}>
+                        <CardHeader 
+                          title="Paramètres d'intérêts" 
+                          titleTypographyProps={{ variant: 'h6' }}
+                          sx={{ bgcolor: 'grey.100' }}
+                        />
+                        <CardContent>
+                          <List dense>
+                            <DetailItem 
+                              label="Taux d'intérêt annuel" 
+                              value={`${selectedType.taux_interet_annuel || 0}%`} 
+                            />
+                            <DetailItem 
+                              label="Fréquence calcul intérêt" 
+                              value={selectedType.frequence_calcul_interet || 'Non défini'} 
+                            />
+                            <DetailItem 
+                              label="Heure calcul intérêt" 
+                              value={selectedType.heure_calcul_interet || 'Non défini'} 
+                            />
+                            <DetailItem 
+                              label="ID Chapitre intérêts créditeurs" 
+                              value={selectedType.chapitre_interet_credit_id || 'Non défini'}
+                            />
+                            <DetailItem 
+                              label="Capitalisation intérêts" 
+                              value={selectedType.capitalisation_interets ? 'Oui' : 'Non'}
+                              color={selectedType.capitalisation_interets ? 'success' : 'default'}
+                            />
+                          </List>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Frais et pénalités */}
+                    <Card variant="outlined" sx={{ mb: 3 }}>
+                      <CardHeader 
+                        title="Frais et pénalités" 
+                        titleTypographyProps={{ variant: 'h6' }}
+                        sx={{ bgcolor: 'grey.100' }}
+                      />
+                      <CardContent>
+                        <List dense>
+                          {selectedType.frais_deblocage_actif && (
+                            <>
+                              <DetailItem 
+                                label="Frais de déblocage" 
+                                value={`${selectedType.frais_deblocage || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre frais déblocage" 
+                                value={selectedType.chapitre_frais_deblocage_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {selectedType.penalite_actif && (
+                            <>
+                              <DetailItem 
+                                label="Pénalité de retrait anticipé" 
+                                value={`${selectedType.penalite_retrait_anticipe || 0}%`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre pénalité" 
+                                value={selectedType.chapitre_penalite_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {selectedType.frais_cloture_anticipe_actif && (
+                            <>
+                              <DetailItem 
+                                label="Frais de clôture anticipée" 
+                                value={`${selectedType.frais_cloture_anticipe || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre clôture anticipée" 
+                                value={selectedType.chapitre_cloture_anticipe_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {selectedType.minimum_compte_actif && (
+                            <DetailItem 
+                              label="Solde minimum" 
+                              value={`${selectedType.minimum_compte || 0} FCFA`} 
+                            />
+                          )}
+
+                          <DetailItem 
+                            label="ID Compte attente produits" 
+                            value={selectedType.compte_attente_produits_id || 'Non défini'}
+                          />
+
+                          <DetailItem 
+                            label="Retrait anticipé autorisé" 
+                            value={selectedType.retrait_anticipe_autorise ? 'Oui' : 'Non'}
+                            color={selectedType.retrait_anticipe_autorise ? 'success' : 'default'}
+                          />
+
+                          <DetailItem 
+                            label="Validation retrait anticipé" 
+                            value={selectedType.validation_retrait_anticipe ? 'Oui' : 'Non'}
+                            color={selectedType.validation_retrait_anticipe ? 'success' : 'default'}
+                          />
+
+                          <DetailItem 
+                            label="Durée blocage min (jours)" 
+                            value={selectedType.duree_blocage_min || 'Non défini'} 
+                          />
+
+                          <DetailItem 
+                            label="Durée blocage max (jours)" 
+                            value={selectedType.duree_blocage_max || 'Non défini'} 
+                          />
+                        </List>
+                      </CardContent>
+                    </Card>
+
+                    {/* Métadonnées */}
+                    <Card variant="outlined">
+                      <CardHeader 
+                        title="Métadonnées" 
+                        titleTypographyProps={{ variant: 'h6' }}
+                        sx={{ bgcolor: 'grey.100' }}
+                      />
+                      <CardContent>
+                        <List dense>
+                          <DetailItem 
+                            label="Observations" 
+                            value={selectedType.observations || 'Aucune observation'} 
+                            multiline
+                          />
+                          <DetailItem 
+                            label="Date de création" 
+                            value={selectedType.created_at ? new Date(selectedType.created_at).toLocaleString() : 'Inconnue'} 
+                          />
+                          <DetailItem 
+                            label="Dernière mise à jour" 
+                            value={selectedType.updated_at ? new Date(selectedType.updated_at).toLocaleString() : 'Jamais modifié'} 
+                          />
+                          {selectedType.deleted_at && (
+                            <DetailItem 
+                              label="Date de suppression" 
+                              value={new Date(selectedType.deleted_at).toLocaleString()}
+                              color="error"
+                            />
+                          )}
+                        </List>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
               )}
-            </Box>
-            <Typography variant="body2" color="textSecondary">
-              Que souhaitez-vous faire maintenant ?
-            </Typography>
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ p: 3, pt: 0 }}>
-          <Button
-            onClick={handleStayAndCreateNew}
-            variant="outlined"
-            color="primary"
-            sx={{ 
-              textTransform: 'none',
-              px: 3
-            }}
+            </DialogContent>
+            <DialogActions sx={{ p: 2, borderTop: 1, borderColor: 'divider', position: 'sticky', bottom: 0, bgcolor: 'background.paper' }}>
+              <Button 
+                onClick={() => setViewModalOpen(false)} 
+                color="primary"
+                variant="contained"
+                startIcon={<CloseIcon />}
+              >
+                Fermer
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Snackbar pour les notifications */}
+          <Snackbar
+            open={snackbar.open}
+            autoHideDuration={6000}
+            onClose={handleCloseSnackbar}
+            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
           >
-            Créer un autre type de compte
-          </Button>
-          <Button
-            onClick={handleCloseSuccessModal}
-            variant="contained"
-            color="primary"
-            autoFocus
-            sx={{ 
-              textTransform: 'none',
-              px: 4
-            }}
-          >
-            Voir la liste des types de compte
-          </Button>
-        </DialogActions>
-      </Dialog>
+            <Alert 
+              onClose={handleCloseSnackbar} 
+              severity={snackbar.severity} 
+              sx={{ width: '100%' }}
+              elevation={6}
+              variant="filled"
+            >
+              {snackbar.message}
+            </Alert>
+          </Snackbar>
+        </Box>
+      </Box>
     </Box>
   );
 };
 
-export default TypeCompteForm;
+export default TypeCompteList;
