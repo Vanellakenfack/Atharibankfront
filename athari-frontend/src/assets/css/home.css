@@ -212,7 +212,7 @@ header {
     position: relative;
     padding: 2rem;
     border-radius: var(--border-radius);
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--gradient-primary);
     backdrop-filter: blur(10px);
     box-shadow: var(--button-section-shadow);
     transform: translateY(-50px);

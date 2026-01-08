@@ -1,56 +1,113 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
-import AccountsPage from '../pages/compte/ComptePage';
-import AccountCreatePage from '../pages/compte/CreationCompte';
-import AccountEditPage from '../pages/compte/EditionPage';
-import AccountDetailPage from '../pages/compte/DetailCompte';
-import Formclient from '../pages/client/FormClient';
-//import Home from '../pages/Home';
+import { Routes, Route, Navigate,Link } from "react-router-dom";
+import AccountManagement  from '../pages/compte/Compte';
+import FormClient from '../pages/client/FormClient';
 import Login from '../pages/Login'; 
 import Home from '../pages/Home';
 import ListeClient from '../pages/client/ListeClient';
 import RoleManagement from "../pages/users/RoleManagement";
 import UserManagement from "../pages/users/UserManagement";
-import ProtectedRoute from "../components/users/ProtectedRoute";
+import Formulaire from '../pages/compte/Formulaire';
+import ProtectedRoute from './ProtectedRoute';
+import Dashboard from '../pages/dashboard/Dashboard';
+import AuditLogView from '../pages/AuditLogView';
+import Agence from '../pages/agences/Agence';
+import FormClientMorale from '../pages/client/FormClientMorale';
+import ChoicePage from '../pages/client/ChoicePage';
+import DetailsClient from '../pages/client/DetailsClient';
+import ModifierClient from '../pages/client/ModifierClient';
+import TypeCompteForm from '../pages/compte/TypeCompteForm';
+import TypeCompteList from '../pages/compte/TypeCompteList';
+import ListeComptes from '../pages/compte/ListeComptes';
+import FraisCommissionPage from '../pages/FraisCommissionPage';
+import FraisApplicationPage from '../pages/FraisApplicationPage';
+import MataManagementPage from '../pages/MataManagementPage';
+import PlanComptableList from '../pages/plancomptable/PlanComptableList';
+import CategoryManager from '../pages/plancomptable/CategoryManager.jsx';
+import DatContractManager from '../pages/compte/DatContractManager.jsx';
+import DatTypeManager from '../pages/compte/DatTypeManager.jsx';
+import JournalComptablePage from '../pages/journal/JournalComptablePage.js'
+// Ajoute "Link" dans l'importation existante
 
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* Route de connexion (URL: /login) */}
-      <Route 
-          path="/login" 
-          element={<Login />} 
-        />
-        <Route
-          path="/users/roles"
-          element={<RoleManagement />}
-        />
-        <Route
-          path="/users/management"
-          element={<UserManagement />}
-        />
-
-      {/* Page d'Accueil (URL: /) */}
+      {/* ==========================================
+          ROUTES PUBLIQUES
+          ========================================== */}
+      <Route path="/login" element={<Login />} />
       <Route path="/" element={<Home />} />
-      
-      {/* Routes Comptes */}
-      <Route path="/accounts" element={<AccountsPage />} />
-      <Route path="/accounts/create" element={<AccountCreatePage />} />
-      <Route path="/accounts/:id" element={<AccountDetailPage />} />
-      <Route path="/accounts/:id/edit" element={<AccountEditPage />} />
+
+      {/* ==========================================
+          ROUTES PROTÉGÉES (GROUPE)
+          Toutes les routes ici utilisent <Outlet /> du ProtectedRoute
+          ========================================== */}
+      <Route element={<ProtectedRoute />}>
         
+        {/* Dashboard (Note : ajout du "/" et respect de la casse) */}
+        <Route path="/dashboard" element={<Dashboard />} /> 
 
-        <Route path='/client' element= {<ListeClient/>} /> 
-           
-        <Route path='/client/creer' element= {<Formclient/>} /> 
-        <Route path='/client/:id/edit' element= {<Formclient/>} />
-   
+        {/* Gestion des utilisateurs */}
+        <Route path="/users/roles" element={<RoleManagement />} />
+        <Route path="/users/management" element={<UserManagement />} />
 
-      
+        {/* Comptes bancaires */}
+        <Route path="/accounts" element={<AccountManagement  />} />
+        <Route path="accounts/create" element={<AccountManagement />} />
+        <Route path="accounts/:id" element={<AccountManagement />} />
+        <Route path="accounts/:id/edit" element={<AccountManagement />} />
+        
+        {/* Types de comptes */}
+        <Route path="/ajout-type-de-compte" element={<TypeCompteForm />} />
+        <Route path="/Liste-type-de-compte" element={<TypeCompteList />} />
 
-      {/* Route Catch-all (URL inexistante / 404) */}
-      <Route path="*" element={<div>Page Non Trouvée (404)</div>} />
+        {/* Clients */}
+        <Route path='/client' element={<ListeClient />} /> 
+        <Route path="/client/choix" element={<ChoicePage />} />
+        <Route path='/client/creer' element={<FormClient />} /> 
+          <Route path='/client/creermorale' element={<FormClientMorale />} /> 
+        <Route path="/clients/:id" element={<DetailsClient />} />
+        <Route path='/client/:id/edit' element={<ModifierClient />} />
+          
+        {/* Logs d'Audit */}
+        <Route path='/log' element={<AuditLogView />} />
 
+        {/* gestion de s agences */}
+        <Route path='/agence' element={<Agence />} />
+
+        {/* gestion des comptes clients */}
+        <Route path='/compte' element={<Formulaire />} />
+        <Route path='/liste-des-comptes' element={<ListeComptes />} />
+
+        {/* Gestion des frais et commissions */}
+        <Route path="/frais/commissions/*" element={<FraisCommissionPage />} />
+        <Route path="/frais/applications/*" element={<FraisApplicationPage />} />
+        
+        {/* Gestion des opérations MATA */}
+        <Route path="/comptes/:compteId/mata/*" element={<MataManagementPage />} />
+        <Route path="/mata" element={<MataManagementPage />} />
+        {/* Plan Comptable */}     
+           <Route path='/plan-comptable' element={<PlanComptableList />} />
+           <Route path='plan-comptable/categories' element={<CategoryManager/>} />
+
+     {/* Gestion des contrats DAT */}
+        <Route path='/dat/contracts' element={<DatContractManager/>} />
+        <Route path='/dat/types' element={<DatTypeManager/>} />
+
+           <Route path='/Journal-Comptable' element={<JournalComptablePage/>} />
+
+                  
+
+
+            
+
+
+      </Route>
+
+      {/* ==========================================
+          GESTION DES ERREURS
+          ========================================== */}
+      <Route path="*" element={<div className="p-5 text-center"><h3>Page Non Trouvée (404)</h3><Link to="/">Retourner à l'accueil</Link></div>} />
     </Routes>
   );
 };

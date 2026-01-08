@@ -1,0 +1,634 @@
+/* Dashboard Custom Styles for Bootstrap */
+
+:root {
+  --bs-body-bg: #f8f9fa;
+  --bs-body-color: #212529;
+  --bs-border-radius: 0.5rem;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+/* Dashboard Container */
+.dashboard-container {
+  display: flex;
+  height: 100vh;
+  background-color: #f8f9fa;
+}
+
+/* Sidebar */
+.sidebar {
+  background-color: #fff;
+  border-right: 1px solid #e9ecef;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease;
+  overflow: hidden;
+  font-weight: bold;
+}
+
+.sidebar-open .sidebar {
+  width: 280px;
+}
+
+.sidebar-closed .sidebar {
+  width: 80px;
+}
+
+.sidebar-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #0d6efd, #0dcaf0);
+  border-radius: 0.5rem;
+}
+
+.sidebar-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  color: #212529;
+}
+
+.sidebar-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6c757d;
+  padding: 0.25rem 0.5rem;
+}
+
+.sidebar-toggle:hover {
+  color: #0d6efd;
+}
+
+/* Toggle rotation when collapsed */
+.sidebar-closed .sidebar-toggle {
+  transform: rotate(180deg);
+  transition: transform 0.35s ease;
+}
+
+/* Link underline animation */
+.sidebar-item {
+  position: relative;
+  overflow: hidden;
+}
+
+.sidebar-item::after {
+  content: '';
+  position: absolute;
+  left: 1rem;
+  bottom: 8px;
+  height: 2px;
+  width: 0;
+  background: linear-gradient(90deg, #0d6efd, #0dcaf0);
+  transition: width 0.28s ease;
+  border-radius: 2px;
+}
+
+.sidebar-item:hover::after {
+  width: calc(100% - 2rem);
+}
+
+/* Small transform and fade for slide-in feel */
+.sidebar-item {
+  transform: translateX(-6px);
+  opacity: 0.92;
+  transition: transform 0.28s ease, background-color 0.22s ease, color 0.22s ease, opacity 0.28s ease;
+}
+
+.sidebar-open .sidebar-item {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+/* Active item visual */
+.sidebar-item.active {
+  background-color: #1770ed;
+  color: #cdced0;
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 rgba(13,110,253,0.12);
+}
+
+/* When collapsed, hide labels with animation */
+.sidebar-closed .sidebar-label {
+  opacity: 0;
+  transform: translateX(-8px);
+  width: 0;
+  display: inline-block;
+  transition: opacity 0.2s ease, transform 0.2s ease, width 0.2s ease;
+}
+
+.sidebar-open .sidebar-label {
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 0.28s ease 0.06s, transform 0.28s ease 0.06s;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #6c757d;
+}
+
+.sidebar-item:hover {
+  background-color: #f0f0f0;
+  color: #0d6efd;
+}
+
+.sidebar-item.active {
+  background-color: #e7f1ff;
+  color: #0d6efd;
+  font-weight: 600;
+}
+
+.sidebar-footer {
+  padding: 1rem;
+  border-top: 1px solid #e9ecef;
+}
+
+/* Main Content */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Top Bar */
+/* Top Bar */
+.top-bar {
+  background: linear-gradient(90deg, #0d6efd 0%, #3b82f6 100%);
+  color: #fff;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding: 0.5rem 1rem;
+  box-shadow: 0 1px 6px rgba(13,110,253,0.12);
+  /* Make top-bar a fixed-height header so it doesn't expand */
+  height: 60px;
+  min-height: 60px;
+  line-height: 1;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: rgba(255,255,255,0.12);
+  border-radius: 0.5rem;
+  /* La hauteur est fixée à 40px */
+
+  box-sizing: border-box;
+  
+  /* C'est la ligne clé pour empêcher le débordement horizontal */
+  flex: 0 1 auto;
+  padding: 0.15rem 0.5rem;
+  max-width: 420px;
+  height: 40px;
+  box-sizing: border-box;
+  
+  /* NOUVEAU : Empêche l'élément de recherche de prendre trop de place */
+  flex: 0 1 auto; 
+}
+
+.search-box input {
+  border: none;
+  background: transparent;
+  outline: none;
+  flex: 1;
+  color: #fff;
+  /* Utilise la hauteur du parent (40px) */
+  height: 100%; 
+  box-sizing: border-box;
+}
+
+.search-box input::placeholder {
+  color: rgba(255,255,255,0.85);
+}
+
+/* --- SECTION DE CORRECTION CRITIQUE --- */
+
+/* Ajustements pour les inputs et boutons à l'intérieur de la top-bar */
+.top-bar .search-box input,
+.top-bar .search-box .form-control-sm {
+  height: 100%;
+  
+  /* Retirer le padding vertical standard de Bootstrap */
+  padding-top: 0;
+  padding-bottom: 0;
+  
+  /* Ajustement horizontal */
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  
+  /* CLÉ DE L'ALIGNEMENT : Forcer la hauteur de ligne à la hauteur du conteneur (40px) */
+  line-height: 40px; 
+  
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+/* S'assurer que l'icône de recherche est bien centrée également */
+.search-box > svg {
+  margin: 0;
+  padding: 0;
+  /* Rendre l'icône "block" pour garantir qu'elle ne soit pas traitée comme du texte */
+  display: block; 
+}
+
+/* --- FIN SECTION DE CORRECTION CRITIQUE --- */
+
+.top-bar .notification-btn,
+.top-bar .notification-btn.btn {
+  height: 32px;
+  padding: 0.25rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* If the dashboard layout uses flex column, ensure content area gets remaining space */
+.flex-fill.d-flex.flex-column > .p-4,
+.flex-fill.d-flex.flex-column > .dashboard-content {
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+.notification-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+}
+
+.notification-btn:hover {
+  color: rgba(255,255,255,0.95);
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #0d6efd, #0dcaf0);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(13, 110, 253, 0.2);
+}
+
+/* Dashboard Content */
+.dashboard-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
+}
+
+/* Stat Cards */
+.stat-card {
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+}
+
+.stat-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.9;
+}
+
+.bg-primary .stat-icon {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.bg-success .stat-icon {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.bg-info .stat-icon {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.bg-warning .stat-icon {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.stat-change {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* Cards */
+.card {
+  border-radius: 0.75rem;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Small colored cards */
+.small-card {
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.small-card .small-card-title {
+  font-size: 0.9rem;
+  opacity: 0.95;
+}
+
+.small-card .small-card-value {
+  font-weight: 700;
+}
+
+.small-card .small-card-icon {
+  opacity: 0.95;
+}
+
+/* Transactions table */
+.transactions-table thead th {
+  color: #495057;
+  font-weight: 700;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.transactions-table tbody tr:hover {
+  background-color: #fbfbfd;
+}
+
+.transactions-table td {
+  padding: 0.9rem 0.6rem;
+}
+
+.card-title {
+  color: #212529;
+  font-weight: bold;
+}
+
+/* Activity List */
+.activity-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.activity-item {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.2s ease;
+}
+
+.activity-item:hover {
+  background-color: #f8f9fa;
+}
+
+.activity-avatar {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #0d6efd, #0dcaf0);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+  font-size: 1.25rem;
+}
+
+/* Bar Chart */
+.chart-container {
+  margin-top: 1rem;
+}
+
+/*.bar-item:hover {
+  background: linear-gradient(to top, #0b5cdb, #0b5cdb) !important;
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+*/
+/* Progress Bars */
+.progress {
+  height: 0.5rem;
+  background-color: #e9ecef;
+  border-radius: 0.25rem;
+}
+
+.progress-bar {
+  background-color: #0d6efd;
+}
+
+/* Utility Classes */
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.gap-3 {
+  gap: 1rem;
+}
+
+.gap-4 {
+  gap: 1.5rem;
+}
+
+.text-white-50 {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .sidebar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    z-index: 1000;
+    width: 280px;
+  }
+
+  .sidebar-closed {
+    width: 80px;
+  }
+
+  .main-content {
+    width: 100%;
+  }
+
+  .dashboard-content {
+    padding: 1rem;
+  }
+
+  .row > div {
+    margin-bottom: 1rem;
+  }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+/* Désactiver spécifiquement l'animation sur le bouton de toggle du header */
+.sidebar-header .btn {
+    position: relative;
+    overflow: visible !important; /* Empêche les effets de rognage */
+    transform: none !important;  /* Annule le translateX(-6px) */
+    opacity: 1 !important;       /* Annule l'opacité 0.92 */
+}
+
+/* Supprimer le "carré" ou la "ligne" bleue au survol */
+.sidebar-header .btn::after, 
+.sidebar-header .btn::before {
+    display: none !important;
+    content: none !important;
+    width: 0 !important;
+}
+
+/* Style propre pour le bouton toggle au survol */
+.sidebar-header .btn:hover {
+    background-color: #e9ecef !important;
+    color: #0d6efd !important;
+    transform: scale(1.05) !important; /* Légère emphase plutôt que décalage */
+}
+
+/* Reset des boutons Bootstrap pour éviter les conflits avec le CSS personnalisé */
+.btn-primary, .btn-secondary, .btn-danger {
+    background-image: none !important; /* Supprime le dégradé parasite */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease-in-out;
+}
+
+/* On s'assure que le survol reste celui de Bootstrap */
+.btn-primary:hover {
+    background-color: #0b5cdb !important; /* Un bleu uni propre */
+    background-image: none !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(13, 110, 253, 0.2) !important;
+}
+
+/* Si l'effet persiste dans le modal */
+.modal-footer .btn {
+    background-image: none !important;
+}
+
+/* --- PROTECTION GLOBALE DES BOUTONS (RESET) --- */
+
+/* 1. On neutralise les héritages de Sidebar sur les boutons */
+.btn, 
+button.btn,
+.modal-content .btn {
+    position: relative !important;
+    overflow: hidden !important;
+    background-image: none !important; /* Supprime le dégradé */
+    transform: none !important;        /* Supprime le décalage */
+    opacity: 1 !important;
+    transition: all 0.2s ease !important;
+    border-radius: 8px !important;    /* Force les coins arrondis */
+}
+
+/* 2. On TUE les pseudo-éléments (les carrés bleus sur tes images) */
+.btn::after, 
+.btn::before,
+.modal-footer .btn::after,
+.modal-footer .btn::before {
+    display: none !important;
+    content: none !important;
+    width: 0 !important;
+}
+
+/* 3. On redéfinit le style propre de l'agence Athari pour le bouton Primaire */
+.btn-primary {
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+    color: white !important;
+}
+
+.btn-primary:hover {
+    background-color: #0b5cdb !important;
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* 4. Fix spécifique pour le bouton "Annuler" du modal */
+.btn-light {
+    background-color: #f8f9fa !important;
+    border: 1px solid #dee2e6 !important;
+    color: #212529 !important;
+}
+
+/* --- BOUTONS PRO STYLE --- */
+
+/* Taille globale plus fine pour les boutons */
+.btn {
+    padding: 0.5rem 1rem !important;
+    font-size: 0.875rem !important; /* Standard pour les tableaux de bord */
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+}
+
+/* Bouton spécifique pour les petites actions */
+.btn-sm {
+    padding: 0.25rem 0.75rem !important;
+    font-size: 0.75rem !important;
+}
+
+/* Alignement parfait icône + texte */
+.btn svg {
+    margin-bottom: 1px;
+}
+
+/* Style spécifique pour les boutons dans le Modal footer */
+.modal-footer .btn {
+    padding: 0.4rem 1.2rem !important;
+    min-width: 100px;
+}
+

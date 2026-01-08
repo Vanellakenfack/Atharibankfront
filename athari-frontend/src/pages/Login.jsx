@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-// Assurez-vous que le chemin est correct (par exemple, "../api/ApiClient")
-import ApiClient from "../ApiClient"; 
+import ApiClient from "../services/api/ApiClient"; 
 import {
   Box,
   Card,
@@ -11,25 +10,20 @@ import {
   Button,
   InputAdornment,
   Alert,
+  CircularProgress,
 } from "@mui/material";
-// ... Imports Mui et styles (omis pour la clarté)
 import EmailIcon from "@mui/icons-material/Email";
 import LockIcon from "@mui/icons-material/Lock";
 import logo from "../assets/img/logo.png";
-// Correction: Suppression de l'import non utilisé de Redux (setLoading)
-// import { setLoading } from "../store/compte/compteSlice"; 
+import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
-  // Correction: Initialisation à vide pour éviter les erreurs de lecture
   const [formData, setFormData] = useState({ email: '', password: '' });
-  
-  // Correction: Ajout de l'état loading (absent précédemment)
   const [loading, setLoading] = useState(false); 
-  
-  // Correction: Renommé seterror en setError (convention JavaScript)
-  const [error, setError] = useState(null); 
+  const [error, setError] = useState(null);
 
   // Mise à jour de l'état lors de la saisie
   const handleChange = (e) => {
@@ -46,7 +40,7 @@ export default function Login() {
     setError(null);
     setLoading(true);
 
-    const deviceName = 'Web Client'; // Requis par le backend
+    const deviceName = 'Web Client';
 
     try {
       const response = await ApiClient.post('/login', {
@@ -55,32 +49,37 @@ export default function Login() {
         device_name: deviceName
       });
 
-      // Stockage du token
-      localStorage.setItem('authToken', response.data.token);
+      console.log('Réponse API:', response.data); // DEBUG: vérifier la structure
 
-      // Stockage des informations utilisateur
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+        // ADAPTEZ selon votre API :
+      const authToken = response.data.authToken || response.data.token;
+      const user = response.data.user;
+        
+      if (!authToken || !user) {
+          throw new Error('Token ou utilisateur manquant dans la réponse');
+      }
       
-      // Redirection après succès
-      navigate('/users/management');
+      login(authToken, user);
+      navigate('/dashboard', { replace: true });
 
     } catch (err) {
+      console.error('Erreur de connexion:', err);
+      
       const errorData = err.response?.data;
+      
       if (errorData?.errors?.email) {
-        // Erreur de validation du champ 'email' (ex: Identifiants invalides)
         setError(errorData.errors.email[0]); 
+      } else if (errorData?.errors?.password) {
+        setError(errorData.errors.password[0]);
       } else if (errorData?.message) {
-        // Erreur générique du backend
-        setError('Erreur de connexion : ' + errorData.message);
+        setError(errorData.message);
+      } else if (err.message === 'Network Error') {
+        setError('Erreur de connexion au serveur. Vérifiez votre connexion internet.');
       } else {
-        // Erreur réseau inattendue
-        setError('Une erreur réseau est survenue.');
+        setError('Une erreur inattendue est survenue. Veuillez réessayer.');
       }
-      // Nettoyage en cas d'échec
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
     } finally {
-      setLoading(false); // Arrêter le chargement
+      setLoading(false);
     }
   };
 
@@ -93,7 +92,7 @@ export default function Login() {
         alignItems: "center",
         justifyContent: "center",
         position: "relative",
-        overflow: "visible",
+        overflow: "hidden",
         zIndex: 1,
       }}
     >
@@ -107,7 +106,7 @@ export default function Login() {
 
       <Card
         component='form'
-        onSubmit={handleSubmit} // Le formulaire gère la soumission
+        onSubmit={handleSubmit}
         sx={{
           width: "100%",
           maxWidth: 430,
@@ -117,11 +116,11 @@ export default function Login() {
           background: "rgba(255,255,255,0.9)",
           position: "relative",
           zIndex: 10,
+          mx: 2,
         }}
       >
-        
         <CardContent sx={{ textAlign: "center", p: 4 }}>
-          {/* Logo (omission du code pour la clarté) */}
+          {/* Logo */}
           <Box sx={{ mb: 2, display: "flex", justifyContent: "center", alignItems: "center" }}>
             <img
               src={logo}
@@ -137,7 +136,7 @@ export default function Login() {
             />
           </Box>
 
-          <Typography variant="h5" color="primary" gutterBottom>
+          <Typography variant="h5" color="primary" gutterBottom fontWeight={600}>
             Connexion
           </Typography>
 
@@ -146,7 +145,11 @@ export default function Login() {
           </Typography>
 
           {/* Affichage de l'erreur */}
-          {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+          {error && (
+            <Alert severity="error" sx={{ mb: 3, textAlign: 'left' }}>
+              {error}
+            </Alert>
+          )}
 
           <TextField
             fullWidth
@@ -155,9 +158,11 @@ export default function Login() {
             type="email"
             name="email"
             placeholder="exemple@atharibank.com"
-            value={formData.email || ''}
+            value={formData.email}
             onChange={handleChange}
-            required // Ajout de required ici pour le formulaire
+            required
+            disabled={loading}
+            autoComplete="email"
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -174,9 +179,11 @@ export default function Login() {
             type="password"
             name="password"
             placeholder="Votre mot de passe"
-            value={formData.password || ''}
+            value={formData.password}
             onChange={handleChange}
             required
+            disabled={loading}
+            autoComplete="current-password"
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -188,25 +195,34 @@ export default function Login() {
 
           <Button
             fullWidth
-            type="submit" // Déclenche la soumission du formulaire
+            type="submit"
             variant="contained"
             size="large"
-            disabled={loading} // Utilisation de l'état loading
-            // SUPPRESSION DE onClick={handleSubmit} - Redondant avec type="submit"
+            disabled={loading || !formData.email || !formData.password}
             sx={{
               mt: 3,
               py: 1.3,
               fontWeight: 600,
+              position: 'relative',
             }}
           >
-           {loading ? "Connexion en cours..." : "Se connecter"}
+            {loading ? (
+              <>
+                <CircularProgress size={24} sx={{ color: 'white', mr: 1 }} />
+                Connexion en cours...
+              </>
+            ) : (
+              "Se connecter"
+            )}
           </Button>
 
           <Button
             href="/"
             variant="text"
             color="secondary"
+            disabled={loading}
             startIcon={<span>{"←"}</span>}
+            sx={{ mt: 2 }}
           >
             Retour à l'accueil
           </Button>
