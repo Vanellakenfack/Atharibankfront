@@ -14,7 +14,7 @@ import {
   Card, CardContent, CardHeader, Divider, Badge,
   Switch, FormControlLabel, LinearProgress,
   Select, MenuItem, FormControl, InputLabel, OutlinedInput,
-  Checkbox, ListItemText, FormGroup
+  Checkbox, ListItemText, FormGroup, CircularProgress
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import type { Permission } from '../../services/permissionService';
@@ -34,7 +34,7 @@ const StyledCard = styled(Card)(({ theme }) => ({
   }
 }));
 
-const PermissionCard = styled(Paper)(({ theme, active }) => ({
+const PermissionCard = styled(Paper)<{ active: boolean }>(({ theme, active }) => ({
   padding: theme.spacing(2),
   borderRadius: 12,
   border: `2px solid ${active ? '#6366F1' : '#E2E8F0'}`,
@@ -47,7 +47,7 @@ const PermissionCard = styled(Paper)(({ theme, active }) => ({
   }
 }));
 
-const RoleBadge = styled(Chip)(({ roletype }) => ({
+const RoleBadge = styled(Chip)<{ roletype?: string }>(({ roletype }) => ({
   borderRadius: 8,
   fontWeight: 600,
   backgroundColor: roletype === 'admin' ? '#FEF2F2' : 
@@ -95,6 +95,7 @@ const RoleManagement = () => {
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [loadingPermissions, setLoadingPermissions] = useState(false);
   const [loadingRoles, setLoadingRoles] = useState(false);
+  const [updatingPermission, setUpdatingPermission] = useState<string | null>(null);
 
   // Charger les rôles et permissions depuis le backend
   useEffect(() => {
@@ -112,12 +113,12 @@ const RoleManagement = () => {
       if (rolesData.length > 0 && !selectedRole) {
         setSelectedRole(rolesData[0]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur lors du chargement des rôles:', error);
       Swal.fire({
         icon: 'error',
         title: 'Erreur',
-        text: 'Impossible de charger les rôles',
+        text: error.message || 'Impossible de charger les rôles',
         confirmButtonColor: '#6366F1'
       });
     } finally {
@@ -136,12 +137,12 @@ const RoleManagement = () => {
       const categorized = categorizePermissions(permissions);
       setCategorizedPermissions(categorized);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur lors du chargement des permissions:', error);
       Swal.fire({
         icon: 'error',
         title: 'Erreur',
-        text: 'Impossible de charger les permissions',
+        text: error.message || 'Impossible de charger les permissions',
         confirmButtonColor: '#6366F1'
       });
     } finally {
@@ -222,8 +223,8 @@ const RoleManagement = () => {
       return;
     }
 
-    // Vérifier si le rôle existe déjà
-    if (roles.find(r => r.name === newRoleName)) {
+    // Vérifier si le rôle existe déjà (insensible à la casse)
+    if (roles.find(r => r.name.toLowerCase() === newRoleName.toLowerCase())) {
       Swal.fire({
         icon: 'warning',
         title: 'Rôle existant',
@@ -234,14 +235,26 @@ const RoleManagement = () => {
     }
 
     try {
+      // Afficher un indicateur de chargement
+      Swal.fire({
+        title: 'Création en cours...',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
       // Créer le rôle via l'API
       const newRoleData = await roleService.createRole({
         name: newRoleName,
         description: ''
       });
 
+      // Fermer l'indicateur de chargement
+      Swal.close();
+
       // Mettre à jour la liste des rôles
-      setRoles([...roles, newRoleData]);
+      setRoles(prev => [...prev, newRoleData]);
       setSelectedRole(newRoleData);
       setNewRoleName('');
       setShowRoleForm(false);
@@ -254,14 +267,17 @@ const RoleManagement = () => {
         title: 'Rôle créé',
         text: 'Le rôle a été créé avec succès',
         confirmButtonColor: '#6366F1',
-        timer: 2000
+        timer: 2000,
+        showConfirmButton: true
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur lors de la création du rôle:', error);
+      Swal.close();
+      
       Swal.fire({
         icon: 'error',
         title: 'Erreur',
-        text: error.response?.data?.message || 'Impossible de créer le rôle',
+        text: error.message || 'Impossible de créer le rôle',
         confirmButtonColor: '#6366F1'
       });
     }
@@ -312,12 +328,12 @@ const RoleManagement = () => {
             confirmButtonColor: '#6366F1',
             timer: 2000
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error('Erreur lors de la suppression du rôle:', error);
           Swal.fire({
             icon: 'error',
             title: 'Erreur',
-            text: error.response?.data?.message || 'Impossible de supprimer le rôle',
+            text: error.message || 'Impossible de supprimer le rôle',
             confirmButtonColor: '#6366F1'
           });
         }
@@ -326,35 +342,61 @@ const RoleManagement = () => {
   };
 
   const togglePermission = async (permissionName: string) => {
-    if (!selectedRole) return;
-
-    const updatedPermissions = selectedRole.permissions.includes(permissionName)
-      ? selectedRole.permissions.filter(p => p !== permissionName)
-      : [...selectedRole.permissions, permissionName];
-
-    try {
-      // Mettre à jour les permissions du rôle via l'API
-      const updatedRole = await roleService.syncRolePermissions(
-        selectedRole.id!,
-        updatedPermissions
-      );
-      
-      // Mettre à jour la liste locale des rôles
-      const updatedRoles = roles.map(r => 
-        r.id === selectedRole.id ? { ...r, permissions: updatedPermissions } : r
-      );
-      
-      setRoles(updatedRoles);
-      setSelectedRole({ ...selectedRole, permissions: updatedPermissions });
-      
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour des permissions:', error);
+    if (!selectedRole || !selectedRole.id) {
       Swal.fire({
         icon: 'error',
         title: 'Erreur',
-        text: 'Impossible de mettre à jour les permissions',
+        text: 'Aucun rôle sélectionné',
         confirmButtonColor: '#6366F1'
       });
+      return;
+    }
+
+    // Vérifier si la permission existe déjà (comparaison insensible à la casse)
+    const existingPermission = (selectedRole.permissions || []).find(p => 
+      p.toLowerCase() === permissionName.toLowerCase()
+    );
+
+    setUpdatingPermission(permissionName);
+
+    try {
+      if (existingPermission) {
+        // Retirer la permission du rôle
+        await roleService.revokePermissionFromRole(selectedRole.id, permissionName);
+      } else {
+        // Attribuer la permission au rôle
+        await roleService.assignPermissionToRole(selectedRole.id, permissionName);
+      }
+      
+      // Rafraîchir les données
+      await fetchAvailableRoles();
+      
+      // Mettre à jour le rôle sélectionné
+      const updatedRoles = await roleService.getRoles();
+      const updatedRole = updatedRoles.find(r => r.id === selectedRole.id);
+      if (updatedRole) {
+        setSelectedRole(updatedRole);
+      }
+
+      Swal.fire({
+        icon: 'success',
+        title: existingPermission ? 'Permission retirée' : 'Permission attribuée',
+        text: `La permission "${permissionName}" a été ${existingPermission ? 'retirée' : 'attribuée'} du rôle ${selectedRole.name}`,
+        confirmButtonColor: '#6366F1',
+        timer: 2000
+      });
+      
+    } catch (error: any) {
+      console.error('Erreur lors de la mise à jour des permissions:', error);
+      
+      Swal.fire({
+        icon: 'warning',
+        title: 'Attention',
+        text: error.message || 'Impossible de mettre à jour la permission',
+        confirmButtonColor: '#6366F1'
+      });
+    } finally {
+      setUpdatingPermission(null);
     }
   };
 
@@ -369,18 +411,8 @@ const RoleManagement = () => {
       return;
     }
 
-    if (newPermission.roleIds.length === 0) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Rôle requis',
-        text: 'Veuillez sélectionner au moins un rôle',
-        confirmButtonColor: '#6366F1'
-      });
-      return;
-    }
-
-    // Vérifier si la permission existe déjà
-    if (allPermissions.some(p => p.name === newPermission.name)) {
+    // Vérifier si la permission existe déjà (insensible à la casse)
+    if (allPermissions.some(p => p.name.toLowerCase() === newPermission.name.toLowerCase())) {
       Swal.fire({
         icon: 'warning',
         title: 'Permission existante',
@@ -391,20 +423,33 @@ const RoleManagement = () => {
     }
 
     try {
+      // Afficher un indicateur de chargement
+      Swal.fire({
+        title: 'Création en cours...',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
       // Créer la permission via l'API
       const createdPermission = await permissionService.create({
         name: newPermission.name,
         description: newPermission.description
       });
 
-      // Assigner la permission aux rôles sélectionnés
+      // Attribuer la permission aux rôles sélectionnés
       for (const roleId of newPermission.roleIds) {
-        const role = availableRoles.find(r => r.id === roleId);
-        if (role) {
-          const currentPermissions = role.permissions || [];
-          await roleService.syncRolePermissions(roleId, [...currentPermissions, newPermission.name]);
+        try {
+          await roleService.assignPermissionToRole(roleId, newPermission.name);
+        } catch (error) {
+          console.error(`Erreur lors de l'attribution au rôle ${roleId}:`, error);
+          // On continue avec les autres rôles même si une attribution échoue
         }
       }
+
+      // Fermer l'indicateur de chargement
+      Swal.close();
 
       // Réinitialiser le formulaire
       setNewPermission({
@@ -423,56 +468,173 @@ const RoleManagement = () => {
         title: 'Permission créée',
         text: 'La permission a été créée et assignée aux rôles sélectionnés',
         confirmButtonColor: '#6366F1',
-        timer: 3000
+        timer: 3000,
+        showConfirmButton: true
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur lors de la création de la permission:', error);
+      Swal.close();
       Swal.fire({
         icon: 'error',
         title: 'Erreur',
-        text: error.response?.data?.message || 'Impossible de créer la permission',
+        text: error.message || 'Impossible de créer la permission',
         confirmButtonColor: '#6366F1'
       });
     }
   };
 
   const toggleAllPermissionsInCategory = async (category: string, enable: boolean) => {
-    if (!selectedRole) return;
+    if (!selectedRole || !selectedRole.id) return;
 
     const categoryPermissions = categorizedPermissions[category] || [];
     const permissionNames = categoryPermissions.map(p => p.name);
-    
-    let updatedPermissions: string[];
-
-    if (enable) {
-      updatedPermissions = [...new Set([...selectedRole.permissions, ...permissionNames])];
-    } else {
-      updatedPermissions = selectedRole.permissions.filter(
-        p => !permissionNames.includes(p)
-      );
-    }
 
     try {
-      // Mettre à jour les permissions via l'API
-      const updatedRole = await roleService.syncRolePermissions(
-        selectedRole.id!,
-        updatedPermissions
-      );
+      // Afficher un indicateur de chargement
+      Swal.fire({
+        title: enable ? 'Attribution en cours...' : 'Retrait en cours...',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      if (enable) {
+        // Attribuer toutes les permissions de la catégorie
+        for (const permissionName of permissionNames) {
+          const hasPermission = (selectedRole.permissions || []).some(p => 
+            p.toLowerCase() === permissionName.toLowerCase()
+          );
+          
+          if (!hasPermission) {
+            try {
+              await roleService.assignPermissionToRole(selectedRole.id, permissionName);
+            } catch (error) {
+              console.error(`Erreur avec la permission ${permissionName}:`, error);
+              // Continue avec les autres permissions
+            }
+          }
+        }
+      } else {
+        // Retirer toutes les permissions de la catégorie
+        for (const permissionName of permissionNames) {
+          const hasPermission = (selectedRole.permissions || []).some(p => 
+            p.toLowerCase() === permissionName.toLowerCase()
+          );
+          
+          if (hasPermission) {
+            try {
+              await roleService.revokePermissionFromRole(selectedRole.id, permissionName);
+            } catch (error) {
+              console.error(`Erreur avec la permission ${permissionName}:`, error);
+              // Continue avec les autres permissions
+            }
+          }
+        }
+      }
+
+      // Rafraîchir les données
+      await fetchAvailableRoles();
       
-      // Mettre à jour localement
-      const updatedRoles = roles.map(r => 
-        r.id === selectedRole.id ? { ...r, permissions: updatedPermissions } : r
-      );
-      
-      setRoles(updatedRoles);
-      setSelectedRole({ ...selectedRole, permissions: updatedPermissions });
-      
-    } catch (error) {
+      // Mettre à jour le rôle sélectionné
+      const updatedRoles = await roleService.getRoles();
+      const updatedRole = updatedRoles.find(r => r.id === selectedRole.id);
+      if (updatedRole) {
+        setSelectedRole(updatedRole);
+      }
+
+      Swal.close();
+      Swal.fire({
+        icon: 'success',
+        title: enable ? 'Permissions attribuées' : 'Permissions retirées',
+        text: `Toutes les permissions de la catégorie "${category}" ont été ${enable ? 'attribuées' : 'retirées'}`,
+        confirmButtonColor: '#6366F1',
+        timer: 2000
+      });
+    } catch (error: any) {
       console.error('Erreur lors de la mise à jour des permissions:', error);
+      Swal.close();
       Swal.fire({
         icon: 'error',
         title: 'Erreur',
-        text: 'Impossible de mettre à jour les permissions',
+        text: error.message || 'Impossible de mettre à jour les permissions',
+        confirmButtonColor: '#6366F1'
+      });
+    }
+  };
+
+  const toggleAllPermissions = async (enable: boolean) => {
+    if (!selectedRole || !selectedRole.id) return;
+
+    const allPermissionNames = allPermissions.map(p => p.name);
+
+    try {
+      // Afficher un indicateur de chargement
+      Swal.fire({
+        title: enable ? 'Attribution en cours...' : 'Retrait en cours...',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      if (enable) {
+        // Attribuer toutes les permissions
+        for (const permissionName of allPermissionNames) {
+          const hasPermission = (selectedRole.permissions || []).some(p => 
+            p.toLowerCase() === permissionName.toLowerCase()
+          );
+          
+          if (!hasPermission) {
+            try {
+              await roleService.assignPermissionToRole(selectedRole.id, permissionName);
+            } catch (error) {
+              console.error(`Erreur avec la permission ${permissionName}:`, error);
+            }
+          }
+        }
+      } else {
+        // Retirer toutes les permissions
+        for (const permissionName of allPermissionNames) {
+          const hasPermission = (selectedRole.permissions || []).some(p => 
+            p.toLowerCase() === permissionName.toLowerCase()
+          );
+          
+          if (hasPermission) {
+            try {
+              await roleService.revokePermissionFromRole(selectedRole.id, permissionName);
+            } catch (error) {
+              console.error(`Erreur avec la permission ${permissionName}:`, error);
+            }
+          }
+        }
+      }
+
+      // Rafraîchir les données
+      await fetchAvailableRoles();
+      
+      // Mettre à jour le rôle sélectionné
+      const updatedRoles = await roleService.getRoles();
+      const updatedRole = updatedRoles.find(r => r.id === selectedRole.id);
+      if (updatedRole) {
+        setSelectedRole(updatedRole);
+      }
+
+      Swal.close();
+      Swal.fire({
+        icon: 'success',
+        title: enable ? 'Toutes les permissions attribuées' : 'Toutes les permissions retirées',
+        text: `Les permissions ont été ${enable ? 'attribuées' : 'retirées'} pour ce rôle`,
+        confirmButtonColor: '#6366F1',
+        timer: 2000
+      });
+    } catch (error: any) {
+      console.error('Erreur lors de la mise à jour des permissions:', error);
+      Swal.close();
+      Swal.fire({
+        icon: 'error',
+        title: 'Erreur',
+        text: error.message || 'Impossible de mettre à jour les permissions',
         confirmButtonColor: '#6366F1'
       });
     }
@@ -483,7 +645,12 @@ const RoleManagement = () => {
     const categoryPermissions = categorizedPermissions[category] || [];
     const permissionNames = categoryPermissions.map(p => p?.name).filter(Boolean);
     if (permissionNames.length === 0) return false;
-    return permissionNames.every(p => selectedRole.permissions?.includes(p));
+    
+    return permissionNames.every(permissionName => 
+      (selectedRole.permissions || []).some(p => 
+        p.toLowerCase() === permissionName.toLowerCase()
+      )
+    );
   };
 
   const isSomePermissionsInCategoryEnabled = (category: string): boolean => {
@@ -491,7 +658,12 @@ const RoleManagement = () => {
     const categoryPermissions = categorizedPermissions[category] || [];
     const permissionNames = categoryPermissions.map(p => p?.name).filter(Boolean);
     if (permissionNames.length === 0) return false;
-    return permissionNames.some(p => selectedRole.permissions?.includes(p));
+    
+    return permissionNames.some(permissionName => 
+      (selectedRole.permissions || []).some(p => 
+        p.toLowerCase() === permissionName.toLowerCase()
+      )
+    );
   };
 
   const toggleCategory = (category: string) => {
@@ -516,9 +688,11 @@ const RoleManagement = () => {
   };
 
   const calculatePermissionPercentage = () => {
-    if (!selectedRole) return 0;
+    if (!selectedRole || !Array.isArray(selectedRole.permissions)) return 0;
     const totalPermissions = calculateTotalPermissions();
-    return Math.round((selectedRole.permissions.length / totalPermissions) * 100);
+    return totalPermissions > 0 
+      ? Math.round((selectedRole.permissions.length / totalPermissions) * 100)
+      : 0;
   };
 
   const handleRoleSelectChange = (event: any) => {
@@ -539,13 +713,6 @@ const RoleManagement = () => {
       confirmButtonColor: '#6366F1',
       timer: 2000
     });
-  };
-
-  // Fonction pour compter les utilisateurs par rôle (à adapter selon votre API)
-  const getUsersCount = (roleId?: number) => {
-    // Cette fonction dépend de votre API
-    // Pour l'instant, on retourne une valeur par défaut
-    return 0;
   };
 
   return (
@@ -749,7 +916,7 @@ const RoleManagement = () => {
                                 {role.name}
                               </Typography>
                               <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5 }}>
-                                {getUsersCount(role.id)} utilisateur(s)
+                                {role.users_count || 0} utilisateur(s)
                               </Typography>
                             </Box>
                           </Box>
@@ -876,6 +1043,54 @@ const RoleManagement = () => {
                       </Box>
                     </Box>
 
+                    {/* Global Controls */}
+                    <Box sx={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      mb: 3,
+                      p: 2,
+                      bgcolor: '#F8FAFC',
+                      borderRadius: 3,
+                      border: '1px solid #E2E8F0'
+                    }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1E293B' }}>
+                        Actions globales
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Button
+                          startIcon={<FiCheck />}
+                          onClick={() => toggleAllPermissions(true)}
+                          variant="outlined"
+                          sx={{
+                            borderColor: '#10B981',
+                            color: '#10B981',
+                            '&:hover': {
+                              borderColor: '#059669',
+                              backgroundColor: '#F0FDF4'
+                            }
+                          }}
+                        >
+                          Tout cocher
+                        </Button>
+                        <Button
+                          startIcon={<FiX />}
+                          onClick={() => toggleAllPermissions(false)}
+                          variant="outlined"
+                          sx={{
+                            borderColor: '#EF4444',
+                            color: '#EF4444',
+                            '&:hover': {
+                              borderColor: '#DC2626',
+                              backgroundColor: '#FEF2F2'
+                            }
+                          }}
+                        >
+                          Tout décocher
+                        </Button>
+                      </Box>
+                    </Box>
+
                     {/* Permissions Categories */}
                     <Box sx={{ mt: 4 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -911,150 +1126,191 @@ const RoleManagement = () => {
                         </StyledCard>
                       ) : (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                          {Object.entries(categorizedPermissions).map(([category, permissions]) => (
-                            <Paper 
-                              key={category} 
-                              elevation={0}
-                              sx={{ 
-                                border: '1px solid #E2E8F0', 
-                                borderRadius: 3,
-                                overflow: 'hidden'
-                              }}
-                            >
-                              {/* Category Header */}
-                              <Box 
-                                onClick={() => toggleCategory(category)}
-                                sx={{
-                                  p: 3,
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  cursor: 'pointer',
-                                  bgcolor: '#F8FAFC',
-                                  '&:hover': { bgcolor: '#F1F5F9' }
+                          {Object.entries(categorizedPermissions).map(([category, permissions]) => {
+                            const allEnabled = isAllPermissionsInCategoryEnabled(category);
+                            const someEnabled = isSomePermissionsInCategoryEnabled(category);
+                            
+                            return (
+                              <Paper 
+                                key={category} 
+                                elevation={0}
+                                sx={{ 
+                                  border: '1px solid #E2E8F0', 
+                                  borderRadius: 3,
+                                  overflow: 'hidden'
                                 }}
                               >
-                                <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1E293B' }}>
-                                  {category} ({permissions.length})
-                                </Typography>
-                                
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                  <Box sx={{ display: 'flex', gap: 1 }}>
-                                    <Tooltip title="Tout cocher">
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          toggleAllPermissionsInCategory(category, true);
-                                        }}
-                                        sx={{
-                                          color: isAllPermissionsInCategoryEnabled(category) ? '#059669' : '#94A3B8',
-                                          '&:hover': { bgcolor: '#F0FDF4' }
-                                        }}
-                                      >
-                                        <FiCheck />
-                                      </IconButton>
-                                    </Tooltip>
-                                    <Tooltip title="Tout décocher">
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          toggleAllPermissionsInCategory(category, false);
-                                        }}
-                                        sx={{
-                                          color: !isSomePermissionsInCategoryEnabled(category) ? '#DC2626' : '#94A3B8',
-                                          '&:hover': { bgcolor: '#FEF2F2' }
-                                        }}
-                                      >
-                                        <FiX />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </Box>
+                                {/* Category Header */}
+                                <Box 
+                                  onClick={() => toggleCategory(category)}
+                                  sx={{
+                                    p: 3,
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    cursor: 'pointer',
+                                    bgcolor: '#F8FAFC',
+                                    '&:hover': { bgcolor: '#F1F5F9' }
+                                  }}
+                                >
+                                  <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1E293B' }}>
+                                    {category} ({permissions.length})
+                                  </Typography>
                                   
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <Chip 
-                                      label={`${(selectedRole?.permissions?.filter(p => permissions?.some(perm => perm?.name === p)) || []).length}/${permissions?.length || 0}`}
-                                      size="small"
-                                      sx={{ 
-                                        bgcolor: '#EEF2FF',
-                                        color: '#6366F1',
-                                        fontWeight: 600
-                                      }}
-                                    />
-                                    <FiChevronRight 
-                                      style={{ 
-                                        transform: expandedCategories[category] ? 'rotate(90deg)' : 'none',
-                                        transition: 'transform 0.2s',
-                                        color: '#64748B'
-                                      }}
-                                    />
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                      <Tooltip title="Tout cocher">
+                                        <IconButton
+                                          size="small"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleAllPermissionsInCategory(category, true);
+                                          }}
+                                          sx={{
+                                            color: allEnabled ? '#059669' : '#94A3B8',
+                                            '&:hover': { 
+                                              bgcolor: '#F0FDF4',
+                                              color: '#059669'
+                                            }
+                                          }}
+                                        >
+                                          <FiCheck />
+                                        </IconButton>
+                                      </Tooltip>
+                                      <Tooltip title="Tout décocher">
+                                        <IconButton
+                                          size="small"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleAllPermissionsInCategory(category, false);
+                                          }}
+                                          sx={{
+                                            color: !someEnabled ? '#DC2626' : '#94A3B8',
+                                            '&:hover': { 
+                                              bgcolor: '#FEF2F2',
+                                              color: '#DC2626'
+                                            }
+                                          }}
+                                        >
+                                          <FiX />
+                                        </IconButton>
+                                      </Tooltip>
+                                    </Box>
+                                    
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <Chip 
+                                        label={`${(selectedRole?.permissions?.filter(p => permissions?.some(perm => 
+                                          perm?.name?.toLowerCase() === p.toLowerCase()
+                                        )) || []).length}/${permissions?.length || 0}`}
+                                        size="small"
+                                        sx={{ 
+                                          bgcolor: '#EEF2FF',
+                                          color: '#6366F1',
+                                          fontWeight: 600
+                                        }}
+                                      />
+                                      <FiChevronRight 
+                                        style={{ 
+                                          transform: expandedCategories[category] ? 'rotate(90deg)' : 'none',
+                                          transition: 'transform 0.2s',
+                                          color: '#64748B'
+                                        }}
+                                      />
+                                    </Box>
                                   </Box>
                                 </Box>
-                              </Box>
 
-                              {/* Permissions List */}
-                              {expandedCategories[category] && (
-                                <Box sx={{ p: 3, pt: 2 }}>
-                                  <Box sx={{ 
-                                    display: 'grid', 
-                                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(3, 1fr)' },
-                                    gap: 2 
-                                  }}>
-                                    {permissions.map((permission) => (
-                                      <PermissionCard 
-                                        key={permission.id}
-                                        active={selectedRole?.permissions?.includes(permission.name) || false}
-                                        onClick={() => togglePermission(permission.name)}
-                                      >
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                          <Box sx={{
-                                            width: 20,
-                                            height: 20,
-                                            borderRadius: '4px',
-                                            border: selectedRole?.permissions?.includes(permission.name) 
-                                              ? '6px solid #6366F1' 
-                                              : '2px solid #CBD5E1',
-                                            bgcolor: selectedRole?.permissions?.includes(permission.name) 
-                                              ? 'white' 
-                                              : 'transparent',
-                                            transition: 'all 0.2s'
-                                          }} />
-                                          <Box sx={{ flex: 1 }}>
-                                            <Typography variant="body2" sx={{ 
-                                              fontWeight: 500,
-                                              color: selectedRole?.permissions?.includes(permission.name) 
-                                                ? '#1E293B' 
-                                                : '#64748B'
-                                            }}>
-                                              {permission.name}
-                                            </Typography>
-                                            {permission.description && (
-                                              <Typography variant="caption" sx={{ 
-                                                color: '#94A3B8',
-                                                display: 'block',
-                                                mt: 0.5
+                                {/* Permissions List */}
+                                {expandedCategories[category] && (
+                                  <Box sx={{ p: 3, pt: 2 }}>
+                                    <Box sx={{ 
+                                      display: 'grid', 
+                                      gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(3, 1fr)' },
+                                      gap: 2 
+                                    }}>
+                                      {permissions.map((permission) => {
+                                        const isActive = (selectedRole?.permissions || []).some(p => 
+                                          p.toLowerCase() === permission.name.toLowerCase()
+                                        );
+                                        const isUpdating = updatingPermission === permission.name;
+                                        
+                                        return (
+                                          <PermissionCard 
+                                            key={permission.id}
+                                            active={isActive}
+                                            onClick={() => !isUpdating && togglePermission(permission.name)}
+                                            sx={{
+                                              position: 'relative',
+                                              opacity: isUpdating ? 0.7 : 1,
+                                              cursor: isUpdating ? 'wait' : 'pointer'
+                                            }}
+                                          >
+                                            {isUpdating && (
+                                              <Box sx={{
+                                                position: 'absolute',
+                                                top: 0,
+                                                left: 0,
+                                                right: 0,
+                                                bottom: 0,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                bgcolor: 'rgba(255, 255, 255, 0.8)',
+                                                borderRadius: '10px'
                                               }}>
-                                                {permission.description}
-                                              </Typography>
+                                                <CircularProgress size={24} />
+                                              </Box>
                                             )}
-                                          </Box>
-                                          {selectedRole?.permissions?.includes(permission.name) && (
-                                            <FiCheckCircle 
-                                              style={{ 
-                                                color: '#059669',
-                                                flexShrink: 0
-                                              }}
-                                            />
-                                          )}
-                                        </Box>
-                                      </PermissionCard>
-                                    ))}
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                              <Box sx={{
+                                                width: 20,
+                                                height: 20,
+                                                borderRadius: '4px',
+                                                border: isActive 
+                                                  ? '6px solid #6366F1' 
+                                                  : '2px solid #CBD5E1',
+                                                bgcolor: isActive 
+                                                  ? 'white' 
+                                                  : 'transparent',
+                                                transition: 'all 0.2s'
+                                              }} />
+                                              <Box sx={{ flex: 1 }}>
+                                                <Typography variant="body2" sx={{ 
+                                                  fontWeight: 500,
+                                                  color: isActive 
+                                                    ? '#1E293B' 
+                                                    : '#64748B'
+                                                }}>
+                                                  {permission.name}
+                                                </Typography>
+                                                {permission.description && (
+                                                  <Typography variant="caption" sx={{ 
+                                                    color: '#94A3B8',
+                                                    display: 'block',
+                                                    mt: 0.5
+                                                  }}>
+                                                    {permission.description}
+                                                  </Typography>
+                                                )}
+                                              </Box>
+                                              {isActive && (
+                                                <FiCheckCircle 
+                                                  style={{ 
+                                                    color: '#059669',
+                                                    flexShrink: 0
+                                                  }}
+                                                />
+                                              )}
+                                            </Box>
+                                          </PermissionCard>
+                                        );
+                                      })}
+                                    </Box>
                                   </Box>
-                                </Box>
-                              )}
-                            </Paper>
-                          ))}
+                                )}
+                              </Paper>
+                            );
+                          })}
                         </Box>
                       )}
                     </Box>
@@ -1108,7 +1364,7 @@ const RoleManagement = () => {
               <TextField
                 autoFocus
                 fullWidth
-                label="Nom du rôle"
+                label="Nom du rôle *"
                 value={newRoleName}
                 onChange={(e) => setNewRoleName(e.target.value)}
                 placeholder="Ex: Superviseur"
@@ -1190,14 +1446,14 @@ const RoleManagement = () => {
               />
 
               <FormControl fullWidth sx={{ mb: 2 }}>
-                <InputLabel id="roles-select-label">Rôles associés *</InputLabel>
+                <InputLabel id="roles-select-label">Rôles associés</InputLabel>
                 <Select
                   labelId="roles-select-label"
                   id="roles-select"
                   multiple
                   value={newPermission.roleIds}
                   onChange={handleRoleSelectChange}
-                  input={<OutlinedInput label="Rôles associés *" />}
+                  input={<OutlinedInput label="Rôles associés" />}
                   renderValue={(selected) => {
                     const selectedRoles = availableRoles.filter(role => 
                       selected.includes(role.id!)

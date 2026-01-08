@@ -298,7 +298,7 @@ export default function DatContractManager() {
                       />
                     </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField select fullWidth label="Compte Source (Débit)" value={formData.client_source_account_id}
+                  <TextField select sx={{ minWidth: 200}} label="Compte Source (Débit)" value={formData.client_source_account_id}
                     onChange={(e) => setFormData({...formData, client_source_account_id: e.target.value, destination_interet_id: e.target.value, destination_capital_id: e.target.value})}>
                     {accounts.filter(a => !a.numero_compte.startsWith('25') && !a.numero_compte.startsWith('36')).map(acc => (
                       <MenuItem key={acc.id} value={acc.id}>{acc.numero_compte} - {acc.intitule}</MenuItem>
@@ -306,7 +306,7 @@ export default function DatContractManager() {
                   </TextField>
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField select fullWidth label="Compte Scellement (36xx)" value={formData.account_id}
+                  <TextField select sx={{ minWidth: 200}}  label="Compte Scellement (36xx)" value={formData.account_id}
                     onChange={(e) => setFormData({...formData, account_id: e.target.value})}>
                     {accounts.filter(a => a.numero_compte.startsWith('36') || a.numero_compte.startsWith('25')).map(acc => (
                       <MenuItem key={acc.id} value={acc.id}>{acc.numero_compte}</MenuItem>
@@ -319,7 +319,7 @@ export default function DatContractManager() {
                   </TextField>
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField fullWidth label="Montant" type="number" value={formData.montant} onChange={(e) => setFormData({...formData, montant: e.target.value})} 
+                  <TextField fullWidth label="Montant DAT" type="number" value={formData.montant} onChange={(e) => setFormData({...formData, montant: e.target.value})} 
                   InputProps={{ endAdornment: <InputAdornment position="end">F CFA</InputAdornment> }}/>
                 </Grid>
               </Grid>

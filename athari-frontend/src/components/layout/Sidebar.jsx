@@ -29,6 +29,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showDATMenu, setShowDATMenu] = useState(false);
   const [showPlanComptable, setShowPlanComptable] = useState(false);
+  const [showTransactions , setShowTransactions ] = useState(false);
 
   const [showAccountMenu, setShowAccountMenu] = useState(false);
 
@@ -312,7 +313,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
           )}
         </div>
         
-                {/* MENU reporting */}
+        {/* MENU reporting */}
         <div className="mb-2">
           <div 
             className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
@@ -376,6 +377,90 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
             </div>
           )}
         </div>
+
+        {/* MENU Transactions administratives  - SAISIE DAT ET TYPE DAT */}
+        <div className="mb-2">
+          <div 
+            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+              isDATPATH ? 'text-white' : 'text-secondary hover-bg-light'
+            }`}
+            style={{ 
+              background: isDATPATH ? activeGradient : 'transparent',
+              cursor: 'pointer'
+            }}
+            onClick={() => setShowTransactions (!showTransactions )}
+          >
+            <div className="d-flex align-items-center gap-3">
+              <FileChartLine size={20} />
+              {sidebarOpen && <span className="small fw-bold">Transactions administratives </span>}
+            </div>
+            {sidebarOpen && (
+              <ChevronDown 
+                size={16} 
+                className={`transition-all ${showTransactions  ? 'rotate-180' : ''}`}
+                style={{ transition: 'transform 0.2s ease' }}
+              />
+            )}
+          </div>
+          
+          {/* Sous-menu Transactions administratives*/}
+          {showTransactions  && sidebarOpen && (
+            <div className="ms-4 mt-1">
+              <Link
+                to="/agence/form"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  location.pathname === '/agence/form' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/agence/form' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileText size={16} />
+                Ouverture/fermeture Agence
+              </Link>
+              
+              <Link
+                to="/guichet/form"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                  location.pathname === '/guichet/form' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/guichet/form' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileType size={16} />
+                Ouverture/Fermeture du guichet
+              </Link>
+
+              <Link
+                to="/caisse/form"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                  location.pathname === '/caisse/form' 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: location.pathname === '/caisse/form' ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileType size={16} />
+                Ouverture/Fermeture de la caisse
+              </Link>
+
+            </div>
+          )}
+        </div>
+
       </nav>
 
       {/* FOOTER */}

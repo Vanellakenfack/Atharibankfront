@@ -1,6 +1,5 @@
 import React from 'react';
 import { Routes, Route, Navigate,Link } from "react-router-dom";
-import AccountManagement  from '../pages/compte/Compte';
 import FormClient from '../pages/client/FormClient';
 import Login from '../pages/Login'; 
 import Home from '../pages/Home';
@@ -26,7 +25,11 @@ import PlanComptableList from '../pages/plancomptable/PlanComptableList';
 import CategoryManager from '../pages/plancomptable/CategoryManager.jsx';
 import DatContractManager from '../pages/compte/DatContractManager.jsx';
 import DatTypeManager from '../pages/compte/DatTypeManager.jsx';
-import JournalComptablePage from '../pages/journal/JournalComptablePage.js'
+import JournalComptablePage from '../pages/journal/JournalComptablePage.js';
+import AgenceForm from '../pages/TransactionsAdministratives/AgenceForm.js';
+import GuichetForm from '../pages/TransactionsAdministratives/GuichetForm.js';
+import CaisseForm from '../pages/TransactionsAdministratives/CaisseForm.js';
+
 // Ajoute "Link" dans l'importation existante
 
 const AppRoutes = () => {
@@ -51,11 +54,7 @@ const AppRoutes = () => {
         <Route path="/users/roles" element={<RoleManagement />} />
         <Route path="/users/management" element={<UserManagement />} />
 
-        {/* Comptes bancaires */}
-        <Route path="/accounts" element={<AccountManagement  />} />
-        <Route path="accounts/create" element={<AccountManagement />} />
-        <Route path="accounts/:id" element={<AccountManagement />} />
-        <Route path="accounts/:id/edit" element={<AccountManagement />} />
+
         
         {/* Types de comptes */}
         <Route path="/ajout-type-de-compte" element={<TypeCompteForm />} />
@@ -65,7 +64,7 @@ const AppRoutes = () => {
         <Route path='/client' element={<ListeClient />} /> 
         <Route path="/client/choix" element={<ChoicePage />} />
         <Route path='/client/creer' element={<FormClient />} /> 
-          <Route path='/client/creermorale' element={<FormClientMorale />} /> 
+        <Route path='/client/creermorale' element={<FormClientMorale />} /> 
         <Route path="/clients/:id" element={<DetailsClient />} />
         <Route path='/client/:id/edit' element={<ModifierClient />} />
           
@@ -94,9 +93,14 @@ const AppRoutes = () => {
         <Route path='/dat/contracts' element={<DatContractManager/>} />
         <Route path='/dat/types' element={<DatTypeManager/>} />
 
-           <Route path='/Journal-Comptable' element={<JournalComptablePage/>} />
+      {/* Gestion  des journaux */}
+      <Route path='/Journal-Comptable' element={<JournalComptablePage/>} />
 
-                  
+      {/* Gestion  des Transactions administratives  */}
+      <Route path='/agence/form' element={<AgenceForm />} />
+      <Route path='/guichet/form' element={<GuichetForm />} />
+      <Route path='/caisse/form' element={<CaisseForm />} />
+
 
 
             
