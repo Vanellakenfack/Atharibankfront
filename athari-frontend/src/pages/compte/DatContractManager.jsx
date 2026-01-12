@@ -314,7 +314,7 @@ export default function DatContractManager() {
                   </TextField>
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField select fullWidth label="Offre DAT" value={formData.dat_type_id} onChange={(e) => handleTypeSelection(e.target.value)}>
+                  <TextField select sx={{minWidth: 200}} label="Offre DAT" value={formData.dat_type_id} onChange={(e) => handleTypeSelection(e.target.value)}>
                     {datTypes.map(t => <MenuItem key={t.id} value={t.id}>{t.libelle} ({t.duree_mois} mois)</MenuItem>)}
                   </TextField>
                 </Grid>
@@ -350,13 +350,13 @@ export default function DatContractManager() {
             {tabIndex === 2 && (
               <Grid container spacing={3}>
                 <Grid item xs={12} md={6}>
-                  <TextField select fullWidth label="Retour Capital vers..." value={formData.destination_capital_id}
+                  <TextField select sx={{minWidth: 250}} label="Retour Capital vers..." value={formData.destination_capital_id}
                     onChange={(e) => setFormData({...formData, destination_capital_id: e.target.value})}>
                     {accounts.map(acc => <MenuItem key={acc.id} value={acc.id}>{acc.numero_compte} - {acc.intitule}</MenuItem>)}
                   </TextField>
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField select fullWidth label="Versement Intérêts vers..." value={formData.destination_interet_id}
+                  <TextField select sx={{minWidth: 250}} label="Versement Intérêts vers..." value={formData.destination_interet_id}
                     onChange={(e) => setFormData({...formData, destination_interet_id: e.target.value})}>
                     {accounts.map(acc => <MenuItem key={acc.id} value={acc.id}>{acc.numero_compte} - {acc.intitule}</MenuItem>)}
                   </TextField>
