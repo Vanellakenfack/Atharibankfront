@@ -422,7 +422,7 @@ const UserManagement = () => {
                   />
                 </Grid>
                 <Grid item xs={12} md={4}>
-                  <FormControl fullWidth size="small">
+                  <FormControl sx={{minWidth: 200}} size="small">
                     <InputLabel>Filtrer par rôle</InputLabel>
                     <Select
                       value={filterRole}

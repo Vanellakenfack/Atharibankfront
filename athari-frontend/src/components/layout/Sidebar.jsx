@@ -18,7 +18,16 @@ import {
   FileType,
   BookOpen,
   List,
-  House
+  House,
+  Receipt,
+  CreditCard,
+  Repeat,
+  ArrowDownUp,
+  Wallet,
+  Coins,
+  DollarSign,
+  FileCheck,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useAuth } from "../../context/AuthContext";
 
@@ -29,11 +38,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showDATMenu, setShowDATMenu] = useState(false);
   const [showPlanComptable, setShowPlanComptable] = useState(false);
-  const [showTransactions , setShowTransactions ] = useState(false);
-
+  const [showTransactions, setShowTransactions] = useState(false);
+  const [showFrontOffice, setShowFrontOffice] = useState(false);
+  const [showCaisseEspece, setShowCaisseEspece] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
-
   const [showReporting, setShowReporting] = useState(false);
+  const [showVersementMenu, setShowVersementMenu] = useState(false);
 
   const items = [
     { id: 'overview', icon: BarChart3, label: 'Tableau de bord', path: '/dashboard' },
@@ -46,17 +56,32 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
 
   const activeGradient = 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)';
 
+  // Fonction utilitaire pour vérifier les chemins actifs
+  const isActivePath = (path, exact = false) => {
+    if (exact) {
+      return location.pathname === path;
+    }
+    return location.pathname.startsWith(path);
+  };
+
+  // Chemins actifs
+  const isDATPATH = isActivePath('/dat');
+  const isAccountPATH = isActivePath('/compte') || isActivePath('/liste-des-comptes');
+  const isTypeComptePATH = isActivePath('/Liste-type-de-compte') || isActivePath('/Ajout-type-de-compte');
+  const isReportingPATH = isActivePath('/Journal-Comptable');
+  const isFrontOfficePATH = isActivePath('/front-office') || 
+                           isActivePath('/versement') || 
+                           location.pathname.includes('caisse-espece') ||
+                           location.pathname.includes('caisse-devise') ||
+                           location.pathname.includes('transfert-fond');
+  const isVersementPATH = isActivePath('/versement');
+
   const handleLogout = async () => {
     if (window.confirm("Voulez-vous vraiment vous déconnecter ?")) {
       await logout();
       navigate('/login');
     }
   };
-
-  const isDATPATH = location.pathname.startsWith('/dat');
-  const isAccountPATH = location.pathname === '/compte' || location.pathname === '/liste-des-comptes';
-  const isTypeComptePATH = location.pathname === '/Liste-type-de-compte' || location.pathname === '/Ajout-type-de-compte';
-  const isReportingPATH = location.pathname === '/' || location.pathname === '/';
 
   return (
     <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'} border-end bg-white`} 
@@ -98,7 +123,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
         </small>
         
         {items.map((item) => {
-          const isActive = location.pathname.startsWith(item.path);
+          const isActive = isActivePath(item.path);
           return (
             <Link
               key={item.id}
@@ -112,7 +137,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               }}
             >
               <item.icon size={20} strokeWidth={isActive ? 3 : 2} />
-              {/* Texte du lien mis en gras (fw-bold) */}
               {sidebarOpen && <span className="fw-bold small">{item.label}</span>}
             </Link>
           );
@@ -122,10 +146,10 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
         <div className="mb-2">
           <div 
             className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
-              location.pathname.startsWith('/plan-comptable') ? 'text-white' : 'text-secondary hover-bg-light'
+              isActivePath('/plan-comptable') ? 'text-white' : 'text-secondary hover-bg-light'
             }`}
             style={{ 
-              background: location.pathname.startsWith('/plan-comptable') ? activeGradient : 'transparent',
+              background: isActivePath('/plan-comptable') ? activeGradient : 'transparent',
               cursor: 'pointer'
             }}
             onClick={() => setShowPlanComptable(!showPlanComptable)}
@@ -149,12 +173,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               <Link
                 to="/plan-comptable"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  location.pathname === '/plan-comptable' 
+                  isActivePath('/plan-comptable', true) 
                     ? 'text-white fw-bold' 
                     : 'text-secondary hover-bg-light'
                 }`}
                 style={{ 
-                  background: location.pathname === '/plan-comptable' ? activeGradient : 'transparent',
+                  background: isActivePath('/plan-comptable', true) ? activeGradient : 'transparent',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -166,12 +190,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               <Link
                 to="/plan-comptable/categories"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  location.pathname === '/plan-comptable/categories' 
+                  isActivePath('/plan-comptable/categories') 
                     ? 'text-white fw-bold' 
                     : 'text-secondary hover-bg-light'
                 }`}
                 style={{ 
-                  background: location.pathname === '/plan-comptable/categories' ? activeGradient : 'transparent',
+                  background: isActivePath('/plan-comptable/categories') ? activeGradient : 'transparent',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -214,12 +238,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               <Link
                 to="/dat/contracts"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  location.pathname === '/dat/contracts' 
+                  isActivePath('/dat/contracts') 
                     ? 'text-white fw-bold' 
                     : 'text-secondary hover-bg-light'
                 }`}
                 style={{ 
-                  background: location.pathname === '/dat/contracts' ? activeGradient : 'transparent',
+                  background: isActivePath('/dat/contracts') ? activeGradient : 'transparent',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -231,12 +255,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               <Link
                 to="/dat/types"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  location.pathname === '/dat/types' 
+                  isActivePath('/dat/types') 
                     ? 'text-white fw-bold' 
                     : 'text-secondary hover-bg-light'
                 }`}
                 style={{ 
-                  background: location.pathname === '/dat/types' ? activeGradient : 'transparent',
+                  background: isActivePath('/dat/types') ? activeGradient : 'transparent',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -279,12 +303,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               <Link
                 to="/compte"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  location.pathname === '/compte' 
+                  isActivePath('/compte', true) 
                     ? 'text-white fw-bold' 
                     : 'text-secondary hover-bg-light'
                 }`}
                 style={{ 
-                  background: location.pathname === '/compte' ? activeGradient : 'transparent',
+                  background: isActivePath('/compte', true) ? activeGradient : 'transparent',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -296,12 +320,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               <Link
                 to="/liste-des-comptes"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  location.pathname === '/liste-des-comptes' 
+                  isActivePath('/liste-des-comptes') 
                     ? 'text-white fw-bold' 
                     : 'text-secondary hover-bg-light'
                 }`}
                 style={{ 
-                  background: location.pathname === '/liste-des-comptes' ? activeGradient : 'transparent',
+                  background: isActivePath('/liste-des-comptes') ? activeGradient : 'transparent',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -344,12 +368,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               <Link
                 to="/Journal-Comptable"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  location.pathname === '/Journal-Comptable' 
+                  isActivePath('/Journal-Comptable') 
                     ? 'text-white fw-bold' 
                     : 'text-secondary hover-bg-light'
                 }`}
                 style={{ 
-                  background: location.pathname === '/Journal-Comptable' ? activeGradient : 'transparent',
+                  background: isActivePath('/Journal-Comptable') ? activeGradient : 'transparent',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -359,14 +383,14 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               </Link>
               
               <Link
-                to="/"
+                to="/reporting-2"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  location.pathname === '/' 
+                  isActivePath('/reporting-2') 
                     ? 'text-white fw-bold' 
                     : 'text-secondary hover-bg-light'
                 }`}
                 style={{ 
-                  background: location.pathname === '/' ? activeGradient : 'transparent',
+                  background: isActivePath('/reporting-2') ? activeGradient : 'transparent',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -378,43 +402,43 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
           )}
         </div>
 
-        {/* MENU Transactions administratives  - SAISIE DAT ET TYPE DAT */}
+        {/* MENU Transactions administratives */}
         <div className="mb-2">
           <div 
             className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
-              isDATPATH ? 'text-white' : 'text-secondary hover-bg-light'
+              isActivePath('/transactions-admin') ? 'text-white' : 'text-secondary hover-bg-light'
             }`}
             style={{ 
-              background: isDATPATH ? activeGradient : 'transparent',
+              background: isActivePath('/transactions-admin') ? activeGradient : 'transparent',
               cursor: 'pointer'
             }}
-            onClick={() => setShowTransactions (!showTransactions )}
+            onClick={() => setShowTransactions(!showTransactions)}
           >
             <div className="d-flex align-items-center gap-3">
               <FileChartLine size={20} />
-              {sidebarOpen && <span className="small fw-bold">Transactions administratives </span>}
+              {sidebarOpen && <span className="small fw-bold">Transactions administratives</span>}
             </div>
             {sidebarOpen && (
               <ChevronDown 
                 size={16} 
-                className={`transition-all ${showTransactions  ? 'rotate-180' : ''}`}
+                className={`transition-all ${showTransactions ? 'rotate-180' : ''}`}
                 style={{ transition: 'transform 0.2s ease' }}
               />
             )}
           </div>
           
           {/* Sous-menu Transactions administratives*/}
-          {showTransactions  && sidebarOpen && (
+          {showTransactions && sidebarOpen && (
             <div className="ms-4 mt-1">
               <Link
                 to="/agence/form"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  location.pathname === '/agence/form' 
+                  isActivePath('/agence/form') 
                     ? 'text-white fw-bold' 
                     : 'text-secondary hover-bg-light'
                 }`}
                 style={{ 
-                  background: location.pathname === '/agence/form' ? activeGradient : 'transparent',
+                  background: isActivePath('/agence/form') ? activeGradient : 'transparent',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -426,12 +450,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               <Link
                 to="/guichet/form"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  location.pathname === '/guichet/form' 
+                  isActivePath('/guichet/form') 
                     ? 'text-white fw-bold' 
                     : 'text-secondary hover-bg-light'
                 }`}
                 style={{ 
-                  background: location.pathname === '/guichet/form' ? activeGradient : 'transparent',
+                  background: isActivePath('/guichet/form') ? activeGradient : 'transparent',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -443,12 +467,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               <Link
                 to="/caisse/form"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  location.pathname === '/caisse/form' 
+                  isActivePath('/caisse/form') 
                     ? 'text-white fw-bold' 
                     : 'text-secondary hover-bg-light'
                 }`}
                 style={{ 
-                  background: location.pathname === '/caisse/form' ? activeGradient : 'transparent',
+                  background: isActivePath('/caisse/form') ? activeGradient : 'transparent',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -456,7 +480,256 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
                 <FileType size={16} />
                 Ouverture/Fermeture de la caisse
               </Link>
+            </div>
+          )}
+        </div>
 
+        {/* MENU Transaction Front Office */}
+        <div className="mb-2">
+          <div 
+            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+              isFrontOfficePATH ? 'text-white' : 'text-secondary hover-bg-light'
+            }`}
+            style={{ 
+              background: isFrontOfficePATH ? activeGradient : 'transparent',
+              cursor: 'pointer'
+            }}
+            onClick={() => setShowFrontOffice(!showFrontOffice)}
+          >
+            <div className="d-flex align-items-center gap-3">
+              <CreditCard size={20} />
+              {sidebarOpen && <span className="small fw-bold">Transaction Front Office</span>}
+            </div>
+            {sidebarOpen && (
+              <ChevronDown 
+                size={16} 
+                className={`transition-all ${showFrontOffice ? 'rotate-180' : ''}`}
+                style={{ transition: 'transform 0.2s ease' }}
+              />
+            )}
+          </div>
+          
+          {/* Sous-menu Transaction Front Office */}
+          {showFrontOffice && sidebarOpen && (
+            <div className="ms-4 mt-1">
+              {/* Transaction Caisse Espèce */}
+              <div className="mb-1">
+                <div 
+                  className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+                    isActivePath('/front-office/caisse-espece') || isVersementPATH ? 'text-white' : 'text-secondary hover-bg-light'
+                  }`}
+                  style={{ 
+                    background: isActivePath('/front-office/caisse-espece') || isVersementPATH ? activeGradient : 'transparent',
+                    cursor: 'pointer'
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowCaisseEspece(!showCaisseEspece);
+                  }}
+                >
+                  <div className="d-flex align-items-center gap-2">
+                    <Wallet size={16} />
+                    <span className="small">Transaction caisse espèce</span>
+                  </div>
+                  <ChevronDown 
+                    size={14} 
+                    className={`transition-all ${showCaisseEspece ? 'rotate-180' : ''}`}
+                    style={{ transition: 'transform 0.2s ease' }}
+                  />
+                </div>
+                
+                {/* Sous-sous-menu Transaction Caisse Espèce */}
+                {showCaisseEspece && (
+                  <div className="ms-3 mt-1">
+                    <Link
+                      to="/entrees-sorties-caisse"
+                      className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                        isActivePath('/entrees-sorties-caisse') 
+                          ? 'text-white fw-bold' 
+                          : 'text-secondary hover-bg-light'
+                      }`}
+                      style={{ 
+                        background: isActivePath('/entrees-sorties-caisse') ? activeGradient : 'transparent',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <ArrowDownUp size={14} />
+                      Entrer/sortie caisse
+                    </Link>
+                    
+                    <Link
+                      to="/Transfert-Inter-Caisse"
+                      className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                        isActivePath('/Transfert-Inter-Caisse') 
+                          ? 'text-white fw-bold' 
+                          : 'text-secondary hover-bg-light'
+                      }`}
+                      style={{ 
+                        background: isActivePath('/Transfert-Inter-Caisse') ? activeGradient : 'transparent',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Repeat size={14} />
+                      Transfert caisse
+                    </Link>
+                    
+                    <Link
+                      to="/front-office/caisse-espece/transfert-inter-envoi"
+                      className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                        isActivePath('/front-office/caisse-espece/transfert-inter-envoi') 
+                          ? 'text-white fw-bold' 
+                          : 'text-secondary hover-bg-light'
+                      }`}
+                      style={{ 
+                        background: isActivePath('/front-office/caisse-espece/transfert-inter-envoi') ? activeGradient : 'transparent',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Receipt size={14} />
+                      Transfert inter caisse envoi
+                    </Link>
+                    
+                    <Link
+                      to="/front-office/caisse-espece/transfert-inter-reception"
+                      className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                        isActivePath('/front-office/caisse-espece/transfert-inter-reception') 
+                          ? 'text-white fw-bold' 
+                          : 'text-secondary hover-bg-light'
+                      }`}
+                      style={{ 
+                        background: isActivePath('/front-office/caisse-espece/transfert-inter-reception') ? activeGradient : 'transparent',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Receipt size={14} />
+                      Transfert inter caisse réception
+                    </Link>
+
+                    {/* MENU Versement avec sous-menus */}
+                    <div className="mb-1">
+                      <div 
+                        className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+                          isVersementPATH ? 'text-white' : 'text-secondary hover-bg-light'
+                        }`}
+                        style={{ 
+                          background: isVersementPATH ? activeGradient : 'transparent',
+                          cursor: 'pointer'
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowVersementMenu(!showVersementMenu);
+                        }}
+                      >
+                        <div className="d-flex align-items-center gap-2">
+                          <DollarSign size={14} />
+                          <span className="small">Gestion des Versement</span>
+                        </div>
+                        <ChevronDown 
+                          size={12} 
+                          className={`transition-all ${showVersementMenu ? 'rotate-180' : ''}`}
+                          style={{ transition: 'transform 0.2s ease' }}
+                        />
+                      </div>
+                      
+                      {/* Sous-sous-menu Versement */}
+                      {showVersementMenu && (
+                        <div className="ms-3 mt-1">
+                          <Link
+                            to="/versement"
+                            className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                              isActivePath('/versement', true) 
+                                ? 'text-white fw-bold' 
+                                : 'text-secondary hover-bg-light'
+                            }`}
+                            style={{ 
+                              background: isActivePath('/versement', true) ? activeGradient : 'transparent',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <DollarSign size={12} />
+                            Versement espèce
+                          </Link>
+                          
+                          <Link
+                            to="/versement/client"
+                            className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                              isActivePath('/versement/client') 
+                                ? 'text-white fw-bold' 
+                                : 'text-secondary hover-bg-light'
+                            }`}
+                            style={{ 
+                              background: isActivePath('/versement/client') ? activeGradient : 'transparent',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <FileCheck size={12} />
+                            Bordereau de Versement Client
+                          </Link>
+                          
+                          <Link
+                            to="/versement/ac"
+                            className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                              isActivePath('/versement/ac') 
+                                ? 'text-white fw-bold' 
+                                : 'text-secondary hover-bg-light'
+                            }`}
+                            style={{ 
+                              background: isActivePath('/versement/ac') ? activeGradient : 'transparent',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <FileSpreadsheet size={12} />
+                            Bordereau de Versement AC
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Transaction Caisse Devise */}
+              <Link
+                to="/front-office/caisse-devise"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  isActivePath('/front-office/caisse-devise') 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: isActivePath('/front-office/caisse-devise') ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Coins size={16} />
+                Transaction caisse devise
+              </Link>
+              
+              {/* Transfert de fond */}
+              <Link
+                to="/front-office/transfert-fond"
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                  isActivePath('/front-office/transfert-fond') 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: isActivePath('/front-office/transfert-fond') ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Repeat size={16} />
+                Transfert de fond
+              </Link>
             </div>
           )}
         </div>
@@ -468,10 +741,10 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
         <div className="mb-1">
           <div 
             className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
-              location.pathname.startsWith('/settings') || isTypeComptePATH ? 'text-white' : 'text-secondary hover-bg-light'
+              isActivePath('/settings') || isTypeComptePATH ? 'text-white' : 'text-secondary hover-bg-light'
             }`}
             style={{ 
-              background: location.pathname.startsWith('/settings') || isTypeComptePATH ? activeGradient : 'transparent',
+              background: isActivePath('/settings') || isTypeComptePATH ? activeGradient : 'transparent',
               cursor: 'pointer'
             }}
             onClick={() => setShowSettingsMenu(!showSettingsMenu)}
@@ -494,31 +767,30 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               <Link
                 to="/users/roles"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  location.pathname === '/users/roles' 
+                  isActivePath('/users/roles') 
                     ? 'text-white fw-bold' 
                     : 'text-secondary hover-bg-light'
                 }`}
                 style={{ 
-                  background: location.pathname === '/users/roles' ? activeGradient : 'transparent',
+                  background: isActivePath('/users/roles') ? activeGradient : 'transparent',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
                 <FileText size={16} />
-                Roles des utilisaters
+                Roles des utilisateurs
               </Link>
 
-          {/* Agence */}
-
+              {/* Agence */}
               <Link
                 to="/agence"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  location.pathname === '/agence' 
+                  isActivePath('/agence') 
                     ? 'text-white fw-bold' 
                     : 'text-secondary hover-bg-light'
                 }`}
                 style={{ 
-                  background: location.pathname === '/agence' ? activeGradient : 'transparent',
+                  background: isActivePath('/agence') ? activeGradient : 'transparent',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -527,17 +799,16 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
                 Agences
               </Link>
 
-
-                {/* Liste des Type de comptes */}
+              {/* Liste des Type de comptes */}
               <Link
                 to="/Liste-type-de-compte"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  location.pathname === '/Liste-type-de-compte' 
+                  isActivePath('/Liste-type-de-compte') 
                     ? 'text-white fw-bold' 
                     : 'text-secondary hover-bg-light'
                 }`}
                 style={{ 
-                  background: location.pathname === '/Liste-type-de-compte' ? activeGradient : 'transparent',
+                  background: isActivePath('/Liste-type-de-compte') ? activeGradient : 'transparent',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -545,50 +816,16 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
                 <List size={16} />
                 Liste des Type de comptes
               </Link>
-
-              {/*<Link
-                to="/frais/commissions"
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  location.pathname.startsWith('/frais/commissions') 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: location.pathname.startsWith('/frais/commissions') ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FileText size={16} />
-                Frais et commissions
-              </Link>
-              <Link
-                to="/users/management"
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  location.pathname.startsWith('/users/management') 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: location.pathname.startsWith('/users/management') ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FileText size={16} />
-                  Gestion des utilisateurs
-              </Link>
-*/}
               
               <Link
                 to="/frais/applications"
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  location.pathname === '/frais/applications' 
+                  isActivePath('/frais/applications') 
                     ? 'text-white fw-bold' 
                     : 'text-secondary hover-bg-light'
                 }`}
                 style={{ 
-                  background: location.pathname === '/frais/applications' ? activeGradient : 'transparent',
+                  background: isActivePath('/frais/applications') ? activeGradient : 'transparent',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -606,7 +843,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
           className="d-flex align-items-center gap-3 p-2 text-danger rounded-3 cursor-pointer hover-bg-danger-subtle transition-all"
         >
           <LogOut size={20} />
-          {/* Texte déconnexion mis en gras */}
           {sidebarOpen && <span className="small fw-bold text-uppercase">Déconnexion</span>}
         </div>
       </div>
