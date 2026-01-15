@@ -16,7 +16,7 @@ import sessionService from '../../services/sessionService';
 
 // Types
 interface Agence {
-  id: number | string;
+  id: number;
   name: string;
   code: string;
 }
@@ -45,7 +45,6 @@ const AgenceForm: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
   const [loadingAgences, setLoadingAgences] = useState<boolean>(true);
-  const [checkingAgenceState, setCheckingAgenceState] = useState<boolean>(false);
   const [agences, setAgences] = useState<Agence[]>([]);
   const [error, setError] = useState<string>('');
   const [snackbar, setSnackbar] = useState<SnackbarState>({ 
@@ -59,8 +58,6 @@ const AgenceForm: React.FC = () => {
   });
 
   const [operation, setOperation] = useState<'OU' | 'FE'>('OU');
-  const [guichetEstOuvert, setGuichetEstOuvert] = useState<boolean>(false);
-  const [caisseEstOuverte, setCaisseEstOuverte] = useState<boolean>(false);
 
   // États du formulaire OUVERTURE
   const [formDataOuverture, setFormDataOuverture] = useState({
@@ -70,10 +67,8 @@ const AgenceForm: React.FC = () => {
 
   // États du formulaire FERMETURE
   const [formDataFermeture, setFormDataFermeture] = useState({
-    session_agence_id: '',
-    journee_id: '',
-    agence_id: '',
-    date_comptable: ''
+    agence_session_id: '',
+    jour_comptable_id: ''
   });
 
   // Charger les agences
@@ -97,57 +92,33 @@ const AgenceForm: React.FC = () => {
     fetchAgences();
   }, []);
 
-  // Vérifier l'état de l'agence et des dépendances
+  // Vérifier l'état de l'agence
   useEffect(() => {
     const checkAgenceState = async () => {
       try {
-        setCheckingAgenceState(true);
-        
-        const storedAgenceId = localStorage.getItem('agence_id');
         const storedSessionId = localStorage.getItem('session_agence_id');
-        const storedJourneeId = localStorage.getItem('journee_id');
+        const storedJourneeId = localStorage.getItem('jour_comptable_id');
         const storedDateComptable = localStorage.getItem('date_comptable');
-        const storedGuichetSessionId = localStorage.getItem('guichet_session_id');
-        const storedCaisseSessionId = localStorage.getItem('caisse_session_id');
         
-        // Vérifier si un guichet est ouvert
-        setGuichetEstOuvert(!!storedGuichetSessionId);
-        
-        // Vérifier si une caisse est ouverte
-        setCaisseEstOuverte(!!storedCaisseSessionId);
-        
-        if (storedAgenceId && storedSessionId && storedJourneeId) {
+        if (storedSessionId && storedJourneeId) {
           console.log('✅ Agence ouverte trouvée dans localStorage');
           console.log('📋 Détails:', {
-            agence_id: storedAgenceId,
             session_agence_id: storedSessionId,
-            journee_id: storedJourneeId,
-            date_comptable: storedDateComptable,
-            guichet_ouvert: !!storedGuichetSessionId,
-            caisse_ouverte: !!storedCaisseSessionId
+            jour_comptable_id: storedJourneeId,
+            date_comptable: storedDateComptable
           });
           
           setAgenceState({
             isOpen: true,
             sessionId: parseInt(storedSessionId),
-            journeeId: storedJourneeId ? parseInt(storedJourneeId) : undefined,
+            journeeId: parseInt(storedJourneeId),
             dateComptable: storedDateComptable || undefined
           });
           
           setFormDataFermeture({
-            session_agence_id: storedSessionId,
-            journee_id: storedJourneeId,
-            agence_id: storedAgenceId,
-            date_comptable: storedDateComptable || ''
+            agence_session_id: storedSessionId,
+            jour_comptable_id: storedJourneeId
           });
-          
-          setFormDataOuverture(prev => ({
-            ...prev,
-            agence_id: storedAgenceId,
-            date_comptable: storedDateComptable 
-              ? new Date(storedDateComptable)
-              : new Date()
-          }));
           
           setOperation('FE');
         } else {
@@ -159,8 +130,6 @@ const AgenceForm: React.FC = () => {
         console.error('❌ Erreur vérification état agence:', err);
         setAgenceState({ isOpen: false });
         setOperation('OU');
-      } finally {
-        setCheckingAgenceState(false);
       }
     };
 
@@ -174,10 +143,8 @@ const AgenceForm: React.FC = () => {
 
   const handleOuvertureChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
     const { name, value } = e.target;
-    if (name === 'agence_id') {
+    if (name && name in formDataOuverture) {
       setFormDataOuverture(prev => ({ ...prev, [name]: value as string }));
-    } else if (name) {
-      setFormDataOuverture(prev => ({ ...prev, [name]: value }));
     }
   };
 
@@ -207,7 +174,7 @@ const AgenceForm: React.FC = () => {
       console.log('📞 Appel API ouverture agence...');
       
       const formattedDate = format(formDataOuverture.date_comptable, 'yyyy-MM-dd');
-      console.log('📅 Date formatée pour MySQL:', formattedDate);
+      console.log('📅 Date formatée:', formattedDate);
       
       const response = await sessionService.ouvrirAgence(
         formDataOuverture.agence_id,
@@ -216,29 +183,22 @@ const AgenceForm: React.FC = () => {
 
       console.log('✅ Réponse API ouverture agence:', response);
       
-      const responseData = response.data;
-      
       return {
         statut: 'success',
-        message: responseData?.message || 'Agence ouverte avec succès !',
-        data: responseData?.data
+        message: response.data?.message || 'Agence ouverte avec succès !',
+        data: response.data?.data
       };
       
     } catch (err: any) {
       console.error('❌ Erreur lors de l\'ouverture de l\'agence:', err);
       
-      if (err.response && err.response.status === 201) {
-        console.log('⚠️ Hook a intercepté un statut 201 (succès)');
-        
-        const errorData = err.response.data;
-        if (errorData && errorData.statut === 'success') {
-          console.log('✅ Correction: c\'était un succès');
-          return {
-            statut: 'success',
-            message: errorData.message || 'Agence ouverte avec succès !',
-            data: errorData.data
-          };
-        }
+      const errorData = err.response?.data;
+      if (errorData) {
+        return {
+          statut: 'error',
+          message: errorData.message || errorData.error || 'Erreur lors de l\'ouverture',
+          data: errorData
+        };
       }
       
       throw err;
@@ -246,37 +206,35 @@ const AgenceForm: React.FC = () => {
   };
 
   const handleCloseAgence = async (): Promise<ApiResponse> => {
-    if (!formDataFermeture.session_agence_id || !formDataFermeture.journee_id) {
+    if (!formDataFermeture.agence_session_id || !formDataFermeture.jour_comptable_id) {
       throw new Error('Informations de session manquantes');
     }
 
     try {
       console.log('📞 Appel API fermeture agence...');
       const response = await sessionService.fermerAgence(
-        parseInt(formDataFermeture.session_agence_id),
-        parseInt(formDataFermeture.journee_id)
+        parseInt(formDataFermeture.agence_session_id),
+        parseInt(formDataFermeture.jour_comptable_id)
       );
 
       console.log('✅ Réponse API fermeture agence:', response);
       
-      const responseData = response.data;
-      
       return {
         statut: 'success',
-        message: responseData?.message || 'Agence fermée avec succès !',
-        data: responseData
+        message: response.data?.message || 'Agence fermée avec succès !',
+        data: response.data
       };
       
     } catch (err: any) {
       console.error('❌ Erreur lors de la fermeture de l\'agence:', err);
       
-      // Afficher le détail de l'erreur
-      if (err.response?.data) {
-        console.error('📋 Détails erreur backend:', {
-          status: err.response.status,
-          data: err.response.data,
-          errors: err.response.data?.errors
-        });
+      const errorData = err.response?.data;
+      if (errorData) {
+        return {
+          statut: 'error',
+          message: errorData.message || errorData.error || 'Erreur lors de la fermeture',
+          data: errorData
+        };
       }
       
       throw err;
@@ -286,52 +244,32 @@ const AgenceForm: React.FC = () => {
   const processOuvertureResponse = (responseData: ApiResponse) => {
     console.log('🔄 Traitement réponse ouverture:', responseData);
     
-    if (!responseData) {
-      console.error('❌ Réponse API vide');
-      showSnackbar('Réponse du serveur vide ou invalide', 'error');
+    if (responseData.statut !== 'success') {
+      showSnackbar(responseData.message || 'Erreur lors de l\'ouverture', 'error');
       return false;
     }
     
-    const isSuccess = responseData.statut === 'success';
-    const message = responseData.message || '';
-    
-    console.log(`📊 Analyse réponse: statut=${responseData.statut}, message="${message}"`);
-    
-    if (!isSuccess) {
-      const lowerMessage = message.toLowerCase();
-      if (lowerMessage.includes('erreur') || 
-          lowerMessage.includes('error') || 
-          lowerMessage.includes('échec') || 
-          lowerMessage.includes('failed')) {
-        console.log('❌ Message d\'erreur détecté:', message);
-        showSnackbar(message || 'Erreur lors de l\'ouverture', 'error');
-        return false;
-      } else {
-        console.log('⚠️ Statut "error" mais message ne semble pas être une erreur:', message);
-        showSnackbar(message || 'Avertissement lors de l\'opération', 'warning');
-        return false;
-      }
-    }
-    
-    console.log('✅ Ouverture réussie:', message);
-    showSnackbar(message || 'Agence ouverte avec succès !', 'success');
+    console.log('✅ Ouverture réussie:', responseData.message);
+    showSnackbar(responseData.message || 'Agence ouverte avec succès !', 'success');
     
     if (responseData.data) {
-      const sessionAgenceId = responseData.data.session_agence_id;
-      const journeeId = responseData.data.journee_id;
+      const sessionAgenceId = responseData.data.agence_session_id;
+      const journeeId = responseData.data.jour_comptable_id;
       const dateComptable = responseData.data.date_comptable;
       
       console.log('💾 Stockage des IDs dans localStorage:');
       console.log('- session_agence_id:', sessionAgenceId);
-      console.log('- journee_id:', journeeId);
+      console.log('- jour_comptable_id:', journeeId);
       console.log('- date_comptable:', dateComptable);
       console.log('- agence_id:', formDataOuverture.agence_id);
       
+      // Stocker dans localStorage
       localStorage.setItem('session_agence_id', sessionAgenceId?.toString() || '');
-      localStorage.setItem('journee_id', journeeId?.toString() || '');
+      localStorage.setItem('jour_comptable_id', journeeId?.toString() || '');
       localStorage.setItem('date_comptable', dateComptable || '');
       localStorage.setItem('agence_id', formDataOuverture.agence_id.toString());
       
+      // Mettre à jour l'état
       setAgenceState({
         isOpen: true,
         sessionId: sessionAgenceId,
@@ -340,20 +278,19 @@ const AgenceForm: React.FC = () => {
       });
       
       setFormDataFermeture({
-        session_agence_id: sessionAgenceId?.toString() || '',
-        journee_id: journeeId?.toString() || '',
-        agence_id: formDataOuverture.agence_id.toString(),
-        date_comptable: dateComptable || ''
+        agence_session_id: sessionAgenceId?.toString() || '',
+        jour_comptable_id: journeeId?.toString() || ''
       });
       
       setOperation('FE');
+      
+      // Redirection vers le guichet
+      console.log('⏳ Redirection vers guichet dans 2 secondes...');
+      setTimeout(() => {
+        console.log('➡️ Redirection vers /guichet/form');
+        navigate('/guichet/form');
+      }, 2000);
     }
-
-    console.log('⏳ Redirection vers guichet dans 2 secondes...');
-    setTimeout(() => {
-      console.log('➡️ Redirection vers /guichet/form');
-      navigate('/guichet/form');
-    }, 2000);
 
     return true;
   };
@@ -361,33 +298,15 @@ const AgenceForm: React.FC = () => {
   const processFermetureResponse = (responseData: ApiResponse) => {
     console.log('🔄 Traitement réponse fermeture:', responseData);
     
-    if (!responseData) {
-      console.error('❌ Réponse API vide');
-      showSnackbar('Réponse du serveur vide ou invalide', 'error');
+    if (responseData.statut !== 'success') {
+      showSnackbar(responseData.message || 'Erreur lors de la fermeture', 'error');
       return false;
     }
     
-    const isSuccess = responseData.statut === 'success';
-    const message = responseData.message || '';
+    console.log('✅ Fermeture réussie:', responseData.message);
+    showSnackbar(responseData.message || 'Agence fermée avec succès !', 'success');
     
-    console.log(`📊 Analyse réponse: statut=${responseData.statut}, message="${message}"`);
-    
-    if (!isSuccess) {
-      // Essayez d'extraire un message d'erreur plus détaillé
-      let errorMessage = message;
-      
-      if (message.includes('422')) {
-        errorMessage = 'Erreur de validation. Vérifiez que la session est valide et que tous les guichets sont fermés.';
-      }
-      
-      console.log('❌ Message d\'erreur:', errorMessage);
-      showSnackbar(errorMessage || 'Erreur lors de la fermeture', 'error');
-      return false;
-    }
-    
-    console.log('✅ Fermeture réussie:', message);
-    showSnackbar(message || 'Agence fermée avec succès !', 'success');
-    
+    // Réinitialiser l'état
     setAgenceState({ isOpen: false });
     
     // Nettoyer TOUTES les données du localStorage
@@ -399,9 +318,6 @@ const AgenceForm: React.FC = () => {
       agence_id: '',
       date_comptable: new Date(),
     });
-    
-    setGuichetEstOuvert(false);
-    setCaisseEstOuverte(false);
     
     return true;
   };
@@ -440,37 +356,6 @@ const AgenceForm: React.FC = () => {
       return;
     }
 
-    // Vérifier si un guichet est encore ouvert
-    if (guichetEstOuvert) {
-      const confirmClose = window.confirm(
-        '⚠️ Un ou plusieurs guichets sont encore ouverts. Si vous fermez l\'agence, les guichets seront automatiquement fermés. Continuer ?'
-      );
-      
-      if (!confirmClose) {
-        return;
-      }
-      
-      // Avertir l'utilisateur
-      showSnackbar('Fermez d\'abord tous les guichets avant de fermer l\'agence', 'warning');
-      navigate('/guichet/form');
-      return;
-    }
-
-    // Vérifier si une caisse est encore ouverte
-    if (caisseEstOuverte) {
-      const confirmClose = window.confirm(
-        '⚠️ Une ou plusieurs caisses sont encore ouvertes. Si vous fermez l\'agence, les caisses seront automatiquement fermées. Continuer ?'
-      );
-      
-      if (!confirmClose) {
-        return;
-      }
-      
-      showSnackbar('Fermez d\'abord toutes les caisses avant de fermer l\'agence', 'warning');
-      navigate('/caisse/form');
-      return;
-    }
-
     setLoading(true);
     
     try {
@@ -478,19 +363,7 @@ const AgenceForm: React.FC = () => {
       processFermetureResponse(responseData);
     } catch (err: any) {
       console.error('❌ Erreur lors de la fermeture de l\'agence:', err);
-      
-      // Message d'erreur amélioré
-      let errorMessage = 'Erreur lors de la fermeture';
-      
-      if (err.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err.response?.data?.error) {
-        errorMessage = err.response.data.error;
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-      
-      showSnackbar(errorMessage, 'error');
+      showSnackbar(err.message || 'Une erreur est survenue', 'error');
     } finally {
       setLoading(false);
     }
@@ -517,8 +390,8 @@ const AgenceForm: React.FC = () => {
       if (!formDataOuverture.agence_id) return true;
       if (!formDataOuverture.date_comptable) return true;
     } else if (operation === 'FE') {
-      if (!formDataFermeture.session_agence_id) return true;
-      if (!formDataFermeture.journee_id) return true;
+      if (!formDataFermeture.agence_session_id) return true;
+      if (!formDataFermeture.jour_comptable_id) return true;
     }
     
     return false;
@@ -590,9 +463,6 @@ const AgenceForm: React.FC = () => {
                           Journée ID: {agenceState.journeeId} | 
                           Date: {agenceState.dateComptable}
                         </Typography>
-                        <Typography variant="body2" sx={{ mt: 1 }}>
-                          Vous pouvez maintenant fermer l'agence.
-                        </Typography>
                       </Alert>
                     ) : operation === 'OU' ? (
                       <Alert severity="info">
@@ -603,56 +473,12 @@ const AgenceForm: React.FC = () => {
                     ) : null}
                   </Grid>
 
-                  {/* Avertissements pour les dépendances ouvertes */}
-                  {operation === 'FE' && (guichetEstOuvert || caisseEstOuverte) && (
-                    <Grid item xs={12}>
-                      <Alert severity="warning">
-                        <Typography variant="body2" fontWeight="bold">
-                          ⚠️ Dépendances ouvertes détectées
-                        </Typography>
-                        {guichetEstOuvert && (
-                          <Typography variant="body2">
-                            • Guichet ouvert: {localStorage.getItem('code_guichet') || 'Oui'}
-                          </Typography>
-                        )}
-                        {caisseEstOuverte && (
-                          <Typography variant="body2">
-                            • Caisse ouverte: {localStorage.getItem('code_caisse') || 'Oui'}
-                          </Typography>
-                        )}
-                        <Typography variant="body2" sx={{ mt: 1 }}>
-                          Il est recommandé de fermer les dépendances avant de fermer l'agence.
-                        </Typography>
-                        <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
-                          {guichetEstOuvert && (
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              onClick={() => navigate('/guichet/form')}
-                            >
-                              Fermer le guichet
-                            </Button>
-                          )}
-                          {caisseEstOuverte && (
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              onClick={() => navigate('/caisse/form')}
-                            >
-                              Fermer la caisse
-                            </Button>
-                          )}
-                        </Box>
-                      </Alert>
-                    </Grid>
-                  )}
-
                   {/* FORMULAIRE OUVERTURE */}
                   {operation === 'OU' ? (
                     <form onSubmit={handleSubmitOuverture} style={{ width: '100%' }}>
                       <Grid container spacing={3}>
                         <Grid item xs={12} md={6}>
-                          <FormControl sx={{ minWidth: 200}} size="small" required>
+                          <FormControl fullWidth size="small" required>
                             <InputLabel>Agence *</InputLabel>
                             <Select
                               name="agence_id"
@@ -699,18 +525,8 @@ const AgenceForm: React.FC = () => {
                           <TextField
                             fullWidth
                             size="small"
-                            label="Agence ID"
-                            value={formDataFermeture.agence_id || 'Non disponible'}
-                            disabled
-                          />
-                        </Grid>
-
-                        <Grid item xs={12} md={6}>
-                          <TextField
-                            fullWidth
-                            size="small"
                             label="Session Agence ID"
-                            value={formDataFermeture.session_agence_id || 'Non disponible'}
+                            value={formDataFermeture.agence_session_id || 'Non disponible'}
                             disabled
                           />
                         </Grid>
@@ -719,18 +535,8 @@ const AgenceForm: React.FC = () => {
                           <TextField
                             fullWidth
                             size="small"
-                            label="Journée ID"
-                            value={formDataFermeture.journee_id || 'Non disponible'}
-                            disabled
-                          />
-                        </Grid>
-
-                        <Grid item xs={12} md={6}>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            label="Date comptable"
-                            value={formDataFermeture.date_comptable || 'Non disponible'}
+                            label="Journée Comptable ID"
+                            value={formDataFermeture.jour_comptable_id || 'Non disponible'}
                             disabled
                           />
                         </Grid>
@@ -746,11 +552,9 @@ const AgenceForm: React.FC = () => {
                       </Typography>
                       <Typography variant="body2" component="div" sx={{ mt: 1, fontFamily: 'monospace', fontSize: '12px' }}>
                         session_agence_id: {localStorage.getItem('session_agence_id') || 'null'}<br/>
-                        agence_id: {localStorage.getItem('agence_id') || 'null'}<br/>
-                        journee_id: {localStorage.getItem('journee_id') || 'null'}<br/>
+                        jour_comptable_id: {localStorage.getItem('jour_comptable_id') || 'null'}<br/>
                         date_comptable: {localStorage.getItem('date_comptable') || 'null'}<br/>
-                        guichet_session_id: {localStorage.getItem('guichet_session_id') || 'null'}<br/>
-                        caisse_session_id: {localStorage.getItem('caisse_session_id') || 'null'}
+                        agence_id: {localStorage.getItem('agence_id') || 'null'}
                       </Typography>
                     </Alert>
                   </Grid>

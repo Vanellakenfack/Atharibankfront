@@ -32,6 +32,8 @@ import {
   TableRow,
   Chip,
   Avatar,
+  InputAdornment,
+  TableHead,
 } from '@mui/material';
 import {
   CheckCircle,
@@ -55,6 +57,9 @@ import {
   Close,
   Add,
   Remove,
+  AttachMoney,
+  AutoFixHigh,
+  RestartAlt,
 } from '@mui/icons-material';
 
 // --- IMPORT DES COMPOSANTS DE LAYOUT ---
@@ -102,6 +107,16 @@ interface TransactionHistory {
   libelle: string;
   statut: 'VALIDEE' | 'EN_ATTENTE' | 'ANNULEE';
   reference: string;
+}
+
+interface BilletItem {
+  id: number;
+  label: string;
+  valeur: number;
+  quantite: number;
+  total: number;
+  type: 'BILLET' | 'PIECE';
+  codeApi: string;
 }
 
 // --- COMPOSANTS STYLISÉS ---
@@ -228,6 +243,26 @@ const EntreesSortiesCaisse = () => {
     { id: 4, date: '2024-01-16T11:20:00', type: 'SORTIE', montant: 1500000, devise: 'FCFA', partenaire: 'AG001', libelle: 'Décaissement', statut: 'ANNULEE', reference: 'TRX-004' },
   ]);
 
+  // État pour le billetage
+  const [billets, setBillets] = useState<BilletItem[]>([
+    { id: 1, label: 'B.10 000', valeur: 10000, quantite: 0, total: 0, type: 'BILLET', codeApi: '10000' },
+    { id: 2, label: 'B.5 000', valeur: 5000, quantite: 0, total: 0, type: 'BILLET', codeApi: '5000' },
+    { id: 3, label: 'B.2 000', valeur: 2000, quantite: 0, total: 0, type: 'BILLET', codeApi: '2000' },
+    { id: 4, label: 'B.1 000', valeur: 1000, quantite: 0, total: 0, type: 'BILLET', codeApi: '1000' },
+    { id: 5, label: 'B.500', valeur: 500, quantite: 0, total: 0, type: 'BILLET', codeApi: '500' },
+    { id: 6, label: 'P.500', valeur: 500, quantite: 0, total: 0, type: 'PIECE', codeApi: '500' },
+    { id: 7, label: 'P.100', valeur: 100, quantite: 0, total: 0, type: 'PIECE', codeApi: '100' },
+    { id: 8, label: 'P.50', valeur: 50, quantite: 0, total: 0, type: 'PIECE', codeApi: '50' },
+    { id: 9, label: 'P.25', valeur: 25, quantite: 0, total: 0, type: 'PIECE', codeApi: '25' },
+    { id: 10, label: 'P.10', valeur: 10, quantite: 0, total: 0, type: 'PIECE', codeApi: '10' },
+    { id: 11, label: 'P.5', valeur: 5, quantite: 0, total: 0, type: 'PIECE', codeApi: '5' },
+    { id: 12, label: 'P.1', valeur: 1, quantite: 0, total: 0, type: 'PIECE', codeApi: '1' },
+  ]);
+  
+  const [totalBilletage, setTotalBilletage] = useState(0);
+  const [difference, setDifference] = useState(0);
+  const [validationMessage, setValidationMessage] = useState<string>('');
+
   const [formData, setFormData] = useState<TransactionFormData>({
     // Informations de base
     agenceCode: 'AG001',
@@ -268,6 +303,11 @@ const EntreesSortiesCaisse = () => {
       }));
     }
   }, [formData.montant, formData.isEntree, formData.soldeCaisse]);
+
+  // Effet pour calculer le billetage
+  useEffect(() => {
+    calculateBilletage();
+  }, [billets, formData.montant]);
 
   // Gestion des changements de formulaire
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -312,6 +352,105 @@ const EntreesSortiesCaisse = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
+  // Gestion du billetage
+  const handleBilletChange = (id: number, quantite: string) => {
+    const numQuantite = parseInt(quantite, 10) || 0;
+    
+    setBillets(prev => prev.map(billet => {
+      if (billet.id === id) {
+        const qte = Math.max(0, numQuantite);
+        const total = qte * billet.valeur;
+        return { ...billet, quantite: qte, total };
+      }
+      return billet;
+    }));
+  };
+
+  const calculateBilletage = () => {
+    const montant = parseFloat(formData.montant || '0');
+    const total = billets.reduce((sum, billet) => sum + billet.total, 0);
+    setTotalBilletage(total);
+    
+    const diff = montant - total;
+    setDifference(diff);
+    
+    if (montant === 0 && total === 0) {
+      setValidationMessage('✅ Montant 0 - Billetage correct');
+    } else if (Math.abs(diff) <= 1) {
+      setValidationMessage('✅ Billetage équilibré');
+    } else if (diff > 0) {
+      setValidationMessage(`❌ Il manque ${formatCurrency(diff)} FCFA`);
+    } else {
+      setValidationMessage(`❌ Excédent de ${formatCurrency(Math.abs(diff))} FCFA`);
+    }
+  };
+
+  const resetBilletage = () => {
+    setBillets(prev => prev.map(billet => ({
+      ...billet,
+      quantite: 0,
+      total: 0
+    })));
+  };
+
+  const suggestBilletage = () => {
+    const montant = parseFloat(formData.montant || '0');
+    if (montant <= 0) {
+      showSnackbar('Veuillez d\'abord saisir un montant valide', 'warning');
+      return;
+    }
+    
+    if (montant === 0) {
+      resetBilletage();
+      showSnackbar('Billetage réinitialisé', 'info');
+      return;
+    }
+    
+    let remaining = Math.floor(montant);
+    const newBillets = [...billets];
+    
+    // Réinitialiser les quantités
+    newBillets.forEach(billet => {
+      billet.quantite = 0;
+      billet.total = 0;
+    });
+    
+    // Trier par valeur décroissante
+    const sortedBillets = [...newBillets].sort((a, b) => b.valeur - a.valeur);
+    
+    // Calculer les quantités optimales
+    for (const billet of sortedBillets) {
+      if (remaining >= billet.valeur && billet.valeur > 0) {
+        if (billet.valeur === 500 && billet.type === 'PIECE') {
+          continue; // On gère les pièces de 500 séparément
+        }
+        
+        const quantite = Math.floor(remaining / billet.valeur);
+        if (quantite > 0) {
+          const index = newBillets.findIndex(b => b.id === billet.id);
+          if (index !== -1) {
+            newBillets[index].quantite = quantite;
+            newBillets[index].total = quantite * billet.valeur;
+            remaining -= quantite * billet.valeur;
+          }
+        }
+      }
+    }
+    
+    // Gérer le reste avec des pièces de 1
+    if (remaining > 0) {
+      const index = newBillets.findIndex(b => b.valeur === 1 && b.type === 'PIECE');
+      if (index !== -1) {
+        newBillets[index].quantite += remaining;
+        newBillets[index].total += remaining;
+        remaining = 0;
+      }
+    }
+    
+    setBillets(newBillets);
+    showSnackbar('Billetage suggéré automatiquement', 'info');
+  };
+
   // Validation du formulaire
   const handleValidate = () => {
     // Validation des champs obligatoires
@@ -333,16 +472,25 @@ const EntreesSortiesCaisse = () => {
     setDialogOpen(true);
   };
 
-  // Simuler le billetage
-  const handleBilletage = () => {
+  // Ouvrir la modal de billetage
+  const handleOpenBilletage = () => {
+    if (!formData.montant || parseFloat(formData.montant) <= 0) {
+      showSnackbar('Veuillez d\'abord saisir un montant valide', 'warning');
+      return;
+    }
     setDialogOpen(false);
     setBilletageDialogOpen(true);
+  };
+
+  // Valider le billetage
+  const handleValidateBilletage = () => {
+    if (Math.abs(difference) > 1) {
+      showSnackbar('Le billetage n\'est pas correct. Ajustez les quantités.', 'error');
+      return;
+    }
     
-    // Simulation du billetage
-    setTimeout(() => {
-      setBilletageDialogOpen(false);
-      setConfirmationDialogOpen(true);
-    }, 2000);
+    setBilletageDialogOpen(false);
+    setConfirmationDialogOpen(true);
   };
 
   // Confirmer la transaction
@@ -376,6 +524,9 @@ const EntreesSortiesCaisse = () => {
       refLettrage: '',
     }));
     
+    // Réinitialiser le billetage
+    resetBilletage();
+    
     showSnackbar(
       `Transaction ${formData.isEntree ? 'd\'entrée' : 'de sortie'} validée avec succès!`,
       'success'
@@ -388,6 +539,7 @@ const EntreesSortiesCaisse = () => {
       setDialogOpen(false);
       setBilletageDialogOpen(false);
       setConfirmationDialogOpen(false);
+      resetBilletage();
       showSnackbar('Transaction annulée', 'info');
     }
   };
@@ -402,6 +554,7 @@ const EntreesSortiesCaisse = () => {
         libelle: '',
         refLettrage: '',
       });
+      resetBilletage();
       showSnackbar('Formulaire réinitialisé', 'info');
     }
   };
@@ -438,6 +591,10 @@ const EntreesSortiesCaisse = () => {
     }
   };
 
+  // Filtrer les billets et pièces
+  const billetsFiltres = billets.filter(b => b.type === 'BILLET');
+  const piecesFiltrees = billets.filter(b => b.type === 'PIECE');
+
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f5f5f5' }}>
       {/* Sidebar */}
@@ -467,101 +624,6 @@ const EntreesSortiesCaisse = () => {
               Transactions d'encaissement et décaissement de fonds - Turbobank
             </Typography>
           </Box>
-
-          {/* Statistiques rapides */}
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} md={3}>
-              <CardStat>
-                <CardContent sx={{ p: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Avatar sx={{ bgcolor: '#E3F2FD', color: '#1976D2', width: 40, height: 40 }}>
-                      <AccountBalanceWallet />
-                    </Avatar>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Solde Caisse
-                      </Typography>
-                      <Typography variant="h6" fontWeight={700} color="#1976D2">
-                        {formatCurrency(formData.soldeCaisse)}
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Agence: {formData.agenceCode}
-                  </Typography>
-                </CardContent>
-              </CardStat>
-            </Grid>
-            
-            <Grid item xs={12} md={3}>
-              <CardStat>
-                <CardContent sx={{ p: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Avatar sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', width: 40, height: 40 }}>
-                      <TrendingUp />
-                    </Avatar>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Entrées du jour
-                      </Typography>
-                      <Typography variant="h6" fontWeight={700} color="#2E7D32">
-                        5,000,000 FCFA
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Typography variant="caption" color="text.secondary">
-                    2 transactions
-                  </Typography>
-                </CardContent>
-              </CardStat>
-            </Grid>
-            
-            <Grid item xs={12} md={3}>
-              <CardStat>
-                <CardContent sx={{ p: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Avatar sx={{ bgcolor: '#FFEBEE', color: '#D32F2F', width: 40, height: 40 }}>
-                      <TrendingDown />
-                    </Avatar>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Sorties du jour
-                      </Typography>
-                      <Typography variant="h6" fontWeight={700} color="#D32F2F">
-                        2,500,000 FCFA
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Typography variant="caption" color="text.secondary">
-                    1 transaction
-                  </Typography>
-                </CardContent>
-              </CardStat>
-            </Grid>
-            
-            <Grid item xs={12} md={3}>
-              <CardStat>
-                <CardContent sx={{ p: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Avatar sx={{ bgcolor: '#FFF3E0', color: '#F57C00', width: 40, height: 40 }}>
-                      <MonetizationOn />
-                    </Avatar>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Nouveau Solde
-                      </Typography>
-                      <Typography variant="h6" fontWeight={700} color="#F57C00">
-                        {formatCurrency(formData.nouveauSolde)}
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Après transaction
-                  </Typography>
-                </CardContent>
-              </CardStat>
-            </Grid>
-          </Grid>
 
           {/* Formulaire principal */}
           <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #e0e0e0', overflow: 'hidden', mb: 3 }}>
@@ -737,6 +799,19 @@ const EntreesSortiesCaisse = () => {
                                   {formData.devise}
                                 </Typography>
                               ),
+                              endAdornment: (
+                                <Tooltip title="Faire le billetage">
+                                  <span>
+                                    <IconButton 
+                                      size="small" 
+                                      onClick={handleOpenBilletage}
+                                      disabled={!formData.montant || parseFloat(formData.montant) <= 0}
+                                    >
+                                      <AttachMoney />
+                                    </IconButton>
+                                  </span>
+                                </Tooltip>
+                              )
                             }}
                           />
                         </Grid>
@@ -1014,30 +1089,260 @@ const EntreesSortiesCaisse = () => {
           <Button onClick={handleCancel} color="inherit">
             Annuler
           </Button>
-          <GradientButton onClick={handleBilletage} autoFocus>
+          <GradientButton onClick={handleOpenBilletage} autoFocus>
             Faire le billetage
           </GradientButton>
         </DialogActions>
       </Dialog>
 
       {/* Dialog de billetage */}
-      <Dialog open={billetageDialogOpen} onClose={() => setBilletageDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#F57C00', color: 'white' }}>
-          <MonetizationOn /> Billetage en cours
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
-            <CircularProgress size={60} sx={{ mb: 2, color: '#F57C00' }} />
-            <Typography variant="h6" gutterBottom>
-              Billetage en cours...
-            </Typography>
-            <Typography variant="body2" color="text.secondary" align="center">
-              Vérification et comptage des billets
-              <br />
-              Cette opération peut prendre quelques secondes
-            </Typography>
+      <Dialog 
+        open={billetageDialogOpen} 
+        onClose={() => setBilletageDialogOpen(false)}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            maxHeight: '80vh'
+          }
+        }}
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box>
+              <Typography variant="h6" fontWeight="bold">
+                Assistant de Billetage
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Montant à billeter: {formatCurrency(formData.montant)} {formData.devise}
+              </Typography>
+            </Box>
+            <IconButton onClick={() => setBilletageDialogOpen(false)} size="small">
+              <Close />
+            </IconButton>
           </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {/* Section Billets */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="subtitle1" fontWeight="bold" color="primary" sx={{ mb: 2, pb: 1, borderBottom: '1px solid #e0e0e0' }}>
+              Billets
+            </Typography>
+            <Grid container spacing={2}>
+              {billetsFiltres.map((billet) => (
+                <Grid item xs={12} sm={6} md={4} key={billet.id}>
+                  <Paper elevation={0} sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: '8px', height: '100%' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                      <Typography variant="subtitle2" fontWeight="bold">
+                        {billet.label}
+                      </Typography>
+                      <Chip 
+                        size="small" 
+                        label={`${formatCurrency(billet.valeur)}`} 
+                        color="primary" 
+                        variant="outlined"
+                      />
+                    </Box>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      label="Quantité"
+                      value={billet.quantite}
+                      onChange={(e) => handleBilletChange(billet.id, e.target.value)}
+                      InputProps={{
+                        inputProps: { min: 0 },
+                        endAdornment: (
+                          <Typography variant="caption" color="text.secondary">
+                            × {formatCurrency(billet.valeur)}
+                          </Typography>
+                        )
+                      }}
+                    />
+                    <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Sous-total:
+                      </Typography>
+                      <Typography variant="body2" fontWeight="bold" color="primary">
+                        {formatCurrency(billet.total)} FCFA
+                      </Typography>
+                    </Box>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+
+          <Divider sx={{ my: 3 }} />
+
+          {/* Section Pièces */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="subtitle1" fontWeight="bold" color="secondary" sx={{ mb: 2, pb: 1, borderBottom: '1px solid #e0e0e0' }}>
+              Pièces
+            </Typography>
+            <Grid container spacing={2}>
+              {piecesFiltrees.map((piece) => (
+                <Grid item xs={12} sm={6} md={4} key={piece.id}>
+                  <Paper elevation={0} sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: '8px', height: '100%' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                      <Typography variant="subtitle2" fontWeight="bold">
+                        {piece.label}
+                      </Typography>
+                      <Chip 
+                        size="small" 
+                        label={`${formatCurrency(piece.valeur)}`} 
+                        color="secondary" 
+                        variant="outlined"
+                      />
+                    </Box>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      label="Quantité"
+                      value={piece.quantite}
+                      onChange={(e) => handleBilletChange(piece.id, e.target.value)}
+                      InputProps={{
+                        inputProps: { min: 0 },
+                        endAdornment: (
+                          <Typography variant="caption" color="text.secondary">
+                            × {formatCurrency(piece.valeur)}
+                          </Typography>
+                        )
+                      }}
+                    />
+                    <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Sous-total:
+                      </Typography>
+                      <Typography variant="body2" fontWeight="bold" color="secondary">
+                        {formatCurrency(piece.total)} FCFA
+                      </Typography>
+                    </Box>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+
+          {/* Résumé */}
+          <Paper elevation={0} sx={{ p: 3, bgcolor: '#f8fafc', borderRadius: '8px', border: '2px solid #e0e0e0' }}>
+            <Typography variant="subtitle1" fontWeight="bold" color="#1E293B" sx={{ mb: 3 }}>
+              Résumé du Billetage
+            </Typography>
+            
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={4}>
+                <Box sx={{ textAlign: 'center', p: 2, borderRadius: '8px', bgcolor: '#FFFFFF' }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Montant à billeter
+                  </Typography>
+                  <Typography variant="h4" fontWeight="bold" color="primary">
+                    {formatCurrency(parseFloat(formData.montant || '0'))} FCFA
+                  </Typography>
+                </Box>
+              </Grid>
+              
+              <Grid item xs={12} md={4}>
+                <Box sx={{ textAlign: 'center', p: 2, borderRadius: '8px', bgcolor: '#FFFFFF' }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Total billetage
+                  </Typography>
+                  <Typography 
+                    variant="h4" 
+                    fontWeight="bold"
+                    sx={{ 
+                      color: Math.abs(difference) <= 1 ? '#10B981' : '#EF4444'
+                    }}
+                  >
+                    {formatCurrency(totalBilletage)} FCFA
+                  </Typography>
+                </Box>
+              </Grid>
+              
+              <Grid item xs={12} md={4}>
+                <Box sx={{ textAlign: 'center', p: 2, borderRadius: '8px', bgcolor: '#FFFFFF' }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Différence
+                  </Typography>
+                  <Typography 
+                    variant="h4" 
+                    fontWeight="bold"
+                    sx={{ 
+                      color: Math.abs(difference) <= 1 ? '#10B981' : '#EF4444'
+                    }}
+                  >
+                    {formatCurrency(difference)} FCFA
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+
+            <Alert 
+              severity={Math.abs(difference) <= 1 ? "success" : "error"}
+              sx={{ mt: 3 }}
+              icon={Math.abs(difference) <= 1 ? <CheckCircle /> : <Warning />}
+            >
+              <Typography variant="body1" fontWeight="bold">
+                {validationMessage}
+              </Typography>
+              {Math.abs(difference) > 1 && (
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  Le billetage doit correspondre exactement au montant saisi (± 1 FCFA).
+                </Typography>
+              )}
+            </Alert>
+          </Paper>
         </DialogContent>
+        
+        <DialogActions sx={{ px: 3, py: 2, bgcolor: '#f8fafc', borderTop: '1px solid #e0e0e0' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <Box>
+              <Button 
+                onClick={suggestBilletage} 
+                variant="outlined" 
+                startIcon={<AutoFixHigh />}
+                sx={{ mr: 1 }}
+                disabled={parseFloat(formData.montant || '0') === 0}
+                size="medium"
+              >
+                Suggérer automatiquement
+              </Button>
+              <Button 
+                onClick={resetBilletage} 
+                variant="outlined"
+                startIcon={<RestartAlt />}
+                size="medium"
+              >
+                Réinitialiser
+              </Button>
+            </Box>
+            <Box>
+              <Button 
+                onClick={() => setBilletageDialogOpen(false)} 
+                variant="outlined"
+                sx={{ mr: 1 }}
+                size="medium"
+              >
+                Annuler
+              </Button>
+              <Button 
+                onClick={handleValidateBilletage}
+                variant="contained"
+                disabled={Math.abs(difference) > 1}
+                size="medium"
+                sx={{
+                  background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                  minWidth: '120px'
+                }}
+              >
+                Valider
+              </Button>
+            </Box>
+          </Box>
+        </DialogActions>
       </Dialog>
 
       {/* Dialog de confirmation */}
@@ -1056,6 +1361,20 @@ const EntreesSortiesCaisse = () => {
             <Typography variant="body2">
               Le montant correspond exactement à la transaction.
             </Typography>
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'white', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                Récapitulatif:
+              </Typography>
+              <Typography variant="body2">
+                • Montant: {formatCurrency(formData.montant)}
+              </Typography>
+              <Typography variant="body2">
+                • Billetage: {formatCurrency(totalBilletage)}
+              </Typography>
+              <Typography variant="body2" fontWeight="bold">
+                • Différence: {formatCurrency(difference)} (Acceptable: ±1)
+              </Typography>
+            </Box>
           </Box>
           <Alert severity="info" sx={{ mt: 2 }}>
             Confirmez la transaction pour finaliser l'opération

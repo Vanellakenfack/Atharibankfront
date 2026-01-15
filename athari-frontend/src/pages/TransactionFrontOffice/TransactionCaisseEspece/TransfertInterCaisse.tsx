@@ -540,7 +540,7 @@ const TransfertInterCaisse = () => {
             </Typography>
           </Box>
 
-          {/* Statistiques des caisses */}
+          {/* Statistiques des caisses 
           <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid item xs={12} md={3}>
               <StatCard>
@@ -642,7 +642,7 @@ const TransfertInterCaisse = () => {
                 </CardContent>
               </StatCard>
             </Grid>
-          </Grid>
+          </Grid>*/}
 
           {/* Formulaire principal */}
           <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #e0e0e0', overflow: 'hidden', mb: 3 }}>
