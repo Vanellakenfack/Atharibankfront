@@ -8,8 +8,16 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from '../../components/layout/Sidebar';
 import TopBar from '../../components/layout/TopBar';
 import sessionService from '../../services/sessionService';
+import guichetService from '../../services/guichetService';
 
 // Types
+interface Guichet {
+  id: number;
+  nom_guichet: string;
+  code_guichet: string;
+  statut?: string;
+}
+
 interface SnackbarState {
   open: boolean;
   message: string;
@@ -19,6 +27,7 @@ interface SnackbarState {
 interface GuichetState {
   isOpen: boolean;
   sessionId?: number;
+  guichetId?: number;
   codeGuichet?: string;
 }
 
@@ -32,8 +41,7 @@ const GuichetForm: React.FC = () => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
-  const [loadingAgence, setLoadingAgence] = useState<boolean>(true);
-  const [loadingGuichetState, setLoadingGuichetState] = useState<boolean>(false);
+  const [loadingGuichets, setLoadingGuichets] = useState<boolean>(true);
   const [snackbar, setSnackbar] = useState<SnackbarState>({ 
     open: false, 
     message: '', 
@@ -42,7 +50,7 @@ const GuichetForm: React.FC = () => {
   
   // États
   const [agenceSessionId, setAgenceSessionId] = useState<string>('');
-  const [agenceEtat, setAgenceEtat] = useState<'OU' | 'FE'>('FE');
+  const [guichets, setGuichets] = useState<Guichet[]>([]);
   const [guichetState, setGuichetState] = useState<GuichetState>({
     isOpen: false
   });
@@ -51,125 +59,157 @@ const GuichetForm: React.FC = () => {
   // États du formulaire OUVERTURE
   const [formDataOuverture, setFormDataOuverture] = useState({
     agence_session_id: '',
-    code_guichet: '',
+    guichet_id: '',
   });
 
   // États du formulaire FERMETURE
   const [formDataFermeture, setFormDataFermeture] = useState({
     guichet_session_id: '',
-    code_guichet: '',
+    guichet_id: '',
+    code_guichet: ''
   });
 
-  // Charger l'état de l'agence et du guichet depuis localStorage
+  // Charger l'état de l'agence et les guichets
   useEffect(() => {
     console.log('🔄 Initialisation GuichetForm...');
     
     const init = async () => {
       try {
         const sessionId = localStorage.getItem('session_agence_id');
-        const agenceId = localStorage.getItem('agence_id');
-        const guichetSessionId = localStorage.getItem('guichet_session_id');
-        const codeGuichet = localStorage.getItem('code_guichet');
-        
-        console.log('📋 localStorage au démarrage GuichetForm:', {
-          session_agence_id: sessionId,
-          agence_id: agenceId,
-          guichet_session_id: guichetSessionId,
-          code_guichet: codeGuichet
-        });
         
         if (sessionId) {
           console.log('✅ Session agence trouvée:', sessionId);
           setAgenceSessionId(sessionId);
-          setAgenceEtat('OU');
           
           setFormDataOuverture(prev => ({
             ...prev,
             agence_session_id: sessionId
           }));
+
+          // Charger les guichets disponibles
+          await loadGuichets();
           
-          // Si un guichet est déjà ouvert
-          if (guichetSessionId && codeGuichet) {
-            console.log('✅ Guichet déjà ouvert:', { guichetSessionId, codeGuichet });
-            setGuichetState({
-              isOpen: true,
-              sessionId: parseInt(guichetSessionId),
-              codeGuichet: codeGuichet
-            });
-            
-            setFormDataFermeture({
-              guichet_session_id: guichetSessionId,
-              code_guichet: codeGuichet
-            });
-            
-            setOperation('FE');
-          } else {
-            setOperation('OU');
-          }
+          // Vérifier si un guichet est déjà ouvert
+          await checkGuichetSession();
+          
         } else {
           console.warn('⚠️ Aucune session agence trouvée');
-          setAgenceEtat('FE');
+          showSnackbar('Ouvrez d\'abord l\'agence', 'warning');
         }
 
       } catch (error: any) {
         console.error('❌ Erreur initialisation:', error);
       } finally {
-        setLoadingAgence(false);
+        setLoadingGuichets(false);
       }
     };
 
     init();
   }, []);
 
-  // Vérifier l'état du guichet quand on change le code
-  useEffect(() => {
-    const checkGuichetState = async () => {
-      if (!formDataOuverture.code_guichet || !agenceSessionId) return;
+  // Fonction pour vérifier l'état du guichet
+  const checkGuichetSession = async () => {
+    try {
+      const guichetSessionId = localStorage.getItem('guichet_session_id');
+      const guichetId = localStorage.getItem('guichet_id');
+      const codeGuichet = localStorage.getItem('code_guichet');
       
-      try {
-        setLoadingGuichetState(true);
+      if (guichetSessionId && guichetId) {
+        console.log('✅ Guichet déjà ouvert:', { guichetSessionId, guichetId, codeGuichet });
         
-        const storedCode = localStorage.getItem('code_guichet');
-        const storedSessionId = localStorage.getItem('guichet_session_id');
-        
-        if (storedCode === formDataOuverture.code_guichet && storedSessionId) {
-          console.log('✅ Guichet déjà ouvert avec ce code');
+        // Vérifier si la session guichet est toujours active
+        try {
+          // Vous pouvez ajouter une vérification API ici si nécessaire
           setGuichetState({
             isOpen: true,
-            sessionId: parseInt(storedSessionId),
-            codeGuichet: storedCode
+            sessionId: parseInt(guichetSessionId),
+            guichetId: parseInt(guichetId),
+            codeGuichet: codeGuichet || ''
           });
-        } else {
-          console.log('❌ Guichet non ouvert avec ce code');
-          setGuichetState({ isOpen: false });
+          
+          setFormDataFermeture({
+            guichet_session_id: guichetSessionId,
+            guichet_id: guichetId,
+            code_guichet: codeGuichet || ''
+          });
+          
+          setOperation('FE');
+          showSnackbar(`Guichet ${codeGuichet} est déjà ouvert`, 'info');
+          
+        } catch (error) {
+          // Si la session n'est plus valide, nettoyer
+          console.log('Session guichet invalide, nettoyage...');
+          clearGuichetStorage();
         }
-        
-      } catch (error: any) {
-        console.error('❌ Erreur vérification état guichet:', error);
-        setGuichetState({ isOpen: false });
-      } finally {
-        setLoadingGuichetState(false);
+      } else {
+        setOperation('OU');
       }
-    };
+    } catch (error) {
+      console.error('Erreur vérification session guichet:', error);
+    }
+  };
 
-    const timeoutId = setTimeout(checkGuichetState, 500);
-    return () => clearTimeout(timeoutId);
-  }, [formDataOuverture.code_guichet, agenceSessionId]);
+  const clearGuichetStorage = () => {
+    localStorage.removeItem('guichet_session_id');
+    localStorage.removeItem('guichet_id');
+    localStorage.removeItem('code_guichet');
+    setGuichetState({ isOpen: false });
+    setOperation('OU');
+  };
+
+  const loadGuichets = async () => {
+    try {
+      setLoadingGuichets(true);
+      console.log('📋 Chargement de tous les guichets...');
+      
+      // Utiliser la méthode corrigée du service
+      const data = await guichetService.getGuichets();
+      console.log('📦 Réponse API getGuichets:', data);
+      
+      // Vérifier si la réponse est un tableau
+      if (Array.isArray(data)) {
+        console.log('✅ Guichets chargés (tableau):', data);
+        setGuichets(data);
+      } else if (data && typeof data === 'object') {
+        // Si c'est un objet unique, le mettre dans un tableau
+        console.log('✅ Guichet unique chargé (converti en tableau):', data);
+        setGuichets([data]);
+      } else if (data && data.statut === 'success' && Array.isArray(data.data)) {
+        // Si la réponse a une structure { statut, message, data: [...] }
+        console.log('✅ Guichets chargés depuis structure data:', data.data);
+        setGuichets(data.data);
+      } else {
+        console.warn('⚠️ Format de données inattendu:', data);
+        setGuichets([]);
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Erreur chargement guichets:', error);
+      let errorMessage = 'Erreur lors du chargement des guichets';
+      
+      if (error && typeof error === 'object') {
+        const err = error as any;
+        errorMessage = err.response?.data?.message || 
+                      err.message || 
+                      errorMessage;
+      }
+      
+      showSnackbar(errorMessage, 'error');
+      setGuichets([]);
+    } finally {
+      setLoadingGuichets(false);
+    }
+  };
 
   const handleOperationChange = (e: React.ChangeEvent<{ value: unknown }>) => {
     const value = e.target.value as 'OU' | 'FE';
     setOperation(value);
   };
 
-  const handleOuvertureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleOuvertureChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
     const { name, value } = e.target;
-    
-    if (name === 'code_guichet') {
-      const numValue = parseInt(value, 10);
-      if ((isNaN(numValue) && value !== '') || (numValue < 1)) {
-        return;
-      }
-      setFormDataOuverture(prev => ({ ...prev, [name]: value }));
+    if (name && name in formDataOuverture) {
+      setFormDataOuverture(prev => ({ ...prev, [name]: value as string }));
     }
   };
 
@@ -181,37 +221,34 @@ const GuichetForm: React.FC = () => {
   const handleOpenGuichet = async (): Promise<ApiResponse> => {
     console.log('📞 Appel API ouverture guichet...');
     
+    if (!formDataOuverture.guichet_id) {
+      throw new Error('Veuillez sélectionner un guichet');
+    }
+
     try {
       const response = await sessionService.ouvrirGuichet(
         agenceSessionId,
-        parseInt(formDataOuverture.code_guichet)
+        parseInt(formDataOuverture.guichet_id)
       );
 
       console.log('✅ Réponse API ouverture guichet:', response);
       
-      const responseData = response.data;
-      
       return {
         statut: 'success',
-        message: responseData?.message || 'Guichet ouvert avec succès !',
-        data: responseData
+        message: response.data?.message || 'Guichet ouvert avec succès !',
+        data: response.data?.data || response.data
       };
       
     } catch (err: any) {
       console.error('❌ Erreur ouverture guichet:', err);
       
-      if (err.response && err.response.status === 201) {
-        console.log('⚠️ Hook a intercepté un statut 201 (succès)');
-        
-        const errorData = err.response.data;
-        if (errorData && errorData.statut === 'success') {
-          console.log('✅ Correction: c\'était un succès');
-          return {
-            statut: 'success',
-            message: errorData.message || 'Guichet ouvert avec succès !',
-            data: errorData
-          };
-        }
+      const errorData = err.response?.data;
+      if (errorData) {
+        return {
+          statut: 'error',
+          message: errorData.message || errorData.error || 'Erreur lors de l\'ouverture',
+          data: errorData
+        };
       }
       
       throw err;
@@ -231,135 +268,136 @@ const GuichetForm: React.FC = () => {
       
       console.log('✅ Réponse API fermeture guichet:', response);
       
-      const responseData = response.data;
-      
       return {
         statut: 'success',
-        message: responseData?.message || 'Guichet fermé avec succès !',
-        data: responseData
+        message: response.data?.message || 'Guichet fermé avec succès !',
+        data: response.data
       };
       
     } catch (err: any) {
       console.error('❌ Erreur fermeture guichet:', err);
+      
+      const errorData = err.response?.data;
+      if (errorData) {
+        return {
+          statut: 'error',
+          message: errorData.message || errorData.error || 'Erreur lors de la fermeture',
+          data: errorData
+        };
+      }
+      
       throw err;
     }
   };
 
-  const processOuvertureResponse = (responseData: ApiResponse) => {
+  const processOuvertureResponse = (responseData: ApiResponse): boolean => {
     console.log('🔄 Traitement réponse ouverture:', responseData);
     
-    if (!responseData) {
-      console.error('❌ Réponse API vide');
-      showSnackbar('Réponse du serveur vide ou invalide', 'error');
+    if (responseData.statut !== 'success') {
+      showSnackbar(responseData.message || 'Erreur lors de l\'ouverture', 'error');
       return false;
     }
     
-    const isSuccess = responseData.statut === 'success';
-    const message = responseData.message || '';
+    console.log('✅ Ouverture réussie:', responseData.message);
+    showSnackbar(responseData.message || 'Guichet ouvert avec succès !', 'success');
     
-    console.log(`📊 Analyse réponse: statut=${responseData.statut}, message="${message}"`);
+    // Extraire les données - Vérifier différents formats possibles
+    let guichetSessionId: number | undefined;
+    let codeGuichet: string | undefined;
+    let guichetId: number | undefined;
     
-    if (!isSuccess) {
-      const lowerMessage = message.toLowerCase();
-      if (lowerMessage.includes('erreur') || 
-          lowerMessage.includes('error') || 
-          lowerMessage.includes('échec') || 
-          lowerMessage.includes('failed')) {
-        console.log('❌ Message d\'erreur détecté:', message);
-        showSnackbar(message || 'Erreur lors de l\'ouverture', 'error');
-        return false;
-      } else {
-        console.log('⚠️ Statut "error" mais message ne semble pas être une erreur:', message);
-        showSnackbar(message || 'Avertissement lors de l\'opération', 'warning');
-        return false;
-      }
+    // Format 1: responseData.data contient directement les informations
+    if (responseData.data) {
+      guichetSessionId = responseData.data.id || responseData.data.guichet_session_id;
+      codeGuichet = responseData.data.code_guichet || responseData.data.code;
+      guichetId = responseData.data.guichet_id || responseData.data.guichetId;
     }
     
-    console.log('✅ Ouverture réussie:', message);
-    showSnackbar(message || 'Guichet ouvert avec succès !', 'success');
-    
-    // Extraire le guichet_session_id
-    const guichetSessionId = 
-      responseData.data?.guichet_session_id || 
-      responseData.data?.data?.guichet_session_id;
-    
-    if (guichetSessionId) {
-      console.log('💾 Stockage guichet dans localStorage:', {
-        guichet_session_id: guichetSessionId,
-        code_guichet: formDataOuverture.code_guichet
-      });
-      
-      localStorage.setItem('guichet_session_id', guichetSessionId.toString());
-      localStorage.setItem('code_guichet', formDataOuverture.code_guichet);
-      
-      setGuichetState({
-        isOpen: true,
-        sessionId: guichetSessionId,
-        codeGuichet: formDataOuverture.code_guichet
-      });
-      
-      setFormDataFermeture({
-        guichet_session_id: guichetSessionId.toString(),
-        code_guichet: formDataOuverture.code_guichet
-      });
-      
-      setOperation('FE');
-      
-      setTimeout(() => {
-        navigate('/caisse/form');
-      }, 2000);
+    // Format 2: responseData contient directement les informations
+    if (!guichetSessionId && responseData.data?.data) {
+      guichetSessionId = responseData.data.data.id;
+      codeGuichet = responseData.data.data.code_guichet;
+      guichetId = responseData.data.data.guichet_id;
     }
+    
+    // Si guichetId n'est pas dans la réponse, utiliser celui du formulaire
+    if (!guichetId) {
+      guichetId = parseInt(formDataOuverture.guichet_id);
+    }
+    
+    // Trouver le guichet sélectionné
+    const selectedGuichet = guichets.find(g => g.id.toString() === formDataOuverture.guichet_id);
+    
+    // Si pas de codeGuichet dans la réponse, utiliser celui du guichet
+    if (!codeGuichet && selectedGuichet) {
+      codeGuichet = selectedGuichet.code_guichet;
+    }
+    
+    // Préparer les données à stocker
+    const finalGuichetSessionId = guichetSessionId || Date.now(); // Fallback si pas d'ID
+    const finalGuichetId = guichetId || selectedGuichet?.id || 0;
+    const finalCodeGuichet = codeGuichet || selectedGuichet?.code_guichet || '';
+    
+    console.log('💾 Données finales à stocker:', {
+      guichet_session_id: finalGuichetSessionId,
+      guichet_id: finalGuichetId,
+      code_guichet: finalCodeGuichet
+    });
+    
+    // Stocker dans localStorage
+    localStorage.setItem('guichet_session_id', finalGuichetSessionId.toString());
+    localStorage.setItem('guichet_id', finalGuichetId.toString());
+    localStorage.setItem('code_guichet', finalCodeGuichet);
+    
+    // Mettre à jour l'état
+    setGuichetState({
+      isOpen: true,
+      sessionId: finalGuichetSessionId,
+      guichetId: finalGuichetId,
+      codeGuichet: finalCodeGuichet
+    });
+    
+    setFormDataFermeture({
+      guichet_session_id: finalGuichetSessionId.toString(),
+      guichet_id: finalGuichetId.toString(),
+      code_guichet: finalCodeGuichet
+    });
+    
+    setOperation('FE');
+    
+    // Redirection vers caisse après 1.5 secondes
+    console.log('🔄 Redirection vers caisse dans 1.5s...');
+    setTimeout(() => {
+      console.log('🚀 Redirection vers /caisse/form');
+      navigate('/caisse/form');
+    }, 1500);
     
     return true;
   };
 
-  const processFermetureResponse = (responseData: ApiResponse) => {
+  const processFermetureResponse = (responseData: ApiResponse): boolean => {
     console.log('🔄 Traitement réponse fermeture:', responseData);
     
-    if (!responseData) {
-      console.error('❌ Réponse API vide');
-      showSnackbar('Réponse du serveur vide ou invalide', 'error');
+    if (responseData.statut !== 'success') {
+      showSnackbar(responseData.message || 'Erreur lors de la fermeture', 'error');
       return false;
     }
     
-    const isSuccess = responseData.statut === 'success';
-    const message = responseData.message || '';
+    console.log('✅ Fermeture réussie:', responseData.message);
+    showSnackbar(responseData.message || 'Guichet fermé avec succès !', 'success');
     
-    console.log(`📊 Analyse réponse: statut=${responseData.statut}, message="${message}"`);
-    
-    if (!isSuccess) {
-      const lowerMessage = message.toLowerCase();
-      if (lowerMessage.includes('erreur') || 
-          lowerMessage.includes('error') || 
-          lowerMessage.includes('échec') || 
-          lowerMessage.includes('failed')) {
-        console.log('❌ Message d\'erreur détecté:', message);
-        showSnackbar(message || 'Erreur lors de la fermeture', 'error');
-        return false;
-      } else {
-        console.log('⚠️ Statut "error" mais message ne semble pas être une erreur:', message);
-        showSnackbar(message || 'Avertissement lors de l\'opération', 'warning');
-        return false;
-      }
-    }
-    
-    console.log('✅ Fermeture réussie:', message);
-    showSnackbar(message || 'Guichet fermé avec succès !', 'success');
-    
-    setGuichetState({ isOpen: false });
-    
-    localStorage.removeItem('guichet_session_id');
-    localStorage.removeItem('code_guichet');
-    localStorage.removeItem('caisse_session_id');
-    localStorage.removeItem('code_caisse');
-    localStorage.removeItem('solde_caisse');
+    // Réinitialiser
+    clearGuichetStorage();
     
     setOperation('OU');
     
     setFormDataOuverture(prev => ({ 
       ...prev, 
-      code_guichet: ''
+      guichet_id: ''
     }));
+    
+    // Recharger les guichets
+    loadGuichets();
     
     return true;
   };
@@ -369,18 +407,13 @@ const GuichetForm: React.FC = () => {
     
     console.log('🚀 Soumission ouverture guichet:', formDataOuverture);
     
-    if (agenceEtat === 'FE') {
-      showSnackbar('L\'agence est fermée. Ouvrez d\'abord l\'agence.', 'warning');
-      return;
-    }
-
     if (!agenceSessionId) {
       showSnackbar('Session agence manquante', 'error');
       return;
     }
 
-    if (!formDataOuverture.code_guichet || isNaN(parseInt(formDataOuverture.code_guichet, 10))) {
-      showSnackbar('Code guichet invalide', 'error');
+    if (!formDataOuverture.guichet_id) {
+      showSnackbar('Veuillez sélectionner un guichet', 'error');
       return;
     }
 
@@ -436,10 +469,9 @@ const GuichetForm: React.FC = () => {
   const isButtonDisabled = () => {
     if (loading) return true;
     if (!agenceSessionId) return true;
-    if (agenceEtat === 'FE') return true;
     
     if (operation === 'OU') {
-      if (!formDataOuverture.code_guichet || isNaN(parseInt(formDataOuverture.code_guichet, 10))) return true;
+      if (!formDataOuverture.guichet_id) return true;
     } else if (operation === 'FE') {
       if (!formDataFermeture.guichet_session_id) return true;
     }
@@ -472,13 +504,11 @@ const GuichetForm: React.FC = () => {
               Étape 3 : Gérer l'ouverture ou la fermeture des guichets
             </Typography>
             
-            {/* Indicateur d'état de l'agence */}
+            {/* Indicateur d'état */}
             <Box sx={{ mt: 2 }}>
-              {loadingAgence ? (
-                <Alert severity="info">Chargement...</Alert>
-              ) : agenceEtat === 'FE' ? (
+              {!agenceSessionId ? (
                 <Alert severity="warning">
-                  ⚠️ L'agence est FERMÉE. Ouvrez d'abord l'agence.
+                  ⚠️ L'agence n'est pas ouverte. Ouvrez d'abord l'agence.
                   <Button
                     variant="contained"
                     size="small"
@@ -488,24 +518,21 @@ const GuichetForm: React.FC = () => {
                     Ouvrir l'agence
                   </Button>
                 </Alert>
-              ) : agenceEtat === 'OU' ? (
+              ) : guichetState.isOpen && operation === 'FE' ? (
+                <Alert severity="info">
+                  <Typography variant="body2" fontWeight="bold">
+                    ℹ️ Guichet {guichetState.codeGuichet} est OUVERT
+                  </Typography>
+                  <Typography variant="body2">
+                    Session ID: {guichetState.sessionId} | Guichet ID: {guichetState.guichetId}
+                  </Typography>
+                </Alert>
+              ) : (
                 <Alert severity="success">
                   ✅ L'agence est OUVERTE (Session ID: {agenceSessionId})
                 </Alert>
-              ) : null}
+              )}
             </Box>
-
-            {/* État du guichet */}
-            {guichetState.isOpen && operation === 'FE' && (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                <Typography variant="body2" fontWeight="bold">
-                  ℹ️ Guichet {guichetState.codeGuichet} est OUVERT
-                </Typography>
-                <Typography variant="body2">
-                  Session ID: {guichetState.sessionId}
-                </Typography>
-              </Alert>
-            )}
           </Box>
 
           <Card sx={{ borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
@@ -513,13 +540,13 @@ const GuichetForm: React.FC = () => {
               <Grid container spacing={3}>
                 {/* Sélection Opération */}
                 <Grid item xs={12} md={6}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Opération</InputLabel>
+                  <FormControl fullWidth size="small" disabled={!agenceSessionId}>
+                    <InputLabel>Opération *</InputLabel>
                     <Select
                       value={operation}
                       onChange={handleOperationChange}
-                      label="Opération"
-                      disabled={!agenceSessionId || agenceEtat === 'FE'}
+                      label="Opération *"
+                      required
                     >
                       <MenuItem value="OU">Ouverture (OU)</MenuItem>
                       <MenuItem value="FE">Fermeture (FE)</MenuItem>
@@ -544,24 +571,33 @@ const GuichetForm: React.FC = () => {
                   <form onSubmit={handleSubmitOuverture} style={{ width: '100%' }}>
                     <Grid container spacing={3}>
                       <Grid item xs={12}>
-                        <Tooltip 
-                          title={agenceEtat === 'FE' ? "L'agence doit être ouverte" : ""}
-                        >
-                          <TextField
-                            fullWidth
-                            size="small"
-                            label="Code du guichet *"
-                            name="code_guichet"
-                            value={formDataOuverture.code_guichet}
+                        <FormControl sx={{minWidth: 200}} size="small" required>
+                          <InputLabel>Sélectionner Guichet</InputLabel>
+                          <Select
+                            name="guichet_id"
+                            value={formDataOuverture.guichet_id}
                             onChange={handleOuvertureChange}
+                            label="Guichet *"
                             required
-                            placeholder="Ex: 1001"
-                            type="number"
-                            inputProps={{ min: 1 }}
-                            disabled={agenceEtat === 'FE'}
-                            helperText={loadingGuichetState ? "Vérification..." : ""}
-                          />
-                        </Tooltip>
+                            disabled={loadingGuichets}
+                          >
+                            <MenuItem value=""><em>Sélectionner un guichet</em></MenuItem>
+                            {guichets.length > 0 ? (
+                              guichets.map((guichet) => (
+                                <MenuItem key={guichet.id} value={guichet.id}>
+                                  {guichet.nom_guichet} ({guichet.code_guichet})
+                                </MenuItem>
+                              ))
+                            ) : (
+                              <MenuItem value="" disabled>
+                                {loadingGuichets ? 'Chargement...' : 'Aucun guichet disponible'}
+                              </MenuItem>
+                            )}
+                          </Select>
+                          {loadingGuichets && (
+                            <CircularProgress size={20} sx={{ position: 'absolute', right: 40, top: '50%' }} />
+                          )}
+                        </FormControl>
                       </Grid>
                     </Grid>
                   </form>
@@ -603,6 +639,7 @@ const GuichetForm: React.FC = () => {
                     <Typography variant="body2" component="div" sx={{ mt: 1, fontFamily: 'monospace', fontSize: '12px' }}>
                       session_agence_id: {localStorage.getItem('session_agence_id') || 'null'}<br/>
                       guichet_session_id: {localStorage.getItem('guichet_session_id') || 'null'}<br/>
+                      guichet_id: {localStorage.getItem('guichet_id') || 'null'}<br/>
                       code_guichet: {localStorage.getItem('code_guichet') || 'null'}
                     </Typography>
                   </Alert>
@@ -632,7 +669,7 @@ const GuichetForm: React.FC = () => {
                           onClick={operation === 'OU' ? handleSubmitOuverture : handleSubmitFermeture}
                           sx={{
                             background: operation === 'OU' 
-                              ? 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)'
+                              ? 'linear-gradient(135deg, #3B82F6 0%, #1D4Ed8 100%)'
                               : 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
                             borderRadius: '8px',
                             px: 4,

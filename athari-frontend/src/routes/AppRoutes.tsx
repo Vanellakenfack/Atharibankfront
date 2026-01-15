@@ -34,6 +34,9 @@ import BordereauVersementAC from '../pages/TransactionFrontOffice/TransactionCai
 import BordereauVersementClient from '../pages/TransactionFrontOffice/TransactionCaisseEspece/BordereauVersementClient.js';
 import EntreesSortiesCaisse from '../pages/TransactionFrontOffice/TransactionCaisseEspece/EntreesSortiesCaisse.js';
 import TransfertInterCaisse from '../pages/TransactionFrontOffice/TransactionCaisseEspece/TransfertInterCaisse.js';
+import DashboardCaissieres from '../pages/TransactionFrontOffice/DasbordCaisse/DashboardCaissieres.js';
+import RetraitEspeces from '../pages/TransactionFrontOffice/TransactionCaisseEspece/RetraitEspeces.js';
+
 
 // Ajoute "Link" dans l'importation existante
 
@@ -112,9 +115,9 @@ const AppRoutes = () => {
       <Route path='/versement/ac' element={<BordereauVersementAC />} />
       <Route path='/entrees-sorties-caisse' element={<EntreesSortiesCaisse />} />
       <Route path='/Transfert-Inter-Caisse' element={<TransfertInterCaisse />} />
-
-            
-
+      <Route path='/Dashboard-Caissieres' element={<DashboardCaissieres />} />            
+      <Route path='/Retrait-Especes' element={<RetraitEspeces />} />
+      
 
       </Route>
 

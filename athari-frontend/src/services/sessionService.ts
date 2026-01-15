@@ -1,7 +1,7 @@
 import ApiClient from './api/ApiClient';
 
 const sessionService = {
-  // Agence
+  // Journée + Agence (Étapes 1 & 2)
   ouvrirAgence: async (agenceId: string | number, dateComptable: string) => {
     const response = await ApiClient.post('/sessions/ouvrir-agence', {
       agence_id: agenceId,
@@ -10,57 +10,66 @@ const sessionService = {
     return response;
   },
 
-  fermerAgence: async (sessionAgenceId: number, journeeId: number) => {
+  fermerAgence: async (agenceSessionId: number, jourComptableId: number) => {
     const response = await ApiClient.post('/sessions/fermer-agence', {
-      agence_session_id: sessionAgenceId,
-      jour_comptable_id: journeeId
+      agence_session_id: agenceSessionId,
+      jour_comptable_id: jourComptableId
     });
     return response;
   },
 
-  // Guichet
-  ouvrirGuichet: async (agenceSessionId: string, codeGuichet: number) => {
+  // Guichet (Étape 3)
+  ouvrirGuichet: async (agenceSessionId: string | number, guichetId: number) => {
     const response = await ApiClient.post('/sessions/ouvrir-guichet', {
-      agence_session_id: parseInt(agenceSessionId),
-      code_guichet: codeGuichet
+      agence_session_id: parseInt(agenceSessionId.toString()),
+      guichet_id: guichetId
     });
     return response;
   },
 
-  fermerGuichet: async (guichetSessionId: string) => {
+  fermerGuichet: async (guichetSessionId: string | number) => {
     const response = await ApiClient.post('/sessions/fermer-guichet', {
-      guichet_session_id: parseInt(guichetSessionId)
+      guichet_session_id: parseInt(guichetSessionId.toString())
     });
     return response;
   },
 
-  // Caisse
+  // Caisse (Étape 4)
   ouvrirCaisse: async (
     guichetSessionId: number,
+    caisseId: number,
     codeCaisse: string,
     billetage: Record<string, number>,
     soldeSaisi: number
   ) => {
     const response = await ApiClient.post('/sessions/ouvrir-caisse', {
       guichet_session_id: guichetSessionId,
-      code_caisse: codeCaisse,
+      caisse_id: caisseId,
       billetage: billetage,
+      code_caisse: codeCaisse,
       solde_saisi: soldeSaisi
     });
     return response;
   },
 
-  fermerCaisse: async (caisseSessionId: number, soldeFermeture: number) => {
+  fermerCaisse: async (caisseSessionId: number, soldeFermeture: number, billetageFermeture: Record<string, number>) => {
     const response = await ApiClient.post('/sessions/fermer-caisse', {
       caisse_session_id: caisseSessionId,
-      solde_fermeture: soldeFermeture // CORRIGÉ: solde_fermeture au lieu de solde_saisi
+      solde_fermeture: soldeFermeture,
+      billetage: billetageFermeture
     });
     return response;
   },
 
-  // Solde informatique
+  // Solde informatique - CORRECTION : URL correcte selon ton backend
   getSoldeInformatique: async (codeCaisse: string) => {
     const response = await ApiClient.get(`/sessions/caisses/${codeCaisse}/solde-informatique`);
+    return response.data;
+  },
+
+  // Bilan caisse
+  getBilanCaisse: async (caisseSessionId: number) => {
+    const response = await ApiClient.get(`/sessions/bilan-caisse/${caisseSessionId}`);
     return response.data;
   }
 };
