@@ -49,6 +49,7 @@ interface CaisseState {
   isOpen: boolean;
   sessionId?: number;
   caisseId?: number;
+  codeCaisse?: string;
   soldeOuverture?: number;
 }
 
@@ -90,6 +91,7 @@ const CaisseForm = () => {
   const [formDataOuverture, setFormDataOuverture] = useState({
     guichet_session_id: '',
     caisse_id: '',
+    code_caisse: '',
     solde_saisi: 0,
   });
   
@@ -170,19 +172,23 @@ const CaisseForm = () => {
               isOpen: true,
               sessionId: parseInt(caisseSessionId),
               caisseId: parseInt(caisseId),
+              codeCaisse: codeCaisse,
               soldeOuverture: soldeCaisse ? parseFloat(soldeCaisse) : undefined
             });
-            
-            // Trouver la caisse correspondante
-            const caisse = caisses.find(c => c.id.toString() === caisseId);
             
             setFormDataFermeture({
               caisse_session_id: caisseSessionId,
               caisse_id: caisseId,
-              code_caisse: codeCaisse || (caisse ? caisse.code : ''),
+              code_caisse: codeCaisse,
               solde_fermeture: soldeCaisse ? parseFloat(soldeCaisse) : 0,
               solde_ouverture: soldeCaisse ? parseFloat(soldeCaisse) : 0
             });
+            
+            // Charger automatiquement le code caisse dans le champ ouverture
+            setFormDataOuverture(prev => ({
+              ...prev,
+              code_caisse: codeCaisse
+            }));
             
             setOperation('FE');
           } else {
@@ -243,8 +249,7 @@ const CaisseForm = () => {
   // Récupérer le solde informatique quand la caisse change (ouverture)
   useEffect(() => {
     if (formDataOuverture.caisse_id && formDataOuverture.caisse_id !== '' && operation === 'OU') {
-      const caisseId = parseInt(formDataOuverture.caisse_id);
-      fetchSoldeInformatique(caisseId);
+      fetchSoldeInformatique();
     } else {
       setSoldeInfo(null);
     }
@@ -257,14 +262,25 @@ const CaisseForm = () => {
     }
   }, [billets, formDataOuverture.solde_saisi]);
 
-  const fetchSoldeInformatique = async (caisseId: number) => {
-    if (!caisseId) return;
+  const getSelectedCaisse = () => {
+    if (!formDataOuverture.caisse_id) return null;
+    return caisses.find(c => c.id.toString() === formDataOuverture.caisse_id);
+  };
+
+  const fetchSoldeInformatique = async () => {
+    if (!formDataOuverture.caisse_id) return;
+    
+    const selectedCaisse = getSelectedCaisse();
+    if (!selectedCaisse) {
+      console.warn('⚠️ Caisse non trouvée');
+      return;
+    }
     
     setLoadingSolde(true);
     try {
-      console.log(`🔍 Récupération solde informatique pour caisse ID: ${caisseId}`);
+      console.log(`🔍 Récupération solde informatique pour caisse: ${selectedCaisse.code_caisse}`);
       
-      const response = await sessionService.getSoldeInformatique(caisseId);
+      const response = await sessionService.getSoldeInformatique(selectedCaisse.code_caisse);
       console.log('📦 Réponse solde informatique:', response);
       
       if (response) {
@@ -313,6 +329,7 @@ const CaisseForm = () => {
         ...prev,
         guichet_session_id: guichetSessionId,
         caisse_id: '',
+        code_caisse: '',
         solde_saisi: 0
       }));
       resetBilletage();
@@ -323,6 +340,13 @@ const CaisseForm = () => {
     const { name, value } = e.target;
     
     if (name === 'caisse_id') {
+      const selectedCaisse = caisses.find(c => c.id.toString() === value);
+      setFormDataOuverture(prev => ({ 
+        ...prev, 
+        [name]: value as string,
+        code_caisse: selectedCaisse ? selectedCaisse.code_caisse : ''
+      }));
+    } else if (name === 'code_caisse') {
       setFormDataOuverture(prev => ({ ...prev, [name]: value as string }));
     } else if (name === 'solde_saisi') {
       const numValue = parseFloat(value as string);
@@ -344,6 +368,8 @@ const CaisseForm = () => {
       } else {
         setFormDataFermeture(prev => ({ ...prev, [name]: 0 }));
       }
+    } else if (name === 'code_caisse') {
+      setFormDataFermeture(prev => ({ ...prev, [name]: value }));
     }
   };
 
@@ -451,6 +477,16 @@ const CaisseForm = () => {
     });
     
     console.log('📦 Billetage formaté pour API:', billetage);
+    console.log('🔍 Type de billetage:', typeof billetage);
+    console.log('🔍 Est un objet?:', typeof billetage === 'object' && !Array.isArray(billetage));
+    console.log('🔍 Est vide?:', Object.keys(billetage).length === 0);
+    
+    // Si le billetage est vide, créer un billetage par défaut avec un total de 0
+    if (Object.keys(billetage).length === 0) {
+      billetage['0'] = 0; // Ajouter une entrée pour indiquer un billetage de 0
+      console.log('⚠️ Billetage vide, création entrée par défaut:', billetage);
+    }
+    
     return billetage;
   };
 
@@ -524,20 +560,45 @@ const CaisseForm = () => {
     const sessionIdNum = parseInt(guichetSessionId);
     const caisseIdNum = parseInt(formDataOuverture.caisse_id);
     const soldeNum = parseFloat(formDataOuverture.solde_saisi.toString());
+    const codeCaisse = formDataOuverture.code_caisse;
     
     console.log('📤 Données ouverture caisse:', {
       guichet_session_id: sessionIdNum,
       caisse_id: caisseIdNum,
+      billetage: billetage,
       solde_saisi: soldeNum,
-      billetage: billetage
+      code_caisse: codeCaisse
     });
+    
+    // Vérification que le billetage est bien un objet
+    console.log('🔍 Type de billetage:', typeof billetage);
+    console.log('🔍 Billetage:', billetage);
+    console.log('🔍 Clés du billetage:', Object.keys(billetage));
+    console.log('🔍 Valeurs du billetage:', Object.values(billetage));
+    
+    // S'assurer que billetage est un objet, pas un nombre
+    let finalBilletage = billetage;
+    if (typeof billetage === 'number') {
+      console.warn('⚠️ Billetage est un nombre, conversion en objet...');
+      finalBilletage = { total: billetage };
+    } else if (!billetage || typeof billetage !== 'object') {
+      console.warn('⚠️ Billetage invalide, création objet avec entrée 0...');
+      finalBilletage = { '0': 0 };
+    }
+    
+    // Si le billetage est vide, ajouter une entrée par défaut
+    if (Object.keys(finalBilletage).length === 0) {
+      console.warn('⚠️ Billetage toujours vide, ajout entrée par défaut');
+      finalBilletage = { 'vide': 0 };
+    }
     
     try {
       const response = await sessionService.ouvrirCaisse(
         sessionIdNum,
         caisseIdNum,
-        billetage,
-        soldeNum
+        finalBilletage,
+        soldeNum,
+        codeCaisse
       );
 
       console.log('✅ Réponse API ouverture caisse:', response);
@@ -549,7 +610,15 @@ const CaisseForm = () => {
       };
       
     } catch (err: any) {
-      console.error('❌ Erreur API ouverture caisse:', err);
+      console.error('❌ Erreur détaillée API ouverture caisse:', err);
+      
+      // Logs détaillés
+      if (err.response) {
+        console.error('❌ Status:', err.response.status);
+        console.error('❌ Headers:', err.response.headers);
+        console.error('❌ Data:', err.response.data);
+        console.error('❌ Request:', err.config?.data);
+      }
       
       const errorData = err.response?.data;
       if (errorData) {
@@ -574,11 +643,27 @@ const CaisseForm = () => {
       billetage: billetageFermeture
     });
 
+    // Vérification que le billetage est bien un objet
+    let finalBilletageFermeture = billetageFermeture;
+    if (typeof billetageFermeture === 'number') {
+      console.warn('⚠️ Billetage fermeture est un nombre, conversion en objet...');
+      finalBilletageFermeture = { total: billetageFermeture };
+    } else if (!billetageFermeture || typeof billetageFermeture !== 'object') {
+      console.warn('⚠️ Billetage fermeture invalide, création objet avec entrée 0...');
+      finalBilletageFermeture = { '0': 0 };
+    }
+    
+    // Si le billetage est vide, ajouter une entrée par défaut
+    if (Object.keys(finalBilletageFermeture).length === 0) {
+      console.warn('⚠️ Billetage fermeture vide, ajout entrée par défaut');
+      finalBilletageFermeture = { 'vide': 0 };
+    }
+
     try {
       const response = await sessionService.fermerCaisse(
         sessionIdNum,
         formDataFermeture.solde_fermeture,
-        billetageFermeture
+        finalBilletageFermeture
       );
       
       console.log('✅ Réponse API fermeture caisse:', response);
@@ -617,38 +702,41 @@ const CaisseForm = () => {
     showSnackbar(responseData.message || 'Caisse ouverte avec succès !', 'success');
     
     // Extraire les données
-    const caisseSessionId = responseData.data?.caisse_session_id;
-    const codeCaisse = responseData.data?.code_caisse;
+    const caisseSessionId = responseData.data?.caisse_session_id || responseData.data?.id;
+    const codeCaisse = responseData.data?.code_caisse || formDataOuverture.code_caisse;
+    const caisseId = responseData.data?.caisse_id || formDataOuverture.caisse_id;
+    const soldeOuverture = responseData.data?.solde_ouverture || formDataOuverture.solde_saisi;
     
-    // Trouver la caisse sélectionnée
-    const selectedCaisse = caisses.find(c => c.id.toString() === formDataOuverture.caisse_id);
-    
-    if (caisseSessionId && selectedCaisse) {
+    if (caisseSessionId && caisseId && codeCaisse) {
       console.log('💾 Stockage caisse dans localStorage:', {
         caisse_session_id: caisseSessionId,
-        caisse_id: selectedCaisse.id,
-        code_caisse: codeCaisse || selectedCaisse.code,
-        solde_caisse: formDataOuverture.solde_saisi
+        caisse_id: caisseId,
+        code_caisse: codeCaisse,
+        solde_caisse: soldeOuverture
       });
       
+      // Stocker dans localStorage
       localStorage.setItem('caisse_session_id', caisseSessionId.toString());
-      localStorage.setItem('caisse_id', selectedCaisse.id.toString());
-      localStorage.setItem('code_caisse', codeCaisse || selectedCaisse.code);
-      localStorage.setItem('solde_caisse', formDataOuverture.solde_saisi.toString());
+      localStorage.setItem('caisse_id', caisseId.toString());
+      localStorage.setItem('code_caisse', codeCaisse);
+      localStorage.setItem('solde_caisse', soldeOuverture.toString());
       
+      // Mettre à jour l'état
       setCaisseState({
         isOpen: true,
-        sessionId: caisseSessionId,
-        caisseId: selectedCaisse.id,
-        soldeOuverture: formDataOuverture.solde_saisi
+        sessionId: parseInt(caisseSessionId),
+        caisseId: parseInt(caisseId),
+        codeCaisse: codeCaisse,
+        soldeOuverture: soldeOuverture
       });
       
+      // Mettre à jour le formulaire de fermeture
       setFormDataFermeture({
         caisse_session_id: caisseSessionId.toString(),
-        caisse_id: selectedCaisse.id.toString(),
-        code_caisse: codeCaisse || selectedCaisse.code,
-        solde_fermeture: formDataOuverture.solde_saisi,
-        solde_ouverture: formDataOuverture.solde_saisi
+        caisse_id: caisseId.toString(),
+        code_caisse: codeCaisse,
+        solde_fermeture: soldeOuverture,
+        solde_ouverture: soldeOuverture
       });
       
       setOperation('FE');
@@ -656,9 +744,11 @@ const CaisseForm = () => {
       resetBilletage();
       
       return true;
+    } else {
+      console.error('❌ Données manquantes dans la réponse:', responseData.data);
+      showSnackbar('Données manquantes dans la réponse du serveur', 'error');
+      return false;
     }
-    
-    return false;
   };
 
   const processFermetureResponse = (responseData: ApiResponse) => {
@@ -672,14 +762,16 @@ const CaisseForm = () => {
     console.log('✅ Fermeture réussie:', responseData.message);
     showSnackbar(responseData.message || 'Caisse fermée avec succès !', 'success');
     
-    // Réinitialiser
+    // Réinitialiser l'état de la caisse
     setCaisseState({ isOpen: false });
     
-    // Nettoyage localStorage
-    localStorage.removeItem('caisse_session_id');
+    // NE PAS SUPPRIMER le caisse_session_id du localStorage car il sera utilisé pour fermer le guichet
+    // Ne supprimer que les données spécifiques à la caisse
     localStorage.removeItem('caisse_id');
     localStorage.removeItem('code_caisse');
     localStorage.removeItem('solde_caisse');
+    
+    // Le caisse_session_id reste dans le localStorage pour être utilisé dans la fermeture du guichet
 
     setOperation('OU');
     
@@ -687,6 +779,7 @@ const CaisseForm = () => {
     setFormDataOuverture({
       guichet_session_id: guichetSessionId,
       caisse_id: '',
+      code_caisse: '',
       solde_saisi: 0,
     });
     
@@ -714,15 +807,31 @@ const CaisseForm = () => {
       return;
     }
 
+    if (!formDataOuverture.code_caisse) {
+      showSnackbar('Veuillez saisir le code de la caisse.', 'error');
+      return;
+    }
+
     if (formDataOuverture.solde_saisi === undefined || formDataOuverture.solde_saisi < 0) {
       showSnackbar('Veuillez saisir un solde valide (≥ 0)', 'error');
       return;
     }
 
-    if (Math.abs(difference) > 1) {
-      showSnackbar('Le billetage n\'est pas correct. Ajustez le billetage.', 'error');
-      setBilletageDialogOpen(true);
-      return;
+    // Vérifier si le billetage est vide
+    const billetage = prepareBilletageForApi();
+    if (Object.keys(billetage).length === 0 || (billetage['0'] === 0 && Object.keys(billetage).length === 1)) {
+      // Si le solde est 0, c'est normal d'avoir un billetage vide
+      if (formDataOuverture.solde_saisi === 0) {
+        console.log('✅ Solde 0, billetage vide accepté');
+      } else if (Math.abs(difference) > 1) {
+        showSnackbar('Le billetage n\'est pas correct. Ajustez le billetage.', 'error');
+        setBilletageDialogOpen(true);
+        return;
+      } else {
+        showSnackbar('Veuillez saisir le billetage.', 'warning');
+        setBilletageDialogOpen(true);
+        return;
+      }
     }
 
     setLoading(true);
@@ -759,9 +868,27 @@ const CaisseForm = () => {
       return;
     }
 
+    if (!formDataFermeture.code_caisse) {
+      showSnackbar('Code caisse manquant.', 'error');
+      return;
+    }
+
     if (formDataFermeture.solde_fermeture === undefined || formDataFermeture.solde_fermeture < 0) {
       showSnackbar('Veuillez saisir un solde de fermeture valide.', 'error');
       return;
+    }
+
+    // Vérifier si le billetage est vide pour la fermeture
+    const billetageFermeture = prepareBilletageForApi();
+    if (Object.keys(billetageFermeture).length === 0 || (billetageFermeture['0'] === 0 && Object.keys(billetageFermeture).length === 1)) {
+      // Si le solde de fermeture est 0, c'est normal d'avoir un billetage vide
+      if (formDataFermeture.solde_fermeture === 0) {
+        console.log('✅ Solde fermeture 0, billetage vide accepté');
+      } else {
+        showSnackbar('Veuillez saisir le billetage de fermeture.', 'warning');
+        setBilletageDialogOpen(true);
+        return;
+      }
     }
 
     setLoading(true);
@@ -807,10 +934,13 @@ const CaisseForm = () => {
     
     if (operation === 'OU') {
       if (!formDataOuverture.caisse_id) return true;
+      if (!formDataOuverture.code_caisse) return true;
       if (formDataOuverture.solde_saisi === undefined || formDataOuverture.solde_saisi < 0) return true;
-      if (Math.abs(difference) > 1) return true;
+      // Si le solde est > 0, vérifier que le billetage est correct
+      if (formDataOuverture.solde_saisi > 0 && Math.abs(difference) > 1) return true;
     } else if (operation === 'FE') {
       if (!formDataFermeture.caisse_session_id) return true;
+      if (!formDataFermeture.code_caisse) return true;
       if (formDataFermeture.solde_fermeture === undefined || formDataFermeture.solde_fermeture < 0) return true;
     }
     
@@ -876,7 +1006,7 @@ const CaisseForm = () => {
                     ✅ La caisse {formDataFermeture.code_caisse} est OUVERTE
                   </Typography>
                   <Typography variant="body2">
-                    Guichet: {codeGuichet} | Session ID: {guichetSessionId}
+                    Guichet: {codeGuichet} | Session ID: {guichetSessionId} | Caisse Session ID: {caisseState.sessionId}
                   </Typography>
                 </Alert>
               ) : (
@@ -959,6 +1089,26 @@ const CaisseForm = () => {
                       </Grid>
 
                       <Grid item xs={12}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Code de la Caisse *"
+                          name="code_caisse"
+                          value={formDataOuverture.code_caisse}
+                          onChange={handleOuvertureChange}
+                          required
+                          helperText="Saisissez le code de la caisse"
+                          InputProps={{
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <InfoIcon color="action" />
+                              </InputAdornment>
+                            )
+                          }}
+                        />
+                      </Grid>
+
+                      <Grid item xs={12}>
                         <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
                           <Box sx={{ flex: 1 }}>
                             <TextField
@@ -1036,45 +1186,50 @@ const CaisseForm = () => {
                       </Grid>
 
                       {/* État du billetage (uniquement pour ouverture) */}
-                      {formDataOuverture.solde_saisi > 0 && (
-                        <Grid item xs={12}>
-                          <Alert 
-                            severity={Math.abs(difference) <= 1 ? "success" : "warning"}
-                            icon={Math.abs(difference) <= 1 ? <CheckCircleIcon /> : <WarningIcon />}
-                          >
+                      <Grid item xs={12}>
+                        <Alert 
+                          severity={Math.abs(difference) <= 1 ? "success" : "warning"}
+                          icon={Math.abs(difference) <= 1 ? <CheckCircleIcon /> : <WarningIcon />}
+                        >
+                          <Typography variant="body2" fontWeight="bold">
+                            État du billetage:
+                          </Typography>
+                          
+                          <Box sx={{ mt: 1 }}>
+                            <Typography variant="body2">
+                              • Solde à billeter: {formatCurrency(formDataOuverture.solde_saisi)} FCFA
+                            </Typography>
+                            <Typography variant="body2">
+                              • Total billetage: {formatCurrency(totalBilletage)} FCFA
+                            </Typography>
                             <Typography variant="body2" fontWeight="bold">
-                              État du billetage:
+                              • Différence: {formatCurrency(difference)} FCFA
                             </Typography>
-                            
-                            <Box sx={{ mt: 1 }}>
-                              <Typography variant="body2">
-                                • Solde à billeter: {formatCurrency(formDataOuverture.solde_saisi)} FCFA
-                              </Typography>
-                              <Typography variant="body2">
-                                • Total billetage: {formatCurrency(totalBilletage)} FCFA
-                              </Typography>
-                              <Typography variant="body2" fontWeight="bold">
-                                • Différence: {formatCurrency(difference)} FCFA
-                              </Typography>
-                            </Box>
-                            
-                            <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
-                              {validationMessage}
-                            </Typography>
-                            
-                            {Math.abs(difference) > 1 && (
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                onClick={handleOpenBilletageDialog}
-                                sx={{ mt: 1 }}
-                              >
-                                Ajuster le billetage
-                              </Button>
-                            )}
-                          </Alert>
-                        </Grid>
-                      )}
+                          </Box>
+                          
+                          <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
+                            {validationMessage}
+                          </Typography>
+                          
+                          <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={handleOpenBilletageDialog}
+                            >
+                              {formDataOuverture.solde_saisi === 0 ? 'Voir le billetage' : 'Ajuster le billetage'}
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={suggestBilletage}
+                              disabled={formDataOuverture.solde_saisi === 0}
+                            >
+                              Suggérer automatiquement
+                            </Button>
+                          </Box>
+                        </Alert>
+                      </Grid>
                     </Grid>
                   </form>
                 ) : (
@@ -1085,10 +1240,15 @@ const CaisseForm = () => {
                         <TextField
                           fullWidth
                           size="small"
-                          label="Code de la caisse"
-                          value={formDataFermeture.code_caisse || 'Non disponible'}
-                          disabled
-                          helperText="Caisse à fermer"
+                          label="ID de Session Caisse"
+                          name="caisse_session_id"
+                          value={formDataFermeture.caisse_session_id || localStorage.getItem('caisse_session_id') || 'Non disponible'}
+                          onChange={(e) => setFormDataFermeture(prev => ({ ...prev, caisse_session_id: e.target.value }))}
+                          required
+                          helperText="ID de session de la caisse (récupéré automatiquement)"
+                          InputProps={{
+                            readOnly: false,
+                          }}
                         />
                       </Grid>
 
@@ -1096,10 +1256,12 @@ const CaisseForm = () => {
                         <TextField
                           fullWidth
                           size="small"
-                          label="Session Caisse ID"
-                          value={formDataFermeture.caisse_session_id || 'Non disponible'}
-                          disabled
-                          helperText="ID de session de la caisse"
+                          label="Code de la Caisse *"
+                          name="code_caisse"
+                          value={formDataFermeture.code_caisse || localStorage.getItem('code_caisse') || ''}
+                          onChange={handleFermetureChange}
+                          required
+                          helperText="Code de la caisse"
                         />
                       </Grid>
 
@@ -1151,14 +1313,23 @@ const CaisseForm = () => {
                           <Typography variant="body2">
                             💡 <strong>Note importante:</strong> N'oubliez pas de saisir également le billetage de fermeture.
                           </Typography>
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={handleOpenBilletageDialog}
-                            sx={{ mt: 1 }}
-                          >
-                            Saisir le billetage de fermeture
-                          </Button>
+                          <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={handleOpenBilletageDialog}
+                            >
+                              Saisir le billetage de fermeture
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={suggestBilletage}
+                              disabled={formDataFermeture.solde_fermeture === 0}
+                            >
+                              Suggérer automatiquement
+                            </Button>
+                          </Box>
                         </Alert>
                       </Grid>
                     </Grid>
@@ -1169,14 +1340,18 @@ const CaisseForm = () => {
                 <Grid item xs={12}>
                   <Alert severity="info" icon={false}>
                     <Typography variant="body2" fontWeight="bold">
-                      Informations techniques:
+                      Informations stockées dans localStorage:
                     </Typography>
                     <Typography variant="body2" component="div" sx={{ mt: 1, fontFamily: 'monospace', fontSize: '12px' }}>
                       • Guichet Session ID: {localStorage.getItem('guichet_session_id') || 'Non défini'}<br/>
                       • Guichet ID: {localStorage.getItem('guichet_id') || 'Non défini'}<br/>
                       • Caisse Session ID: {localStorage.getItem('caisse_session_id') || 'Non défini'}<br/>
                       • Caisse ID: {localStorage.getItem('caisse_id') || 'Non défini'}<br/>
+                      • Code Caisse: {localStorage.getItem('code_caisse') || 'Non défini'}<br/>
                       • Agence Session ID: {localStorage.getItem('session_agence_id') || 'Non défini'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      <strong>Note:</strong> Le Caisse Session ID reste dans le localStorage après fermeture pour être utilisé dans la fermeture du guichet.
                     </Typography>
                   </Alert>
                 </Grid>
