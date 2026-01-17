@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -33,6 +33,11 @@ import {
   TableHead,
   IconButton,
   InputAdornment,
+  Avatar,
+  Divider,
+  Radio,
+  RadioGroup,
+  FormLabel,
 } from '@mui/material';
 import {
   CheckCircle,
@@ -44,7 +49,22 @@ import {
   Remove as RemoveIcon,
   Calculate as CalculateIcon,
   Warning,
+  Key,
+  Lock,
+  Portrait,
+  Fingerprint,
+  AlternateEmail,
+  Phone,
+  AccountBalance,
+  AccountBalanceWallet,
+  Print,
+  Download,
 } from '@mui/icons-material';
+
+import logo from '../../../assets/img/logo.png';
+// Import pour génération PDF
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 // --- IMPORT DES COMPOSANTS DE LAYOUT ---
 import Sidebar from '../../../components/layout/Sidebar';
@@ -52,6 +72,7 @@ import TopBar from '../../../components/layout/TopBar';
 
 // --- IMPORT DES SERVICES ---
 import retraitService, { 
+  RetraitService,
   type BilletageItem, 
   type RetraitData, 
   type TiersData 
@@ -60,6 +81,8 @@ import compteService from '../../../services/api/compteService';
 import agenceService, { type Agence as AgenceApi } from '../../../services/agenceService';
 import guichetService from '../../../services/guichetService';
 import caisseService from '../../../services/caisseService';
+import ApiClient from '../../../services/api/ApiClient';
+import type { color } from 'html2canvas/dist/types/css/types/color';
 
 // --- INTERFACES ---
 interface Guichet {
@@ -86,18 +109,118 @@ interface Caisse {
   plafond_autonomie_caissiere: string;
 }
 
+interface ClientPhysique {
+  id: number;
+  client_id: number;
+  nom_prenoms: string;
+  sexe: string;
+  date_naissance: string;
+  lieu_naissance?: string;
+  cni_numero?: string;
+  cni_delivrance?: string;
+  cni_expiration?: string;
+  profession?: string;
+  nom_pere?: string;
+  nom_mere?: string;
+  nationalite?: string;
+  photo?: string;
+  photo_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ClientMorale {
+  id: number;
+  client_id: number;
+  raison_sociale: string;
+  sigle?: string;
+  forme_juridique?: string;
+  activite_principale?: string;
+  capital_social?: string;
+  registre_commerce?: string;
+  numero_contribuable?: string;
+  nom_representant?: string;
+  qualite_representant?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface Client {
   id: number;
   nom_complet: string;
   type_client: string;
   telephone?: string;
   email?: string;
-  physique?: {
-    nom_prenoms: string;
-    sexe: string;
-    date_naissance: string;
-  };
+  physique?: ClientPhysique;
+  morale?: ClientMorale;
+  adresse_quartier?: string;
+  adresse_ville?: string;
+  pays_residence?: string;
 }
+
+interface Mandataire {
+  id: number;
+  adresse?: string;
+  cni_conjoint?: string | null;
+  compte_id: number;
+  created_at: string;
+  date_naissance: string;
+  date_naissance_conjoint?: string | null;
+  lieu_naissance: string;
+  lieu_naissance_conjoint?: string | null;
+  nationalite: string;
+  nom: string;
+  nom_conjoint?: string | null;
+  nom_jeune_fille_mere: string;
+  numero_cni: string;
+  ordre: number;
+  prenom: string;
+  profession: string;
+  sexe: string;
+  signature_path?: string | null;
+  situation_familiale: string;
+  telephone: string;
+  updated_at: string;
+  type_piece?: string;
+  numero_piece?: string;
+  signature_url?: string;
+  photo?: string;
+  photo_url?: string;
+  date_delivrance_piece?: string;
+  lieu_delivrance_piece?: string;
+}
+
+// Interface pour les données du reçu
+interface ReceiptData {
+  reference: string;
+  date: string;
+  compte: string;
+  titulaire: string;
+  porteur: string;
+  pieceId: string;
+  montant: string;
+  caissierId: string;
+  typeOperation: 'RETRAIT' | 'VERSEMENT';
+  agence?: string;
+  guichet?: string;
+  motif?: string;
+  billetage?: BilletageItem[];
+}
+
+// Fonction utilitaire pour obtenir le nom complet du mandataire
+const getMandataireNomComplet = (mandataire: Mandataire): string => {
+  return `${mandataire.prenom || ''} ${mandataire.nom || ''}`.trim();
+};
+
+// Fonction utilitaire pour obtenir le type de pièce (par défaut CNI)
+const getMandataireTypePiece = (mandataire: Mandataire): string => {
+  return mandataire.type_piece || 'CNI';
+};
+
+// Fonction utilitaire pour obtenir le numéro de pièce
+const getMandataireNumeroPiece = (mandataire: Mandataire): string => {
+  return mandataire.numero_piece || mandataire.numero_cni || '';
+};
 
 interface PlanComptable {
   id: number;
@@ -115,6 +238,8 @@ interface Compte {
   client: Client;
   plan_comptable_id: number;
   plan_comptable: PlanComptable;
+  signature_path?: string;
+  mandataires?: Mandataire[];
   type_compte?: {
     code_chapitre?: string;
     nom?: string;
@@ -137,7 +262,6 @@ interface RetraitFormData {
   motif: string;
   dateOperation: string;
   dateValeur: string;
-  dateIndisponible: string;
   smsEnabled: boolean;
   telephone: string;
   fraisEnCompte: boolean;
@@ -150,7 +274,11 @@ interface RetraitFormData {
   numero_bordereau: string;
   type_bordereau: string;
   
-  // Onglet Porteur
+  // Onglet Porteur - Type de porteur
+  typePorteur: 'client' | 'mandataire' | 'autre';
+  selectedMandataireId: string;
+  
+  // Informations porteur
   nomPorteur: string;
   adresse: string;
   typeId: string;
@@ -169,6 +297,12 @@ interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
   value: number;
+}
+
+// Interface pour les données de la modal de succès
+interface SuccessModalData {
+  open: boolean;
+  transactionData?: ReceiptData;
 }
 
 // --- COMPOSANTS STYLISÉS ---
@@ -233,6 +367,35 @@ const SecondaryButton = styled(Button)({
   },
 });
 
+const ValidationCodeInput = styled(TextField)({
+  '& .MuiOutlinedInput-root': {
+    fontSize: '1.5rem',
+    fontWeight: 700,
+    letterSpacing: '0.5em',
+    textAlign: 'center',
+  },
+});
+
+const StyledAvatar = styled(Avatar)({
+  width: 120,
+  height: 120,
+  border: '3px solid #e0e0e0',
+});
+
+const SignatureContainer = styled(Box)({
+  border: '1px solid #ddd',
+  borderRadius: 4,
+  padding: 10,
+  backgroundColor: '#f9f9f9',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  minHeight: 100,
+});
+
+// Constante pour l'URL de l'API
+const API_BASE_URL = ApiClient;
+
 // --- FONCTIONS UTILITAIRES ---
 const formatCurrency = (value: string) => {
   const num = parseFloat(value || '0');
@@ -240,6 +403,121 @@ const formatCurrency = (value: string) => {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(num);
+};
+
+const formatDate = (dateString: string) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('fr-FR');
+};
+
+const formatDateTime = (dateString: string) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('fr-FR') + ' ' + date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+};
+
+// Fonction pour générer une référence unique
+const generateReference = (type: 'RET' | 'VER' = 'RET'): string => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  
+  // Générer un identifiant aléatoire de 4 caractères
+  const randomId = Math.random().toString(36).substring(2, 6).toUpperCase();
+  
+  return `${type}-${year}${month}${day}${hours}${minutes}${seconds}-${randomId}`;
+};
+
+// Fonction pour convertir un nombre en lettres (français)
+const numberToFrenchWords = (num: number): string => {
+  const units = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf'];
+  const teens = ['dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'dix-sept', 'dix-huit', 'dix-neuf'];
+  const tens = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante', 'soixante', 'quatre-vingt', 'quatre-vingt'];
+  
+  if (num === 0) return 'zéro';
+  
+  let result = '';
+  
+  // Convertir les millions
+  if (num >= 1000000) {
+    const millions = Math.floor(num / 1000000);
+    result += numberToFrenchWords(millions) + ' million';
+    if (millions > 1) result += 's';
+    num %= 1000000;
+    if (num > 0) result += ' ';
+  }
+  
+  // Convertir les milliers
+  if (num >= 1000) {
+    const thousands = Math.floor(num / 1000);
+    if (thousands === 1) {
+      result += 'mille';
+    } else {
+      result += numberToFrenchWords(thousands) + ' mille';
+    }
+    num %= 1000;
+    if (num > 0) result += ' ';
+  }
+  
+  // Convertir les centaines
+  if (num >= 100) {
+    const hundreds = Math.floor(num / 100);
+    if (hundreds === 1) {
+      result += 'cent';
+    } else {
+      result += units[hundreds] + ' cent';
+    }
+    num %= 100;
+    if (num > 0) result += ' ';
+  }
+  
+  // Convertir les dizaines et unités
+  if (num >= 10) {
+    if (num >= 10 && num < 20) {
+      result += teens[num - 10];
+      num = 0;
+    } else {
+      const ten = Math.floor(num / 10);
+      const unit = num % 10;
+      
+      if (ten === 7 || ten === 9) {
+        // Soixante-dix ou quatre-vingt-dix
+        const base = ten === 7 ? 60 : 80;
+        const remainder = num - base;
+        if (remainder === 0) {
+          result += tens[ten];
+        } else if (remainder === 1) {
+          result += tens[ten] + '-et-un';
+        } else if (remainder < 10) {
+          result += tens[ten] + '-' + units[remainder];
+        } else {
+          result += tens[ten] + '-' + teens[remainder - 10];
+        }
+        num = 0;
+      } else {
+        result += tens[ten];
+        if (unit === 1 && ten !== 8) {
+          result += '-et-un';
+          num = 0;
+        } else if (unit > 0) {
+          result += '-' + units[unit];
+          num = 0;
+        }
+      }
+    }
+  }
+  
+  // Convertir les unités
+  if (num > 0) {
+    result += units[num];
+  }
+  
+  return result;
 };
 
 const TabPanel: React.FC<TabPanelProps> = (props) => {
@@ -293,6 +571,29 @@ const RetraitEspeces: React.FC = () => {
   
   const [calculating, setCalculating] = useState<boolean>(false);
   
+  // États pour la validation
+  const [validationCode, setValidationCode] = useState<string>('');
+  const [showValidationInput, setShowValidationInput] = useState<boolean>(false);
+  const [pendingDemandeId, setPendingDemandeId] = useState<number | null>(null);
+  const [isCodeValid, setIsCodeValid] = useState<boolean>(false);
+  const [codeValidationError, setCodeValidationError] = useState<string>('');
+  
+  // États pour la photo/signature
+  const [photoUrl, setPhotoUrl] = useState<string>('');
+  const [signatureUrl, setSignatureUrl] = useState<string>('');
+
+  // État pour la modal de succès
+  const [successModal, setSuccessModal] = useState<SuccessModalData>({
+    open: false,
+    transactionData: undefined,
+  });
+
+  // État pour le chargement du téléchargement
+  const [downloading, setDownloading] = useState<boolean>(false);
+
+  // Référence pour le reçu caché
+  const receiptRef = useRef<HTMLDivElement>(null);
+
   // Initialisation avec RetraitFormData
   const [formData, setFormData] = useState<RetraitFormData>({
     // Onglet Retrait Espèces
@@ -309,7 +610,6 @@ const RetraitEspeces: React.FC = () => {
     motif: '',
     dateOperation: new Date().toISOString().split('T')[0],
     dateValeur: new Date().toISOString().split('T')[0],
-    dateIndisponible: '',
     smsEnabled: false,
     telephone: '',
     fraisEnCompte: true,
@@ -323,6 +623,8 @@ const RetraitEspeces: React.FC = () => {
     type_bordereau: 'RETRAIT',
     
     // Onglet Porteur
+    typePorteur: 'client',
+    selectedMandataireId: '',
     nomPorteur: '',
     adresse: '',
     typeId: 'CNI',
@@ -336,6 +638,471 @@ const RetraitEspeces: React.FC = () => {
     netAEncaisser: '0',
     netADebiter: '0',
   });
+
+  // Fonction pour générer et télécharger le reçu PDF amélioré
+  const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
+    try {
+      setDownloading(true);
+      
+      // Créer un élément temporaire pour le reçu
+      const receiptElement = document.createElement('div');
+      receiptElement.style.position = 'absolute';
+      receiptElement.style.left = '-9999px';
+      receiptElement.style.top = '0';
+      receiptElement.style.width = '210mm'; // A4 width
+      receiptElement.style.minHeight = '297mm'; // A4 height
+      receiptElement.style.backgroundColor = 'white';
+      receiptElement.style.padding = '15mm';
+      receiptElement.style.fontFamily = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+      receiptElement.style.color = '#333';
+      receiptElement.style.fontSize = '12px';
+      receiptElement.style.lineHeight = '1.4';
+      
+      // Convertir le montant en lettres
+      const montantNumerique = parseFloat(receiptData.montant.replace(/\s/g, '')) || 0;
+      const montantEnLettres = numberToFrenchWords(montantNumerique).toUpperCase();
+      
+      // Filtrer le billetage pour n'afficher que les coupures utilisées
+      const billetageFiltre = receiptData.billetage?.filter(item => item.quantite > 0) || [];
+      
+      // Contenu HTML du reçu amélioré
+      receiptElement.innerHTML = `
+        <div style="text-align: center; margin-bottom: 25px;">
+          <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 15px;">
+            <div style="width: 80px; height: 80px; margin-right: 15px;">
+              <img src="${logo}" alt="Logo Athari Financial" style="width: 100%; height: 100%; object-fit: contain;" />
+            </div>
+            <div>
+              <h1 style="margin: 0; font-size: 22px; color: #1976d2; font-weight: bold; letter-spacing: 0.5px;">
+                ATHARI FINANCIAL COOP-CA
+              </h1>
+              <p style="margin: 4px 0; font-size: 13px; color: #666;">
+                Coopérative d'Épargne et de Crédit
+              </p>
+              <p style="margin: 4px 0; font-size: 12px; color: #777;">
+                Agrément N°: MF-2023-001 | RCCM: CI-ABJ-2023-B-00001
+              </p>
+            </div>
+          </div>
+          <div style="border-top: 3px solid #1976d2; margin: 0 auto; width: 100%;"></div>
+        </div>
+        
+        <div style="text-align: center; margin-bottom: 25px;">
+          <h2 style="margin: 0; font-size: 18px; color: #333; font-weight: 600; text-transform: uppercase;">
+            REÇU DE RETRAIT D'ESPÈCES
+          </h2>
+          <p style="margin: 5px 0; font-size: 13px; color: #666;">
+            Référence: <strong>${receiptData.reference}</strong>
+          </p>
+          <p style="margin: 0; font-size: 12px; color: #777;">
+            Date et heure: ${receiptData.date}
+          </p>
+        </div>
+        
+        <div style="margin-bottom: 25px;">
+          <div style="background-color: #1976d2; color: white; padding: 8px 12px; font-weight: 600; font-size: 13px; border-radius: 4px 4px 0 0;">
+            INFORMATIONS SUR L'OPÉRATION
+          </div>
+          <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-top: none;">
+            <tr>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; width: 40%; font-weight: 500; background-color: #f9f9f9;">Référence transaction:</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 600;">${receiptData.reference}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 500; background-color: #f9f9f9;">Date et heure:</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee;">${receiptData.date}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 500; background-color: #f9f9f9;">Type d'opération:</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; color: #d32f2f; font-weight: 600;">RETRAIT D'ESPÈCES</td>
+            </tr>
+            ${receiptData.agence ? `
+            <tr>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 500; background-color: #f9f9f9;">Agence:</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee;">${receiptData.agence}</td>
+            </tr>
+            ` : ''}
+            ${receiptData.guichet ? `
+            <tr>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 500; background-color: #f9f9f9;">Guichet:</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee;">${receiptData.guichet}</td>
+            </tr>
+            ` : ''}
+            ${receiptData.motif ? `
+            <tr>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 500; background-color: #f9f9f9;">Motif:</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee;">${receiptData.motif}</td>
+            </tr>
+            ` : ''}
+          </table>
+        </div>
+        
+        <div style="margin-bottom: 25px;">
+          <div style="background-color: #1976d2; color: white; padding: 8px 12px; font-weight: 600; font-size: 13px; border-radius: 4px 4px 0 0;">
+            INFORMATIONS COMPTE
+          </div>
+          <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-top: none;">
+            <tr>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; width: 40%; font-weight: 500; background-color: #f9f9f9;">Numéro de compte:</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 600;">${receiptData.compte}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 500; background-color: #f9f9f9;">Titulaire du compte:</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee;">${receiptData.titulaire}</td>
+            </tr>
+          </table>
+        </div>
+        
+        <div style="margin-bottom: 25px;">
+          <div style="background-color: #1976d2; color: white; padding: 8px 12px; font-weight: 600; font-size: 13px; border-radius: 4px 4px 0 0;">
+            INFORMATIONS PORTEUR
+          </div>
+          <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-top: none;">
+            <tr>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; width: 40%; font-weight: 500; background-color: #f9f9f9;">Nom du porteur:</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee;">${receiptData.porteur}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 500; background-color: #f9f9f9;">Pièce d'identité:</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee;">${receiptData.pieceId}</td>
+            </tr>
+          </table>
+        </div>
+        
+        <div style="margin-bottom: 25px;">
+          <div style="background-color: #1976d2; color: white; padding: 8px 12px; font-weight: 600; font-size: 13px; border-radius: 4px 4px 0 0;">
+            DÉTAILS DU MONTANT
+          </div>
+          <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-top: none;">
+            <tr>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; width: 40%; font-weight: 500; background-color: #f9f9f9;">Montant retiré:</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; text-align: right; font-weight: 700; font-size: 16px; color: #d32f2f;">
+                ${formatCurrency(receiptData.montant)} FCFA
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 500; background-color: #f9f9f9;">Montant en toutes lettres:</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-style: italic;">
+                ${montantEnLettres} FRANCS CFA
+              </td>
+            </tr>
+          </table>
+        </div>
+        
+        ${billetageFiltre.length > 0 ? `
+        <div style="margin-bottom: 25px;">
+          <div style="background-color: #1976d2; color: white; padding: 8px 12px; font-weight: 600; font-size: 13px; border-radius: 4px 4px 0 0;">
+            BILLETAGE - COMPOSITION
+          </div>
+          <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-top: none;">
+            <thead>
+              <tr style="background-color: #f5f5f5;">
+                <th style="padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid #ddd;">Coupure (FCFA)</th>
+                <th style="padding: 10px 12px; text-align: center; font-weight: 600; border-bottom: 1px solid #ddd;">Quantité</th>
+                <th style="padding: 10px 12px; text-align: right; font-weight: 600; border-bottom: 1px solid #ddd;">Sous-total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${billetageFiltre.map(item => `
+                <tr>
+                  <td style="padding: 10px 12px; border-bottom: 1px solid #eee;">${item.valeur.toLocaleString()} FCFA</td>
+                  <td style="padding: 10px 12px; text-align: center; border-bottom: 1px solid #eee;">${item.quantite}</td>
+                  <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #eee; font-weight: 500;">${(item.valeur * item.quantite).toLocaleString()} FCFA</td>
+                </tr>
+              `).join('')}
+              <tr style="background-color: #f9f9f9;">
+                <td style="padding: 10px 12px; font-weight: 600; border-top: 2px solid #ddd;" colspan="2">TOTAL BILLETAGE:</td>
+                <td style="padding: 10px 12px; text-align: right; font-weight: 700; font-size: 14px; color: #1976d2; border-top: 2px solid #ddd;">
+                  ${billetageFiltre.reduce((sum, item) => sum + (item.valeur * item.quantite), 0).toLocaleString()} FCFA
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        ` : ''}
+        
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #1976d2;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 40px;">
+            <div style="text-align: center; flex: 1;">
+              <div style="height: 60px; border-bottom: 1px solid #999; margin-bottom: 10px; position: relative;">
+                <div style="position: absolute; bottom: 5px; left: 0; right: 0; height: 1px; background-color: #999;"></div>
+              </div>
+              <div style="font-weight: 600; font-size: 13px; color: #333;">Signature du porteur</div>
+            </div>
+            <div style="text-align: center; flex: 1;">
+              <div style="height: 60px; border-bottom: 1px solid #999; margin-bottom: 10px; position: relative;">
+                <div style="position: absolute; bottom: 5px; left: 0; right: 0; height: 1px; background-color: #999;"></div>
+              </div>
+              <div style="font-weight: 600; font-size: 13px; color: #333;">Signature et cachet de la caisse</div>
+            </div>
+          </div>
+          
+          <div style="text-align: center; margin-top: 20px; color: #666; font-size: 11px;">
+            <div style="font-weight: 600; margin-bottom: 5px; color: #333;">
+              Caissier ID: ${receiptData.caissierId}
+            </div>
+            <div style="margin-bottom: 5px;">
+              Ce document fait foi de transaction effectuée.
+            </div>
+            <div style="color: #999; margin-top: 10px;">
+              Reçu électronique généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+            <div style="color: #1976d2; font-weight: 500; margin-top: 5px;">
+              Athari Financial Coop-CA - Votre partenaire financier de confiance
+            </div>
+          </div>
+        </div>
+        
+        <div style="margin-top: 30px; padding: 10px; background-color: #f5f5f5; border-radius: 4px; border-left: 4px solid #1976d2; font-size: 10px; color: #666;">
+          <strong>NOTE IMPORTANTE:</strong> Ce reçu est un justificatif de transaction. Conservez-le précieusement. 
+          En cas de litige, présentez ce document avec votre pièce d'identité.
+        </div>
+      `;
+      
+      // Ajouter l'élément au DOM
+      document.body.appendChild(receiptElement);
+      
+      // Générer le PDF
+      const canvas = await html2canvas(receiptElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#FFFFFF',
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+      
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 297; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      // Calculer la position pour centrer verticalement si nécessaire
+      let position = 0;
+      
+      // Vérifier si le contenu dépasse une page
+      if (imgHeight <= pageHeight) {
+        // Contenu sur une seule page
+        position = (pageHeight - imgHeight) / 2;
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      } else {
+        // Contenu sur plusieurs pages (au cas où)
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      }
+      
+      // Télécharger le PDF
+      const fileName = `Retrait-${receiptData.reference}.pdf`;
+      pdf.save(fileName);
+      
+      // Nettoyer
+      document.body.removeChild(receiptElement);
+      
+      showSnackbar('Reçu PDF généré avec succès', 'success');
+      
+    } catch (error) {
+      console.error('Erreur lors de la génération du reçu:', error);
+      showSnackbar('Erreur lors de la génération du reçu', 'error');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  // Fonction pour télécharger le reçu
+  const downloadReceipt = async (receiptData: ReceiptData) => {
+    await generateAndDownloadReceipt(receiptData);
+  };
+
+  // Fonction pour charger les informations du client
+  const loadClientInfo = (compte: Compte) => {
+    if (!compte || !compte.client) return;
+    
+    const client = compte.client;
+    let nomClient = '';
+    let adresse = '';
+    let photo = '';
+    let signature = '';
+    let typeId = 'CNI';
+    let numeroId = '';
+    let delivreLe = '';
+    let delivreA = '';
+    
+    if (client.type_client === 'physique' && client.physique) {
+      const physique = client.physique;
+      nomClient = physique.nom_prenoms || client.nom_complet;
+      adresse = `${client.adresse_quartier || ''}, ${client.adresse_ville || ''}`;
+      photo = physique.photo_url || '';
+      typeId = 'CNI';
+      numeroId = physique.cni_numero || '';
+      delivreLe = physique.cni_delivrance || '';
+      delivreA = physique.lieu_naissance || '';
+    } else if (client.type_client === 'morale' && client.morale) {
+      const morale = client.morale;
+      nomClient = morale.raison_sociale || client.nom_complet;
+      adresse = `${client.adresse_quartier || ''}, ${client.adresse_ville || ''}`;
+      // Pour les clients moraux, on prend le nom du représentant comme porteur par défaut
+      if (formData.typePorteur === 'client' && morale.nom_representant) {
+        nomClient = morale.nom_representant;
+      }
+    }
+    
+    // Mise à jour des informations du porteur si c'est le client
+    if (formData.typePorteur === 'client') {
+      setFormData(prev => ({
+        ...prev,
+        nomPorteur: nomClient,
+        adresse: adresse,
+        typeId: typeId || 'CNI',
+        numeroId: numeroId,
+        delivreLe: delivreLe,
+        delivreA: delivreA,
+      }));
+      
+      // Charger la photo si disponible
+      if (photo) {
+        setPhotoUrl(photo);
+      }
+      
+      // Charger la signature du compte si disponible
+      if (compte.signature_path) {
+        const fullSignatureUrl = compte.signature_path.startsWith('http') 
+          ? compte.signature_path 
+          : `${API_BASE_URL}/storage/${compte.signature_path}`;
+        setSignatureUrl(fullSignatureUrl);
+      }
+    }
+  };
+
+  // Fonction pour charger les informations du mandataire
+  const loadMandataireInfo = (mandataireId: string) => {
+    if (!compteDetails || !compteDetails.mandataires || !mandataireId) return;
+    
+    const mandataire = compteDetails.mandataires.find(m => m.id.toString() === mandataireId);
+    if (!mandataire) return;
+    
+    console.log('Chargement mandataire:', mandataire);
+    
+    // Utiliser les fonctions utilitaires pour obtenir les informations
+    const nomComplet = getMandataireNomComplet(mandataire);
+    const typePiece = getMandataireTypePiece(mandataire);
+    const numeroPiece = getMandataireNumeroPiece(mandataire);
+    
+    console.log('Nom complet mandataire:', nomComplet);
+    console.log('Type pièce:', typePiece);
+    console.log('Numéro pièce:', numeroPiece);
+    
+    setFormData(prev => ({
+      ...prev,
+      nomPorteur: nomComplet,
+      adresse: mandataire.adresse || '',
+      typeId: typePiece,
+      numeroId: numeroPiece,
+      delivreLe: mandataire.date_delivrance_piece || '',
+      delivreA: mandataire.lieu_delivrance_piece || mandataire.lieu_naissance || '',
+    }));
+    
+    // Charger la photo du mandataire si disponible
+    if (mandataire.photo_url) {
+      setPhotoUrl(mandataire.photo_url);
+    } else if (mandataire.photo) {
+      const fullPhotoUrl = mandataire.photo.startsWith('http')
+        ? mandataire.photo
+        : `${API_BASE_URL}/storage/${mandataire.photo}`;
+      setPhotoUrl(fullPhotoUrl);
+    } else {
+      setPhotoUrl('');
+    }
+    
+    // Charger la signature du mandataire si disponible
+    if (mandataire.signature_url) {
+      setSignatureUrl(mandataire.signature_url);
+    } else if (mandataire.signature_path) {
+      const fullSignatureUrl = mandataire.signature_path.startsWith('http')
+        ? mandataire.signature_path
+        : `${API_BASE_URL}/storage/${mandataire.signature_path}`;
+      setSignatureUrl(fullSignatureUrl);
+    } else {
+      setSignatureUrl('');
+    }
+  };
+
+  // Effet pour charger les informations quand le type de porteur change
+  useEffect(() => {
+    console.log('Type porteur changé:', formData.typePorteur);
+    console.log('Compte details:', compteDetails);
+    console.log('Mandataires disponibles:', compteDetails?.mandataires);
+    
+    if (!compteDetails) return;
+    
+    if (formData.typePorteur === 'client') {
+      // Réinitialiser les infos manuelles et charger les infos du client
+      loadClientInfo(compteDetails);
+    } else if (formData.typePorteur === 'mandataire') {
+      console.log('Sélection mandataire ID:', formData.selectedMandataireId);
+      
+      // Si un mandataire est sélectionné, charger ses infos
+      if (formData.selectedMandataireId) {
+        loadMandataireInfo(formData.selectedMandataireId);
+      } else if (compteDetails.mandataires && compteDetails.mandataires.length > 0) {
+        // Sélectionner le premier mandataire par défaut
+        const firstMandataire = compteDetails.mandataires[0];
+        console.log('Premier mandataire par défaut:', firstMandataire);
+        
+        setFormData(prev => ({
+          ...prev,
+          selectedMandataireId: firstMandataire.id.toString(),
+        }));
+        loadMandataireInfo(firstMandataire.id.toString());
+      } else {
+        // Pas de mandataire disponible
+        console.log('Aucun mandataire disponible');
+        setFormData(prev => ({
+          ...prev,
+          nomPorteur: '',
+          adresse: '',
+          typeId: 'CNI',
+          numeroId: '',
+          delivreLe: '',
+          delivreA: '',
+        }));
+        setPhotoUrl('');
+        setSignatureUrl('');
+      }
+    } else if (formData.typePorteur === 'autre') {
+      // Réinitialiser les champs pour saisie manuelle
+      setFormData(prev => ({
+        ...prev,
+        selectedMandataireId: '',
+        nomPorteur: '',
+        adresse: '',
+        typeId: 'CNI',
+        numeroId: '',
+        delivreLe: '',
+        delivreA: '',
+      }));
+      setPhotoUrl('');
+      setSignatureUrl('');
+    }
+  }, [formData.typePorteur, formData.selectedMandataireId, compteDetails]);
+
+  // Effet pour charger les infos client quand un compte est sélectionné
+  useEffect(() => {
+    console.log('Compte détail changé:', compteDetails);
+    if (compteDetails) {
+      loadClientInfo(compteDetails);
+    }
+  }, [compteDetails]);
+
+  // Effet pour charger les infos mandataire quand la sélection change
+  useEffect(() => {
+    console.log('Mandataire sélectionné changé:', formData.selectedMandataireId);
+    if (formData.typePorteur === 'mandataire' && formData.selectedMandataireId) {
+      loadMandataireInfo(formData.selectedMandataireId);
+    }
+  }, [formData.selectedMandataireId]);
 
   // Charger les agences au montage
   useEffect(() => {
@@ -546,34 +1313,69 @@ const RetraitEspeces: React.FC = () => {
         compte_id: null,
         client: '',
         chapitre: '',
-        soldeComptable: '0'
+        soldeComptable: '0',
+        typePorteur: 'client', // Réinitialiser au client par défaut
+        selectedMandataireId: '',
       }));
+      setPhotoUrl('');
+      setSignatureUrl('');
       return;
     }
     
     try {
       setCompteDetails(compte);
       
-      const clientName = compte.client?.nom_complet || 
-                        (compte.client?.physique?.nom_prenoms) || 
-                        'Client inconnu';
+      console.log('Compte sélectionné:', compte);
+      console.log('Mandataires du compte:', compte.mandataires);
       
-      const chapitreLibelle = compte.plan_comptable?.libelle || 'N/A';
+      const client = compte.client;
+      let nomClient = '';
+      let chapitreLibelle = compte.plan_comptable?.libelle || 'N/A';
+      
+      if (client.type_client === 'physique' && client.physique) {
+        nomClient = client.physique.nom_prenoms || client.nom_complet;
+      } else if (client.type_client === 'morale' && client.morale) {
+        nomClient = client.morale.raison_sociale || client.nom_complet;
+      } else {
+        nomClient = client.nom_complet;
+      }
       
       setFormData(prev => ({
         ...prev,
         compte: compte.numero_compte || '',
         compte_id: compte.id,
-        client: clientName,
+        client: nomClient,
         chapitre: chapitreLibelle,
-        soldeComptable: compte.solde || '0'
+        soldeComptable: compte.solde || '0',
+        typePorteur: 'client', // Par défaut le client est le porteur
+        selectedMandataireId: '',
       }));
+      
+      // Charger les infos du client
+      loadClientInfo(compte);
       
       showSnackbar('Compte chargé avec succès', 'success');
     } catch (error) {
       console.error('Erreur chargement détails compte:', error);
       showSnackbar('Erreur lors du chargement du compte', 'error');
     }
+  };
+
+  // Gestion du type de porteur
+  const handleTypePorteurChange = (type: 'client' | 'mandataire' | 'autre') => {
+    console.log('Changement type porteur vers:', type);
+    
+    let selectedMandataireId = '';
+    if (type === 'mandataire' && compteDetails?.mandataires?.length) {
+      selectedMandataireId = compteDetails.mandataires[0].id.toString();
+      console.log('Sélection auto mandataire ID:', selectedMandataireId);
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      typePorteur: type,
+      selectedMandataireId: selectedMandataireId,
+    }));
   };
 
   // Gestion du billetage
@@ -628,8 +1430,65 @@ const RetraitEspeces: React.FC = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  // Fonction principale de soumission POUR RETRAIT
-  const handleSubmitRetrait = async () => {
+  // Vérifier localement le code de validation
+  const handleVerifyCode = () => {
+    const validationResult = retraitService.verifierCodeValidationLocal(validationCode);
+    
+    if (validationResult.valid) {
+      setIsCodeValid(true);
+      setCodeValidationError('');
+      showSnackbar('Code validé localement. Prêt pour soumission.', 'success');
+      
+      // Fermer le modal de validation
+      setValidationDialog(false);
+    } else {
+      setIsCodeValid(false);
+      setCodeValidationError(validationResult.message);
+      showSnackbar(validationResult.message, 'error');
+    }
+  };
+
+  // Fonction pour ouvrir la modal de succès
+  const openSuccessModal = (transactionData: any) => {
+    // Récupérer l'agence et le guichet sélectionnés
+    const selectedAgence = agences.find(a => a.id.toString() === formData.selectedAgence);
+    const selectedGuichet = guichets.find(g => g.id.toString() === formData.guichet);
+    
+    // Récupérer le nom du caissier (à remplacer par les informations réelles de l'utilisateur connecté)
+    const caissierId = "Directeur Général"; // À remplacer par l'utilisateur connecté
+    
+    const receiptData: ReceiptData = {
+      reference: generateReference('RET'),
+      date: formatDateTime(new Date().toISOString()),
+      compte: formData.compte,
+      titulaire: formData.client,
+      porteur: formData.nomPorteur,
+      pieceId: `${formData.typeId} - ${formData.numeroId}`,
+      montant: formData.montant,
+      caissierId: caissierId,
+      typeOperation: 'RETRAIT' as const,
+      agence: selectedAgence?.name,
+      guichet: selectedGuichet?.nom_guichet,
+      motif: formData.motif,
+      billetage: billetage,
+    };
+    
+    setSuccessModal({
+      open: true,
+      transactionData: receiptData,
+    });
+  };
+
+  // Fonction pour fermer la modal de succès
+  const closeSuccessModal = () => {
+    setSuccessModal({
+      open: false,
+      transactionData: undefined,
+    });
+  };
+
+  // Traitement principal du retrait
+  const processRetrait = async () => {
     try {
       console.log('=== DÉBUT SOUMISSION RETRAIT ===');
       
@@ -741,56 +1600,54 @@ const RetraitEspeces: React.FC = () => {
         guichet_code: selectedGuichet?.code_guichet || '',
         caisse_code: selectedCaisse?.code_caisse || '',
         caisse_id: selectedCaisse?.id,
-        guichet_id: selectedGuichet?.id
+        guichet_id: selectedGuichet?.id,
+        
+        // CORRECTION ICI : Ajouter les champs bordereau
+        numero_bordereau: formData.numero_bordereau || '',
+        type_bordereau: formData.type_bordereau || 'RETRAIT',
+        
+        // Ajouter les dates
+        date_operation: formData.dateOperation,
+        date_valeur: formData.dateValeur,
       };
+      
+      // AJOUTER LE CODE DE VALIDATION SI DISPONIBLE
+      if (showValidationInput && validationCode && isCodeValid) {
+        // Ajouter le code de validation aux données envoyées
+        retraitData.code_validation = validationCode;
+        console.log('Code de validation ajouté aux données:', validationCode);
+      }
       
       console.log('=== DONNÉES RETRAIT PRÉPARÉES ===');
       console.log('RetraitData:', retraitData);
       console.log('Billetage:', billetageValide);
-      
-      // Vérifier les plafonds avant soumission
-      try {
-        if (selectedCaisse?.id) {
-          const plafondCheck = await retraitService.verifierPlafond(selectedCaisse.id, montant);
-          if (!plafondCheck.success) {
-            showSnackbar(`Attention: ${plafondCheck.message}`, 'warning');
-            if (!window.confirm(`${plafondCheck.message}\n\nVoulez-vous continuer ?`)) {
-              return;
-            }
-          }
-        }
-      } catch (error) {
-        console.warn('Erreur lors de la vérification du plafond:', error);
-      }
       
       // Appeler le service de RETRAIT
       const result = await retraitService.effectuerRetrait(retraitData, billetageValide);
       
       if (result.requires_validation) {
         // Cas où une validation est nécessaire
+        setPendingDemandeId(result.demande_id!);
         setValidationData({
           demande_id: result.demande_id,
           message: result.message,
           montant: formData.montant
         });
+        setShowValidationInput(true);
         setValidationDialog(true);
         showSnackbar(result.message || 'Validation requise par l\'assistant', 'warning');
       } else if (result.success) {
         // Transaction réussie
         showSnackbar('Retrait effectué avec succès !', 'success');
         console.log('Référence transaction:', result.data?.reference);
+        console.log('ID transaction:', result.data?.transaction_id);
+        
+        // Ouvrir la modal de succès avec les informations de la transaction
+        openSuccessModal(result.data);
         
         // Réinitialiser le formulaire
         resetForm();
         
-        // Afficher les détails de la transaction réussie
-        if (result.data) {
-          setSnackbar({
-            open: true,
-            message: `Retrait réussi! Référence: ${result.data.reference}`,
-            severity: 'success'
-          });
-        }
       } else {
         // Erreur
         const errorMsg = result.message || 'Erreur lors du retrait';
@@ -826,7 +1683,6 @@ const RetraitEspeces: React.FC = () => {
       motif: '',
       dateOperation: new Date().toISOString().split('T')[0],
       dateValeur: new Date().toISOString().split('T')[0],
-      dateIndisponible: '',
       smsEnabled: false,
       telephone: '',
       fraisEnCompte: true,
@@ -836,6 +1692,8 @@ const RetraitEspeces: React.FC = () => {
       refLettrage: '',
       numero_bordereau: '',
       type_bordereau: 'RETRAIT',
+      typePorteur: 'client',
+      selectedMandataireId: '',
       nomPorteur: '',
       adresse: '',
       typeId: 'CNI',
@@ -852,11 +1710,18 @@ const RetraitEspeces: React.FC = () => {
     setCompteDetails(null);
     setGuichets([]);
     setCaisses([]);
+    setValidationCode('');
+    setIsCodeValid(false);
+    setCodeValidationError('');
+    setShowValidationInput(false);
+    setPendingDemandeId(null);
+    setPhotoUrl('');
+    setSignatureUrl('');
   };
 
   const handleConfirmValidation = () => {
     setDialogOpen(false);
-    handleSubmitRetrait();
+    processRetrait();
   };
 
   const handleCancel = () => {
@@ -864,6 +1729,54 @@ const RetraitEspeces: React.FC = () => {
       setDialogOpen(false);
       showSnackbar('Transaction annulée', 'info');
     }
+  };
+
+  // Vérifier si les champs doivent être désactivés
+  const shouldDisableField = (fieldName: keyof RetraitFormData) => {
+    if (formData.typePorteur === 'autre') {
+      return false; // Tout est modifiable pour "autre"
+    }
+    
+    // Pour "client" ou "mandataire", le champ "typeId" (type de pièce) doit être modifiable
+    if (fieldName === 'typeId') {
+      return false; // Le type de pièce est toujours modifiable
+    }
+    
+    if (formData.typePorteur === 'client') {
+      // Pour le client, certains champs sont modifiables
+      return !['adresse', 'delivreLe', 'delivreA', 'typeId'].includes(fieldName);
+    }
+    
+    if (formData.typePorteur === 'mandataire') {
+      // Pour le mandataire, certains champs peuvent être modifiés
+      return !['adresse', 'delivreLe', 'delivreA', 'typeId'].includes(fieldName);
+    }
+    
+    return true;
+  };
+
+  // Récupérer le nom du mandataire sélectionné
+  const getSelectedMandataireName = () => {
+    if (!compteDetails || !compteDetails.mandataires || !formData.selectedMandataireId) {
+      return '';
+    }
+    
+    const mandataire = compteDetails.mandataires.find(m => m.id.toString() === formData.selectedMandataireId);
+    if (!mandataire) return '';
+    
+    return getMandataireNomComplet(mandataire);
+  };
+
+  // Récupérer le numéro CNI du mandataire sélectionné
+  const getSelectedMandataireNumeroCni = () => {
+    if (!compteDetails || !compteDetails.mandataires || !formData.selectedMandataireId) {
+      return '';
+    }
+    
+    const mandataire = compteDetails.mandataires.find(m => m.id.toString() === formData.selectedMandataireId);
+    if (!mandataire) return '';
+    
+    return getMandataireNumeroPiece(mandataire);
   };
 
   return (
@@ -1026,8 +1939,6 @@ const RetraitEspeces: React.FC = () => {
                                 onChange={handleSelectChange}
                               >
                                 <MenuItem value="01">01 - Retrait espèces</MenuItem>
-                                <MenuItem value="02">02 - Retrait guichet</MenuItem>
-                                <MenuItem value="03">03 - Retrait distributeur</MenuItem>
                               </Select>
                             </FormControl>
                           </Grid>
@@ -1133,7 +2044,7 @@ const RetraitEspeces: React.FC = () => {
                                   variant="outlined"
                                   size="small"
                                   required
-                                  fullWidth
+                                  sx={{minWidth: 200}}
                                   InputProps={{
                                     ...params.InputProps,
                                     endAdornment: (
@@ -1202,7 +2113,7 @@ const RetraitEspeces: React.FC = () => {
                           {/* Dates */}
                           <Grid item xs={12}>
                             <Grid container spacing={1.5}>
-                              <Grid item xs={4}>
+                              <Grid item xs={6}>
                                 <TextField
                                   fullWidth
                                   size="small"
@@ -1212,9 +2123,10 @@ const RetraitEspeces: React.FC = () => {
                                   value={formData.dateOperation}
                                   onChange={handleChange}
                                   InputLabelProps={{ shrink: true }}
+                                  disabled
                                 />
                               </Grid>
-                              <Grid item xs={4}>
+                              <Grid item xs={6}>
                                 <TextField
                                   fullWidth
                                   size="small"
@@ -1224,18 +2136,7 @@ const RetraitEspeces: React.FC = () => {
                                   value={formData.dateValeur}
                                   onChange={handleChange}
                                   InputLabelProps={{ shrink: true }}
-                                />
-                              </Grid>
-                              <Grid item xs={4}>
-                                <TextField
-                                  fullWidth
-                                  size="small"
-                                  label="Date indisponible"
-                                  name="dateIndisponible"
-                                  type="date"
-                                  value={formData.dateIndisponible}
-                                  onChange={handleChange}
-                                  InputLabelProps={{ shrink: true }}
+                                  disabled
                                 />
                               </Grid>
                             </Grid>
@@ -1279,9 +2180,9 @@ const RetraitEspeces: React.FC = () => {
                               control={
                                 <Checkbox
                                   size="small"
-                                  name="fraisEnCompte"
-                                  checked={formData.fraisEnCompte}
-                                  onChange={handleChange}
+                                    name="fraisEnCompte"
+                                    checked={formData.fraisEnCompte}
+                                    onChange={handleChange}
                                 />
                               }
                               label="Frais en compte"
@@ -1458,6 +2359,79 @@ const RetraitEspeces: React.FC = () => {
                     </StyledCard>
                   </Grid>
 
+                  {/* Section Validation Code */}
+                  {showValidationInput && (
+                    <Grid item xs={12}>
+                      <StyledCard>
+                        <CardContent sx={{ p: 2 }}>
+                          <Typography variant="subtitle2" sx={{ mb: 2, color: '#d32f2f', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Lock fontSize="small" />
+                            Code de Validation Requis
+                          </Typography>
+                          <Alert severity="warning" sx={{ mb: 2 }}>
+                            Cette opération nécessite une validation. Veuillez saisir le code fourni par l'assistant comptable.
+                          </Alert>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                            <ValidationCodeInput
+                              label="Code de validation *"
+                              value={validationCode}
+                              onChange={(e) => {
+                                const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+                                setValidationCode(value);
+                                setCodeValidationError('');
+                                setIsCodeValid(false);
+                              }}
+                              placeholder="Ex: A1B2C3"
+                              size="medium"
+                              sx={{ width: 300 }}
+                              inputProps={{ maxLength: 6 }}
+                              error={!!codeValidationError}
+                              helperText={codeValidationError || "Code à 6 caractères fourni par l'assistant"}
+                              InputProps={{
+                                startAdornment: (
+                                  <InputAdornment position="start">
+                                    <Key />
+                                  </InputAdornment>
+                                ),
+                              }}
+                            />
+                            <Button
+                              variant="contained"
+                              color="primary"
+                              onClick={handleVerifyCode}
+                              disabled={validationCode.length !== 6}
+                              startIcon={<CheckCircle />}
+                            >
+                              Vérifier le code
+                            </Button>
+                            {isCodeValid && (
+                              <Box sx={{ display: 'flex', alignItems: 'center', color: 'success.main' }}>
+                                <CheckCircle sx={{ mr: 1 }} />
+                                <Typography variant="body2">Code valide</Typography>
+                              </Box>
+                            )}
+                            <Button
+                              variant="outlined"
+                              color="secondary"
+                              onClick={() => {
+                                setShowValidationInput(false);
+                                setPendingDemandeId(null);
+                                setValidationCode('');
+                                setIsCodeValid(false);
+                                setCodeValidationError('');
+                              }}
+                            >
+                              Annuler
+                            </Button>
+                          </Box>
+                          <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
+                            Demande #{pendingDemandeId} - Le code est valable 30 minutes
+                          </Typography>
+                        </CardContent>
+                      </StyledCard>
+                    </Grid>
+                  )}
+
                   {/* Résumé financier POUR RETRAIT */}
                   <Grid item xs={12}>
                     <StyledCard>
@@ -1508,6 +2482,85 @@ const RetraitEspeces: React.FC = () => {
                     <StyledCard>
                       <CardContent sx={{ p: 2 }}>
                         <Typography variant="subtitle2" sx={{ mb: 2, color: '#1976D2', fontWeight: 600 }}>
+                          Type de Porteur *
+                        </Typography>
+                        
+                        <Box sx={{ mb: 3 }}>
+                          <FormControl component="fieldset">
+                            <RadioGroup
+                              aria-label="type-porteur"
+                              name="typePorteur"
+                              value={formData.typePorteur}
+                              onChange={(e) => handleTypePorteurChange(e.target.value as 'client' | 'mandataire' | 'autre')}
+                            >
+                              <FormControlLabel 
+                                value="client" 
+                                control={<Radio />} 
+                                label={
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Portrait fontSize="small" />
+                                    <Typography>Je suis le client (titulaire du compte)</Typography>
+                                  </Box>
+                                } 
+                              />
+                              <FormControlLabel 
+                                value="mandataire" 
+                                control={<Radio />} 
+                                label={
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Fingerprint fontSize="small" />
+                                    <Typography>Je suis le mandataire</Typography>
+                                  </Box>
+                                } 
+                                disabled={!compteDetails?.mandataires || compteDetails.mandataires.length === 0}
+                              />
+                              <FormControlLabel 
+                                value="autre" 
+                                control={<Radio />} 
+                                label={
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Person fontSize="small" />
+                                    <Typography>Autre (remplir manuellement)</Typography>
+                                  </Box>
+                                } 
+                              />
+                            </RadioGroup>
+                          </FormControl>
+                        </Box>
+
+                        {/* Sélection du mandataire */}
+                        {formData.typePorteur === 'mandataire' && compteDetails?.mandataires && compteDetails.mandataires.length > 0 && (
+                          <Box sx={{ mb: 3 }}>
+                            <FormControl fullWidth size="small">
+                              <InputLabel>Mandataire *</InputLabel>
+                              <Select
+                                name="selectedMandataireId"
+                                value={formData.selectedMandataireId}
+                                label="Mandataire *"
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setFormData(prev => ({ 
+                                    ...prev, 
+                                    selectedMandataireId: value
+                                  }));
+                                }}
+                              >
+                                <MenuItem value="">
+                                  <em>Sélectionner un mandataire</em>
+                                </MenuItem>
+                                {compteDetails.mandataires.map((mandataire) => (
+                                  <MenuItem key={mandataire.id} value={mandataire.id.toString()}>
+                                    {getMandataireNomComplet(mandataire) || 'Sans nom'}
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                          </Box>
+                        )}
+
+                        <Divider sx={{ my: 2 }} />
+                        
+                        <Typography variant="subtitle2" sx={{ mb: 2, color: '#1976D2', fontWeight: 600 }}>
                           Identité du Porteur *
                         </Typography>
                         <Grid container spacing={1.5}>
@@ -1515,12 +2568,22 @@ const RetraitEspeces: React.FC = () => {
                             <TextField
                               fullWidth
                               size="small"
-                              label="Nom complet *"
+                              label={
+                                formData.typePorteur === 'client' ? 'Nom du client chargé automatiquement' :
+                                formData.typePorteur === 'mandataire' ? `Mandataire: ${getSelectedMandataireName()}` :
+                                ''
+                              }
                               name="nomPorteur"
                               value={formData.nomPorteur}
                               onChange={handleChange}
                               placeholder="Nom complet du porteur"
                               required
+                              disabled={shouldDisableField('nomPorteur')}
+                              helperText={
+                                formData.typePorteur === 'client' ? 'Nom du client chargé automatiquement' :
+                                formData.typePorteur === 'mandataire' ? `Mandataire: ${getSelectedMandataireName()}` :
+                                ''
+                              }
                             />
                           </Grid>
                           <Grid item xs={12}>
@@ -1534,6 +2597,8 @@ const RetraitEspeces: React.FC = () => {
                               placeholder="Adresse complète"
                               multiline
                               rows={2}
+                              disabled={shouldDisableField('adresse')}
+                              helperText={formData.typePorteur === 'autre' ? '' : 'Modifiable si nécessaire'}
                             />
                           </Grid>
                           <Grid item xs={6}>
@@ -1541,9 +2606,10 @@ const RetraitEspeces: React.FC = () => {
                               <InputLabel>Type pièce *</InputLabel>
                               <Select
                                 name="typeId"
-                                value={formData.typeId}
+                                value={formData.typeId || 'CNI'}
                                 label="Type pièce *"
                                 onChange={handleSelectChange}
+                                disabled={shouldDisableField('typeId')}
                               >
                                 <MenuItem value="CNI">CNI</MenuItem>
                                 <MenuItem value="PASSEPORT">Passeport</MenuItem>
@@ -1562,6 +2628,12 @@ const RetraitEspeces: React.FC = () => {
                               onChange={handleChange}
                               placeholder="Numéro de pièce"
                               required
+                              disabled={shouldDisableField('numeroId')}
+                              helperText={
+                                formData.typePorteur === 'client' ? 'Numéro CNI du client' :
+                                formData.typePorteur === 'mandataire' ? `Numéro CNI: ${getSelectedMandataireNumeroCni()}` :
+                                ''
+                              }
                             />
                           </Grid>
                           <Grid item xs={6}>
@@ -1574,6 +2646,8 @@ const RetraitEspeces: React.FC = () => {
                               value={formData.delivreLe}
                               onChange={handleChange}
                               InputLabelProps={{ shrink: true }}
+                              disabled={shouldDisableField('delivreLe')}
+                              helperText={formData.typePorteur === 'client' || formData.typePorteur === 'mandataire' ? 'Modifiable si nécessaire' : ''}
                             />
                           </Grid>
                           <Grid item xs={6}>
@@ -1585,6 +2659,8 @@ const RetraitEspeces: React.FC = () => {
                               value={formData.delivreA}
                               onChange={handleChange}
                               placeholder="Lieu de délivrance"
+                              disabled={shouldDisableField('delivreA')}
+                              helperText={formData.typePorteur === 'client' || formData.typePorteur === 'mandataire' ? 'Modifiable si nécessaire' : ''}
                             />
                           </Grid>
                         </Grid>
@@ -1595,14 +2671,18 @@ const RetraitEspeces: React.FC = () => {
                   <Grid item xs={12} md={6}>
                     <StyledCard sx={{ height: '100%' }}>
                       <CardContent sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
-                        <Typography variant="subtitle2" sx={{ mb: 2, color: '#1976D2', fontWeight: 600 }}>
+                        <Typography variant="subtitle2" sx={{ mb: 2, color: '#1976D2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <AccountBalance fontSize="small" />
                           Détails du compte sélectionné
                         </Typography>
                         {compteDetails ? (
                           <Box>
                             <InfoBox sx={{ mb: 1 }}>
                               <Typography variant="caption" color="text.secondary" display="block">
-                                Numéro compte
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <AccountBalanceWallet fontSize="small" />
+                                  Numéro compte
+                                </Box>
                               </Typography>
                               <Typography variant="body2" fontWeight={500}>
                                 {compteDetails.numero_compte}
@@ -1610,12 +2690,17 @@ const RetraitEspeces: React.FC = () => {
                             </InfoBox>
                             <InfoBox sx={{ mb: 1 }}>
                               <Typography variant="caption" color="text.secondary" display="block">
-                                Client
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Portrait fontSize="small" />
+                                  Client
+                                </Box>
                               </Typography>
                               <Typography variant="body2" fontWeight={500}>
-                                {compteDetails.client?.nom_complet || 
-                                 compteDetails.client?.physique?.nom_prenoms || 
-                                 'Client inconnu'}
+                                {compteDetails.client.type_client === 'physique' && compteDetails.client.physique
+                                  ? compteDetails.client.physique.nom_prenoms
+                                  : compteDetails.client.type_client === 'morale' && compteDetails.client.morale
+                                  ? compteDetails.client.morale.raison_sociale
+                                  : compteDetails.client.nom_complet}
                               </Typography>
                             </InfoBox>
                             <InfoBox sx={{ mb: 1 }}>
@@ -1623,12 +2708,28 @@ const RetraitEspeces: React.FC = () => {
                                 Type client
                               </Typography>
                               <Typography variant="body2" fontWeight={500}>
-                                {compteDetails.client?.type_client || 'N/A'}
+                                {compteDetails.client.type_client === 'physique' ? 'Personne physique' : 
+                                 compteDetails.client.type_client === 'morale' ? 'Personne morale' : 
+                                 'N/A'}
                               </Typography>
                             </InfoBox>
-                            <InfoBox>
+                            <InfoBox sx={{ mb: 1 }}>
                               <Typography variant="caption" color="text.secondary" display="block">
-                                Solde actuel
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Phone fontSize="small" />
+                                  Téléphone
+                                </Box>
+                              </Typography>
+                              <Typography variant="body2" fontWeight={500}>
+                                {compteDetails.client.telephone || 'Non renseigné'}
+                              </Typography>
+                            </InfoBox>
+                            <InfoBox sx={{ mb: 1 }}>
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <AttachMoney fontSize="small" />
+                                  Solde actuel
+                                </Box>
                               </Typography>
                               <Typography variant="body2" fontWeight={500} color="success.main">
                                 {parseFloat(compteDetails.solde || '0').toLocaleString()} FCFA
@@ -1637,11 +2738,37 @@ const RetraitEspeces: React.FC = () => {
                             {compteDetails.plan_comptable && (
                               <InfoBox sx={{ mt: 1 }}>
                                 <Typography variant="caption" color="text.secondary" display="block">
-                                  Plan comptable
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    <Description fontSize="small" />
+                                    Plan comptable
+                                  </Box>
                                 </Typography>
                                 <Typography variant="body2" fontWeight={500}>
                                   {compteDetails.plan_comptable.libelle} ({compteDetails.plan_comptable.code})
                                 </Typography>
+                              </InfoBox>
+                            )}
+                            {compteDetails.mandataires && compteDetails.mandataires.length > 0 && (
+                              <InfoBox sx={{ mt: 1 }}>
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Mandataires disponibles
+                                </Typography>
+                                <Typography variant="body2" fontWeight={500}>
+                                  {compteDetails.mandataires.length} mandataire(s) enregistré(s)
+                                </Typography>
+                                <Box sx={{ mt: 1 }}>
+                                  {compteDetails.mandataires.map((mandataire, index) => (
+                                    <Typography key={mandataire.id} variant="body2" sx={{ 
+                                      fontSize: '0.8rem',
+                                      backgroundColor: formData.selectedMandataireId === mandataire.id.toString() ? '#e3f2fd' : 'transparent',
+                                      p: 0.5,
+                                      borderRadius: 1,
+                                      mb: 0.5
+                                    }}>
+                                      {index + 1}. {getMandataireNomComplet(mandataire)} - {getMandataireNumeroPiece(mandataire)}
+                                    </Typography>
+                                  ))}
+                                </Box>
                               </InfoBox>
                             )}
                           </Box>
@@ -1688,17 +2815,91 @@ const RetraitEspeces: React.FC = () => {
 
               {/* Onglet Photo/signature */}
               <TabPanel value={tabValue} index={3}>
-                <StyledCard>
-                  <CardContent sx={{ textAlign: 'center', py: 4 }}>
-                    <Photo sx={{ fontSize: 64, color: '#bdbdbd', mb: 2 }} />
-                    <Typography variant="body1" color="text.secondary" gutterBottom>
-                      Photo et signature du porteur
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Cette section affiche la photo et la signature du porteur si disponibles
-                    </Typography>
-                  </CardContent>
-                </StyledCard>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <StyledCard sx={{ height: '100%' }}>
+                      <CardContent sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <Typography variant="subtitle2" sx={{ mb: 2, color: '#1976D2', fontWeight: 600, alignSelf: 'flex-start' }}>
+                          Photo du porteur
+                        </Typography>
+                        {photoUrl ? (
+                          <>
+                            <StyledAvatar 
+                              src={photoUrl} 
+                              alt="Photo porteur"
+                              sx={{ mb: 2 }}
+                            />
+                            <Typography variant="caption" color="text.secondary">
+                              Photo du {formData.typePorteur === 'client' ? 'client' : 
+                                       formData.typePorteur === 'mandataire' ? 'mandataire' : 
+                                       'porteur'}
+                            </Typography>
+                            {formData.typePorteur === 'mandataire' && (
+                              <Typography variant="caption" color="primary" sx={{ mt: 1 }}>
+                                {getSelectedMandataireName()}
+                              </Typography>
+                            )}
+                          </>
+                        ) : (
+                          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 4 }}>
+                            <Portrait sx={{ fontSize: 64, color: '#bdbdbd', mb: 2 }} />
+                            <Typography variant="body1" color="text.secondary" gutterBottom>
+                              Aucune photo disponible
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" align="center">
+                              {formData.typePorteur === 'autre' 
+                                ? 'Aucune photo chargée pour ce porteur'
+                                : `La photo du ${formData.typePorteur} n'est pas disponible dans le système`}
+                            </Typography>
+                          </Box>
+                        )}
+                      </CardContent>
+                    </StyledCard>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <StyledCard sx={{ height: '100%' }}>
+                      <CardContent sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                        <Typography variant="subtitle2" sx={{ mb: 2, color: '#1976D2', fontWeight: 600 }}>
+                          Signature du porteur
+                        </Typography>
+                        {signatureUrl ? (
+                          <>
+                            <SignatureContainer sx={{ flexGrow: 1, mb: 2 }}>
+                              <Box 
+                                component="img" 
+                                src={signatureUrl} 
+                                alt="Signature"
+                                sx={{ maxWidth: '100%', maxHeight: 150 }}
+                              />
+                            </SignatureContainer>
+                            <Typography variant="caption" color="text.secondary">
+                              Signature du {formData.typePorteur === 'client' ? 'client' : 
+                                         formData.typePorteur === 'mandataire' ? 'mandataire' : 
+                                         'porteur'}
+                            </Typography>
+                            {formData.typePorteur === 'mandataire' && (
+                              <Typography variant="caption" color="primary" sx={{ mt: 1 }}>
+                                {getSelectedMandataireName()}
+                              </Typography>
+                            )}
+                          </>
+                        ) : (
+                          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 4 }}>
+                            <Description sx={{ fontSize: 64, color: '#bdbdbd', mb: 2 }} />
+                            <Typography variant="body1" color="text.secondary" gutterBottom>
+                              Aucune signature disponible
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" align="center">
+                              {formData.typePorteur === 'autre' 
+                                ? 'Aucune signature chargée pour ce porteur'
+                                : `La signature du ${formData.typePorteur} n'est pas disponible dans le système`}
+                            </Typography>
+                          </Box>
+                        )}
+                      </CardContent>
+                    </StyledCard>
+                  </Grid>
+                </Grid>
               </TabPanel>
 
               {/* Boutons d'action */}
@@ -1708,7 +2909,7 @@ const RetraitEspeces: React.FC = () => {
                 </SecondaryButton>
                 <GradientButton
                   variant="contained"
-                  onClick={handleSubmitRetrait}
+                  onClick={processRetrait}
                   startIcon={<CheckCircle />}
                   disabled={
                     !formData.compte_id || 
@@ -1719,10 +2920,11 @@ const RetraitEspeces: React.FC = () => {
                     billetage.every(item => item.quantite === 0) ||
                     !formData.selectedAgence ||
                     !formData.guichet ||
-                    !formData.caisse
+                    !formData.caisse ||
+                    (showValidationInput && !isCodeValid) // Si validation requise, doit avoir un code valide
                   }
                 >
-                  Valider le retrait
+                  {showValidationInput ? 'Valider le retrait avec code' : 'Valider le retrait'}
                 </GradientButton>
               </Box>
             </Box>
@@ -1758,13 +2960,16 @@ const RetraitEspeces: React.FC = () => {
               <br />
               • Compte: {formData.compte}
               <br />
-              • Type retrait: {formData.typeRetrait === '01' ? 'Retrait espèces' : 
-                               formData.typeRetrait === '02' ? 'Retrait guichet' :
-                               formData.typeRetrait === '03' ? 'Retrait distributeur' : 'Autres'}
+              • Type retrait: {formData.typeRetrait === '01' ? 'Retrait espèces' : 'Retrait guichet'}
               <br />
               • Montant: {formatCurrency(formData.montant)} FCFA
               <br />
               • Porteur: {formData.nomPorteur}
+              <br />
+              • Type porteur: {
+                formData.typePorteur === 'client' ? 'Client (titulaire)' :
+                formData.typePorteur === 'mandataire' ? 'Mandataire' : 'Autre'
+              }
               <br />
               • Pièce: {formData.typeId} - {formData.numeroId}
               <br />
@@ -1785,26 +2990,199 @@ const RetraitEspeces: React.FC = () => {
       </Dialog>
 
       {/* Modal pour la validation requise */}
-      <Dialog open={validationDialog} onClose={() => setValidationDialog(false)}>
-        <DialogTitle>
-          <Warning color="warning" sx={{ mr: 1, verticalAlign: 'middle' }} />
+      <Dialog 
+        open={validationDialog} 
+        onClose={() => {
+          setValidationDialog(false);
+          if (!showValidationInput) {
+            setPendingDemandeId(null);
+          }
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Warning color="warning" />
           Validation requise par l'assistant comptable
         </DialogTitle>
         <DialogContent>
           <Typography sx={{ mb: 2 }}>
             {validationData?.message || "Cette opération nécessite une validation supplémentaire car elle dépasse votre plafond."}
           </Typography>
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            Demande #{validationData?.demande_id} en attente d'approbation
-          </Alert>
+          
+          {showValidationInput ? (
+            <>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Veuillez demander le code de validation à l'assistant comptable
+              </Alert>
+              <ValidationCodeInput
+                autoFocus
+                margin="dense"
+                label="Code de validation"
+                fullWidth
+                value={validationCode}
+                onChange={(e) => {
+                  const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+                  setValidationCode(value);
+                  setCodeValidationError('');
+                  setIsCodeValid(false);
+                }}
+                placeholder="Ex: A1B2C3"
+                inputProps={{ maxLength: 6 }}
+                error={!!codeValidationError}
+                helperText={codeValidationError || "Code à 6 caractères"}
+              />
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                <Button 
+                  onClick={handleVerifyCode}
+                  variant="contained"
+                  color="primary"
+                  disabled={validationCode.length !== 6}
+                >
+                  Vérifier le code
+                </Button>
+              </Box>
+            </>
+          ) : (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              Demande #{validationData?.demande_id} en attente d'approbation
+            </Alert>
+          )}
+          
           <Typography variant="body2" color="text.secondary">
-            L'assistant comptable doit approuver cette transaction. Vous serez notifié lorsqu'une décision sera prise.
+            {showValidationInput 
+              ? "Saisissez le code reçu et cliquez sur 'Vérifier' avant de soumettre."
+              : "L'assistant comptable doit approuver cette transaction. Vous serez notifié lorsqu'une décision sera prise."}
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setValidationDialog(false)}>Fermer</Button>
+          <Button onClick={() => {
+            setValidationDialog(false);
+            if (!showValidationInput) {
+              setPendingDemandeId(null);
+            }
+          }}>
+            Fermer
+          </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Modal de succès - Impression du reçu */}
+      <Dialog 
+        open={successModal.open} 
+        onClose={closeSuccessModal}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'success.main' }}>
+          <CheckCircle />
+          Retrait effectué avec succès !
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="success" sx={{ mb: 2 }}>
+            Votre transaction a été validée et enregistrée avec succès.
+          </Alert>
+          
+          <Box sx={{ mb: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, color: '#1976D2', fontWeight: 600 }}>
+              Détails de la transaction :
+            </Typography>
+            <Grid container spacing={1}>
+              <Grid item xs={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Référence :
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {successModal.transactionData?.reference || 'N/A'}
+                </Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Date :
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {successModal.transactionData?.date || formatDateTime(new Date().toISOString())}
+                </Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Compte :
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {successModal.transactionData?.compte || 'N/A'}
+                </Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Titulaire :
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {successModal.transactionData?.titulaire || 'N/A'}
+                </Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Montant :
+                </Typography>
+                <Typography variant="body2" fontWeight={500} color="success.main">
+                  {successModal.transactionData?.montant ? formatCurrency(successModal.transactionData.montant) : '0'} FCFA
+                </Typography>
+              </Grid>
+            </Grid>
+          </Box>
+          
+          <Typography variant="body1" sx={{ mb: 2, fontWeight: 500, textAlign: 'center' }}>
+            Télécharger le reçu de votre retrait <span style={{ color: 'red' }}>AVANT DE FERMER CETTE POP-UP</span>
+          </Typography>
+          
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
+            Cliquez sur le bouton ci-dessous pour télécharger le reçu PDF professionnel de votre transaction.
+          </Typography>
+          
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={downloading ? <CircularProgress size={20} color="inherit" /> : <Download />}
+              onClick={() => successModal.transactionData && downloadReceipt(successModal.transactionData)}
+              disabled={downloading || !successModal.transactionData}
+              sx={{ px: 4, py: 1.5 }}
+            >
+              {downloading ? 'Téléchargement en cours...' : 'Télécharger le reçu PDF'}
+            </Button>
+          </Box>
+          
+          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+            <Button
+              variant="outlined"
+              startIcon={<Print />}
+              onClick={() => successModal.transactionData && downloadReceipt(successModal.transactionData)}
+              disabled={downloading || !successModal.transactionData}
+            >
+              Imprimer le reçu
+            </Button>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={closeSuccessModal} color="inherit">
+            Fermer
+          </Button>
+          <Button 
+            onClick={() => {
+              closeSuccessModal();
+              // Optionnel: Rediriger vers l'historique des transactions
+              // navigate('/transactions');
+            }} 
+            variant="contained" 
+            color="primary"
+          >
+            Terminer
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Élément caché pour le reçu (utilisé pour la génération PDF) */}
+      <div ref={receiptRef} style={{ position: 'absolute', left: '-9999px', top: '0' }}></div>
 
       {/* Snackbar */}
       <Snackbar

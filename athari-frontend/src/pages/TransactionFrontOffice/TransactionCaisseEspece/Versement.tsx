@@ -56,7 +56,7 @@ import type { BilletageItem, VersementData, TiersData } from '../../../services/
 import compteService from '../../../services/api/compteService';
 import agenceService, { type Agence as AgenceApi } from '../../../services/agenceService';
 import guichetService from '../../../services/guichetService';
-import caisseService from '../../../services/caisseService'; // Service pour récupérer les caisses
+import caisseService from '../../../services/caisseService';
 
 // --- INTERFACES ---
 interface Guichet {
@@ -153,6 +153,9 @@ interface VersementFormData {
   numeroId: string;
   delivreLe: string;
   delivreA: string;
+  
+  // NOUVEAU CHAMP : Provenance des fonds
+  provenance_fonds: string;
   
   // Calculs
   soldeComptable: string;
@@ -291,7 +294,8 @@ const Versement = () => {
     selectedAgence: '',
     guichet: '',
     caisse: '',
-    typeVersement: '01',
+    // CORRECTION ICI: Utiliser les valeurs de l'enum Laravel
+    typeVersement: 'ESPECE', // Changé de '01' à 'ESPECE'
     agenceCompte: '',
     compte: '',
     compte_id: null,
@@ -320,6 +324,9 @@ const Versement = () => {
     numeroId: '',
     delivreLe: '',
     delivreA: '',
+    
+    // NOUVEAU CHAMP : Provenance des fonds
+    provenance_fonds: '',
     
     // Calculs
     soldeComptable: '0',
@@ -382,49 +389,30 @@ const Versement = () => {
         setLoadingGuichets(true);
         console.log(`Chargement des guichets pour l'agence ${formData.selectedAgence}...`);
         
-        // Récupérer tous les guichets
         const response = await guichetService.getGuichets();
         console.log('Guichets disponibles:', response);
         
-        // Vérifier si la réponse est un tableau directement
         let guichetsArray: Guichet[] = [];
         
         if (Array.isArray(response)) {
           guichetsArray = response;
-          console.log('Réponse est un tableau direct');
         } else if (response && typeof response === 'object') {
-          // Debug: afficher la structure
-          console.log('Type de réponse:', typeof response);
-          console.log('Propriétés de l\'objet:', Object.keys(response));
-          console.log('Valeur de success:', response.success);
-          console.log('Valeur de data:', response.data);
-          
           if (response.success !== undefined && response.data !== undefined) {
-            // Si c'est un objet avec success et data
             if (response.success && Array.isArray(response.data)) {
               guichetsArray = response.data;
-              console.log('Structure: {success, data}');
             }
           } else if (response.data !== undefined) {
-            // Si c'est un objet avec data seulement
             if (Array.isArray(response.data)) {
               guichetsArray = response.data;
-              console.log('Structure: {data}');
             }
           } else {
-            // Si c'est un objet qui peut être converti en tableau
-            console.log('Tentative de conversion en tableau...');
             const values = Object.values(response);
             if (values.length > 0 && typeof values[0] === 'object' && values[0] !== null) {
               guichetsArray = values as Guichet[];
-              console.log('Conversion réussie');
             }
           }
         }
         
-        console.log(`Nombre de guichets récupérés: ${guichetsArray.length}`);
-        
-        // Filtrer les guichets par agence_id
         const filteredGuichets = guichetsArray.filter((guichet: Guichet) => 
           guichet.agence_id === parseInt(formData.selectedAgence)
         );
@@ -432,7 +420,6 @@ const Versement = () => {
         console.log(`Guichets filtrés pour agence ${formData.selectedAgence}:`, filteredGuichets);
         setGuichets(filteredGuichets);
         
-        // Réinitialiser les caisses
         setCaisses([]);
         setFormData(prev => ({ ...prev, guichet: '', caisse: '' }));
         
@@ -461,49 +448,30 @@ const Versement = () => {
         setLoadingCaisses(true);
         console.log(`Chargement des caisses pour le guichet ${formData.guichet}...`);
         
-        // Récupérer toutes les caisses
         const response = await caisseService.getCaisses();
         console.log('Caisses disponibles:', response);
         
-        // Vérifier si la réponse est un tableau directement
         let caissesArray: Caisse[] = [];
         
         if (Array.isArray(response)) {
           caissesArray = response;
-          console.log('Réponse est un tableau direct');
         } else if (response && typeof response === 'object') {
-          // Debug: afficher la structure
-          console.log('Type de réponse:', typeof response);
-          console.log('Propriétés de l\'objet:', Object.keys(response));
-          console.log('Valeur de success:', response.success);
-          console.log('Valeur de data:', response.data);
-          
           if (response.success !== undefined && response.data !== undefined) {
-            // Si c'est un objet avec success et data
             if (response.success && Array.isArray(response.data)) {
               caissesArray = response.data;
-              console.log('Structure: {success, data}');
             }
           } else if (response.data !== undefined) {
-            // Si c'est un objet avec data seulement
             if (Array.isArray(response.data)) {
               caissesArray = response.data;
-              console.log('Structure: {data}');
             }
           } else {
-            // Si c'est un objet qui peut être converti en tableau
-            console.log('Tentative de conversion en tableau...');
             const values = Object.values(response);
             if (values.length > 0 && typeof values[0] === 'object' && values[0] !== null) {
               caissesArray = values as Caisse[];
-              console.log('Conversion réussie');
             }
           }
         }
         
-        console.log(`Nombre de caisses récupérées: ${caissesArray.length}`);
-        
-        // Filtrer les caisses par guichet_id
         const guichetId = parseInt(formData.guichet);
         const filteredCaisses = caissesArray.filter((caisse: Caisse) => 
           caisse.guichet_id === guichetId && caisse.est_active === true
@@ -572,7 +540,6 @@ const Versement = () => {
       [name]: value,
     };
 
-    // Mise à jour de l'agence
     if (name === 'selectedAgence') {
       if (value) {
         const selectedAgence = agences.find(agence => agence.id.toString() === value);
@@ -607,15 +574,12 @@ const Versement = () => {
     console.log('Compte sélectionné:', compte);
     
     try {
-      // Utiliser les données déjà disponibles dans le compte
       setCompteDetails(compte);
       
-      // Extraire les informations du client
       const clientName = compte.client?.nom_complet || 
                         (compte.client?.physique?.nom_prenoms) || 
                         'Client inconnu';
       
-      // Extraire le libellé du plan comptable
       const chapitreLibelle = compte.plan_comptable?.libelle || 'N/A';
       
       setFormData(prev => ({
@@ -647,10 +611,8 @@ const Versement = () => {
     newBilletage[index] = { ...newBilletage[index], [field]: Math.max(0, value) };
     setBilletage(newBilletage);
     
-    // Calculer le total du billetage
     const total = newBilletage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0);
     
-    // Mettre à jour le montant dans le formulaire
     setFormData(prev => ({
       ...prev,
       montant: total.toString()
@@ -695,7 +657,7 @@ const Versement = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  // Fonction principale de soumission COMPLÈTEMENT CORRIGÉE
+  // Fonction principale de soumission
   const handleSubmitVersement = async () => {
     try {
       console.log('=== DÉBUT SOUMISSION VERSEMENT ===');
@@ -717,7 +679,6 @@ const Versement = () => {
         return;
       }
       
-      // Vérifier le billetage
       const billetageValide = billetage.filter(item => item.quantite > 0);
       if (billetageValide.length === 0) {
         showSnackbar('Veuillez saisir le billetage', 'error');
@@ -730,12 +691,10 @@ const Versement = () => {
         return;
       }
       
-      // Récupérer les entités sélectionnées
       const selectedAgence = agences.find(a => a.id.toString() === formData.selectedAgence);
       const selectedGuichet = guichets.find(g => g.id.toString() === formData.guichet);
       const selectedCaisse = caisses.find(c => c.id.toString() === formData.caisse);
       
-      // Validation des sélections
       if (!selectedAgence) {
         showSnackbar('Veuillez sélectionner une agence', 'error');
         return;
@@ -751,19 +710,17 @@ const Versement = () => {
         return;
       }
       
-      // Vérifier si la caisse est active
       if (!selectedCaisse.est_active) {
         showSnackbar('La caisse sélectionnée n\'est pas active', 'error');
         return;
       }
       
-      // Calcul des montants
       const commissions = parseFloat(formData.commissions) || 0;
       const taxes = parseFloat(formData.taxes) || 0;
       const totalFrais = commissions + taxes;
       const netCrediter = formData.fraisEnCompte ? montant - totalFrais : montant;
       
-      // PRÉPARER LES DONNÉES SELON LE FORMAT ATTENDU PAR LARAVEL
+      // CORRECTION ICI: Utiliser la valeur correcte pour type_versement
       const versementData: VersementData = {
         // Données obligatoires de base
         compte_id: formData.compte_id,
@@ -789,7 +746,7 @@ const Versement = () => {
           numero_piece: formData.numeroId.trim()
         },
         
-        // CHAMPS "remettant_" REQUIS (en plus de la structure tiers)
+        // CHAMPS "remettant_" REQUIS
         remettant_nom: formData.nomRemettant.trim(),
         remettant_type_piece: formData.typeId,
         remettant_numero_piece: formData.numeroId.trim(),
@@ -799,9 +756,13 @@ const Versement = () => {
         date_delivrance_piece: formData.delivreLe || '',
         lieu_delivrance_piece: formData.delivreA || '',
         
+        // NOUVEAU CHAMP : Provenance des fonds
+        provenance_fonds: formData.provenance_fonds?.trim() || '',
+        
         // Contexte de l'opération
         origine_fonds: formData.motif?.trim() || 'Versement espèces',
-        type_versement: formData.typeVersement,
+        // CORRECTION ICI: Utiliser la valeur de l'enum
+        type_versement: formData.typeVersement, // Doit être 'ESPECE', 'ORANGE_MONEY', ou 'MOBILE_MONEY'
         date_valeur: formData.dateValeur,
         ref_lettrage: formData.refLettrage?.trim() || '',
         
@@ -816,27 +777,24 @@ const Versement = () => {
       console.log('=== DONNÉES PRÉPARÉES POUR LARAVEL ===');
       console.log('VersementData:', versementData);
       console.log('Billetage:', billetageValide);
+      console.log('Type versement envoyé:', versementData.type_versement);
+      console.log('Provenance des fonds:', versementData.provenance_fonds);
       
-      // Vérifier les plafonds avant soumission (optionnel)
       try {
         const plafondCheck = await caisseServices.verifierPlafond(selectedCaisse.id, montant);
         if (!plafondCheck.success) {
           showSnackbar(`Attention: ${plafondCheck.message}`, 'warning');
-          // Demander confirmation si plafond dépassé
           if (!window.confirm(`${plafondCheck.message}\n\nVoulez-vous continuer ?`)) {
             return;
           }
         }
       } catch (error) {
         console.warn('Erreur lors de la vérification du plafond:', error);
-        // Continuer même si la vérification échoue
       }
       
-      // Appeler le service
       const result = await caisseServices.effectuerVersement(versementData, billetageValide);
       
       if (result.requires_validation) {
-        // Cas où une validation est nécessaire (dépassement de plafond)
         setValidationData({
           demande_id: result.demande_id,
           message: result.message,
@@ -845,14 +803,11 @@ const Versement = () => {
         setValidationDialog(true);
         showSnackbar(result.message || 'Validation requise par l\'assistant', 'warning');
       } else if (result.success) {
-        // Transaction réussie
         showSnackbar('Versement effectué avec succès !', 'success');
         console.log('Référence transaction:', result.data?.reference);
         
-        // Réinitialiser le formulaire
         resetForm();
         
-        // Afficher les détails de la transaction réussie
         if (result.data) {
           setSnackbar({
             open: true,
@@ -861,10 +816,8 @@ const Versement = () => {
           });
         }
       } else {
-        // Erreur
         const errorMsg = result.message || 'Erreur lors du versement';
         if (result.errors) {
-          // Afficher les détails des erreurs de validation
           const errorDetails = Object.entries(result.errors)
             .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
             .join('; ');
@@ -887,7 +840,7 @@ const Versement = () => {
       selectedAgence: '',
       guichet: '',
       caisse: '',
-      typeVersement: '01',
+      typeVersement: 'ESPECE', // CORRIGÉ
       agenceCompte: '',
       compte: '',
       compte_id: null,
@@ -904,17 +857,15 @@ const Versement = () => {
       commissions: '0',
       taxes: '0',
       refLettrage: '',
-      
-      // NOUVEAUX CHAMPS : Bordereau
       numero_bordereau: '',
       type_bordereau: 'VERSEMENT',
-      
       nomRemettant: '',
       adresse: '',
       typeId: 'CNI',
       numeroId: '',
       delivreLe: '',
       delivreA: '',
+      provenance_fonds: '',
       soldeComptable: '0',
       indisponible: '0',
       netEncaisser: '0',
@@ -941,10 +892,8 @@ const Versement = () => {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f5f5f5' }}>
-      {/* Sidebar */}
       <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-      {/* Contenu principal */}
       <Box
         component="main"
         sx={{
@@ -957,9 +906,7 @@ const Versement = () => {
       >
         <TopBar sidebarOpen={sidebarOpen} />
 
-        {/* Zone de travail */}
         <Box sx={{ px: { xs: 2, md: 3 }, py: 3 }}>
-          {/* Header */}
           <Box sx={{ mb: 3 }}>
             <Typography variant="h5" sx={{ fontWeight: 600, color: '#1E293B', mb: 0.5 }}>
               Versement Espèces
@@ -970,7 +917,6 @@ const Versement = () => {
           </Box>
 
           <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #e0e0e0', overflow: 'hidden' }}>
-            {/* Barre d'onglets */}
             <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: '#f8f9fa' }}>
               <StyledTabs value={tabValue} onChange={handleTabChange} aria-label="versement tabs">
                 <Tab 
@@ -996,12 +942,9 @@ const Versement = () => {
               </StyledTabs>
             </Box>
 
-            {/* Contenu des onglets */}
             <Box sx={{ p: 3 }}>
-              {/* Onglet Versement Espèces */}
               <TabPanel value={tabValue} index={0}>
                 <Grid container spacing={2}>
-                  {/* Colonne 1: Informations de base */}
                   <Grid item xs={12} md={6}>
                     <StyledCard sx={{ mb: 2 }}>
                       <CardContent sx={{ p: 2 }}>
@@ -1098,9 +1041,10 @@ const Versement = () => {
                                 label="Type versement *"
                                 onChange={handleSelectChange}
                               >
-                                <MenuItem value="01">01 - Versement espèces</MenuItem>
-                                <MenuItem value="02">02 - Versement OM</MenuItem>
-                                <MenuItem value="03">03 - Virement MOMO</MenuItem>
+                                {/* CORRECTION ICI: Utiliser les valeurs de l'enum Laravel */}
+                                <MenuItem value="ESPECE">Espèces</MenuItem>
+                                <MenuItem value="ORANGE_MONEY">Orange Money</MenuItem>
+                                <MenuItem value="MOBILE_MONEY">Mobile Money</MenuItem>
                               </Select>
                             </FormControl>
                           </Grid>
@@ -1120,7 +1064,6 @@ const Versement = () => {
                       </CardContent>
                     </StyledCard>
 
-                    {/* Infos solde */}
                     <StyledCard>
                       <CardContent sx={{ p: 2 }}>
                         <Typography variant="subtitle2" sx={{ mb: 2, color: '#1976D2', fontWeight: 600 }}>
@@ -1152,7 +1095,6 @@ const Versement = () => {
                     </StyledCard>
                   </Grid>
 
-                  {/* Colonne 2: Détails du versement - CORRIGÉ POUR MEILLEUR ESPACEMENT */}
                   <Grid item xs={12} md={6}>
                     <StyledCard sx={{ height: '100%' }}>
                       <CardContent sx={{ p: 2, height: '100%' }}>
@@ -1160,7 +1102,6 @@ const Versement = () => {
                           Détails du Versement
                         </Typography>
                         <Grid container spacing={2}>
-                          {/* NOUVEAUX CHAMPS : Bordereau */}
                           <Grid item xs={12}>
                             <Grid container spacing={1.5}>
                               <Grid item xs={6}>
@@ -1221,7 +1162,6 @@ const Versement = () => {
                             />
                           </Grid>
                           
-                          {/* Informations compte sélectionné - MEILLEUR ESPACEMENT */}
                           <Grid item xs={12}>
                             <Grid container spacing={1.5}>
                               <Grid item xs={6}>
@@ -1272,7 +1212,21 @@ const Versement = () => {
                             />
                           </Grid>
                           
-                          {/* Dates - MEILLEUR ESPACEMENT */}
+                          {/* NOUVEAU CHAMP : Provenance des fonds */}
+                          <Grid item xs={12}>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              label="Provenance des fonds"
+                              name="provenance_fonds"
+                              value={formData.provenance_fonds}
+                              onChange={handleChange}
+                              placeholder="Ex: Revenus professionnels, Épargne, Vente..."
+                              required
+                            />
+                          </Grid>
+                          
+                          {/* Dates - MODIFICATION: Date opération et Date valeur désactivées */}
                           <Grid item xs={12}>
                             <Grid container spacing={1.5}>
                               <Grid item xs={4}>
@@ -1285,6 +1239,8 @@ const Versement = () => {
                                   value={formData.dateOperation}
                                   onChange={handleChange}
                                   InputLabelProps={{ shrink: true }}
+                                  disabled // MODIFICATION: Champ désactivé
+                                  helperText="Date automatique"
                                 />
                               </Grid>
                               <Grid item xs={4}>
@@ -1297,6 +1253,8 @@ const Versement = () => {
                                   value={formData.dateValeur}
                                   onChange={handleChange}
                                   InputLabelProps={{ shrink: true }}
+                                  disabled // MODIFICATION: Champ désactivé
+                                  helperText="Date automatique"
                                 />
                               </Grid>
                               <Grid item xs={4}>
@@ -1318,7 +1276,6 @@ const Versement = () => {
                     </StyledCard>
                   </Grid>
 
-                  {/* Section SMS et Frais */}
                   <Grid item xs={12}>
                     <StyledCard>
                       <CardContent sx={{ p: 2 }}>
@@ -1423,7 +1380,6 @@ const Versement = () => {
                     </StyledCard>
                   </Grid>
 
-                  {/* Section Billetage */}
                   <Grid item xs={12}>
                     <StyledCard>
                       <CardContent sx={{ p: 2 }}>
@@ -1531,7 +1487,6 @@ const Versement = () => {
                     </StyledCard>
                   </Grid>
 
-                  {/* Résumé financier */}
                   <Grid item xs={12}>
                     <StyledCard>
                       <CardContent sx={{ p: 2 }}>
@@ -1574,7 +1529,6 @@ const Versement = () => {
                 </Grid>
               </TabPanel>
 
-              {/* Onglet Remettant */}
               <TabPanel value={tabValue} index={1}>
                 <Grid container spacing={2}>
                   <Grid item xs={12} md={6}>
@@ -1731,7 +1685,6 @@ const Versement = () => {
                 </Grid>
               </TabPanel>
 
-              {/* Onglet Condition */}
               <TabPanel value={tabValue} index={2}>
                 <StyledCard>
                   <CardContent>
@@ -1755,7 +1708,6 @@ const Versement = () => {
                 </StyledCard>
               </TabPanel>
 
-              {/* Onglet Photo/signature */}
               <TabPanel value={tabValue} index={3}>
                 <StyledCard>
                   <CardContent sx={{ textAlign: 'center', py: 4 }}>
@@ -1770,7 +1722,6 @@ const Versement = () => {
                 </StyledCard>
               </TabPanel>
 
-              {/* Boutons d'action */}
               <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                 <SecondaryButton onClick={() => window.history.back()}>
                   Annuler
@@ -1785,6 +1736,7 @@ const Versement = () => {
                     parseFloat(formData.montant) <= 0 ||
                     !formData.nomRemettant ||
                     !formData.numeroId ||
+                    !formData.provenance_fonds || // MODIFICATION: Ajout de la validation
                     billetage.every(item => item.quantite === 0) ||
                     !formData.selectedAgence ||
                     !formData.guichet ||
@@ -1799,7 +1751,6 @@ const Versement = () => {
         </Box>
       </Box>
 
-      {/* Dialog de confirmation */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <CheckCircle color="primary" />
@@ -1827,13 +1778,15 @@ const Versement = () => {
               <br />
               • Compte: {formData.compte}
               <br />
-              • Type versement: {formData.typeVersement === '01' ? 'Versement espèces' : 
-                                formData.typeVersement === '02' ? 'Versement OM' :
-                                formData.typeVersement === '03' ? 'Virement MOMO' : 'Autres'}
+              • Type versement: {formData.typeVersement === 'ESPECE' ? 'Espèces' : 
+                                formData.typeVersement === 'ORANGE_MONEY' ? 'Orange Money' :
+                                formData.typeVersement === 'MOBILE_MONEY' ? 'Mobile Money' : 'Autres'}
               <br />
               • Montant: {formatCurrency(formData.montant)} FCFA
               <br />
               • Remettant: {formData.nomRemettant}
+              <br />
+              • Provenance des fonds: {formData.provenance_fonds}
               <br />
               • Net à créditer: {formatCurrency(formData.netCrediter)} FCFA
               <br />
@@ -1851,7 +1804,6 @@ const Versement = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Modal pour la validation requise */}
       <Dialog open={validationDialog} onClose={() => setValidationDialog(false)}>
         <DialogTitle>
           <Warning color="warning" sx={{ mr: 1, verticalAlign: 'middle' }} />
@@ -1873,7 +1825,6 @@ const Versement = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}

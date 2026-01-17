@@ -38,6 +38,8 @@ interface VersementData {
   remettant_nom?: string;
   remettant_type_piece?: string;
   remettant_numero_piece?: string;
+  // NOUVEAU CHAMP : Provenance des fonds
+  provenance_fonds?: string;
 }
 
 interface VersementResponse {
@@ -86,6 +88,9 @@ const caisseServices = {
         numero_bordereau: data.numero_bordereau || '',
         type_bordereau: data.type_bordereau || 'VERSEMENT',
         
+        // NOUVEAU CHAMP : Provenance des fonds
+        provenance_fonds: data.provenance_fonds || '',
+        
         // Calcul des montants nets
         montant_net: data.montant_net || parseFloat(data.montant_brut.toString()) - 
           (parseFloat(data.commissions?.toString() || '0') + parseFloat(data.taxes?.toString() || '0')),
@@ -109,7 +114,7 @@ const caisseServices = {
         
         // Contexte de l'opération
         origine_fonds: data.origine_fonds || 'Versement espèces',
-        type_versement: data.type_versement || '01',
+        type_versement: data.type_versement || 'ESPECE',
         date_valeur: data.date_valeur || new Date().toISOString().split('T')[0],
         ref_lettrage: data.ref_lettrage || '',
         
@@ -132,6 +137,7 @@ const caisseServices = {
       console.log('URL de la requête:', '/caisse/versement');
       console.log('Payload Laravel:', JSON.stringify(payload, null, 2));
       console.log('Billetage:', payload.billetage);
+      console.log('Provenance des fonds:', payload.provenance_fonds);
       
       // Vérifications de validation avant envoi
       if (!payload.compte_id || payload.compte_id <= 0) {
@@ -155,6 +161,14 @@ const caisseServices = {
         return {
           success: false,
           message: 'Informations du remettant incomplètes'
+        };
+      }
+      
+      if (!payload.provenance_fonds) {
+        console.error('Erreur: provenance des fonds manquante');
+        return {
+          success: false,
+          message: 'La provenance des fonds est obligatoire'
         };
       }
       
