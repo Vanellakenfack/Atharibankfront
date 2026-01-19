@@ -1,96 +1,521 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box, Paper, Typography, TextField, Button, MenuItem,
+  Box, Typography, TextField, Button, MenuItem,
   FormControl, InputLabel, Select, Grid, Card, CardContent,
-  CircularProgress, Alert
+  CircularProgress, Alert, Snackbar, Tooltip
 } from '@mui/material';
-import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { fr } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../../components/layout/Sidebar';
 import TopBar from '../../components/layout/TopBar';
-import agenceService from '../../services/agenceService';
+import sessionService from '../../services/sessionService';
+import guichetService from '../../services/guichetService';
 
-const GuichetForm = () => {
+// Types
+interface Guichet {
+  id: number;
+  nom_guichet: string;
+  code_guichet: string;
+  statut?: string;
+  agence_id: number;
+  est_actif: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface SnackbarState {
+  open: boolean;
+  message: string;
+  severity: 'success' | 'error' | 'warning' | 'info';
+}
+
+interface GuichetState {
+  isOpen: boolean;
+  sessionId?: number;
+  guichetId?: number;
+  codeGuichet?: string;
+}
+
+interface ApiResponse {
+  statut: 'success' | 'error';
+  message: string;
+  data?: any;
+}
+
+const GuichetForm: React.FC = () => {
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [loadingAgences, setLoadingAgences] = useState(true);
-  const [agences, setAgences] = useState([]);
-  const [error, setError] = useState('');
-  const [guichets, setGuichets] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [loadingGuichets, setLoadingGuichets] = useState<boolean>(true);
+  const [snackbar, setSnackbar] = useState<SnackbarState>({ 
+    open: false, 
+    message: '', 
+    severity: 'success' 
+  });
+  
+  // États
+  const [agenceSessionId, setAgenceSessionId] = useState<string>('');
+  const [guichets, setGuichets] = useState<Guichet[]>([]);
+  const [guichetState, setGuichetState] = useState<GuichetState>({
+    isOpen: false
+  });
+  const [operation, setOperation] = useState<'OU' | 'FE'>('OU');
 
-  // États du formulaire
-  const [formData, setFormData] = useState({
-    agence: '',
-    guichet: '',
-    situationActuelle: 'FE',
-    operation: 'OU',
-    dateComptable: new Date(),
+  // États du formulaire OUVERTURE
+  const [formDataOuverture, setFormDataOuverture] = useState({
+    agence_session_id: '',
+    guichet_id: '',
+    code_guichet: ''
   });
 
-  // Charger les agences depuis l'API
+  // États du formulaire FERMETURE
+  const [formDataFermeture, setFormDataFermeture] = useState({
+    guichet_session_id: '',
+    guichet_id: '',
+    code_guichet: ''
+  });
+
+  // Charger l'état de l'agence et les guichets
   useEffect(() => {
-    const fetchAgences = async () => {
+    console.log('🔄 Initialisation GuichetForm...');
+    
+    const init = async () => {
       try {
-        setLoadingAgences(true);
-        const data = await agenceService.getAgences();
-        setAgences(data);
-        setError('');
-      } catch (err) {
-        console.error('Erreur lors du chargement des agences:', err);
-        setError('Impossible de charger la liste des agences');
+        const sessionId = localStorage.getItem('session_agence_id');
+        
+        if (sessionId) {
+          console.log('✅ Session agence trouvée:', sessionId);
+          setAgenceSessionId(sessionId);
+          
+          setFormDataOuverture(prev => ({
+            ...prev,
+            agence_session_id: sessionId
+          }));
+
+          // Charger les guichets disponibles
+          await loadGuichets();
+          
+          // Vérifier si un guichet est déjà ouvert
+          await checkGuichetSession();
+          
+        } else {
+          console.warn('⚠️ Aucune session agence trouvée');
+          showSnackbar('Ouvrez d\'abord l\'agence', 'warning');
+        }
+
+      } catch (error: any) {
+        console.error('❌ Erreur initialisation:', error);
       } finally {
-        setLoadingAgences(false);
+        setLoadingGuichets(false);
       }
     };
 
-    fetchAgences();
+    init();
   }, []);
 
-  // Simuler le chargement des guichets selon l'agence sélectionnée
-  useEffect(() => {
-    if (formData.agence) {
-      // Ici, vous devrez implémenter un appel API pour les guichets
-      // Pour l'exemple, on utilise des données mock
-      const mockGuichets = [
-        { id: 'G001', code: 'G001', nom: 'Guichet Principal', situation: 'FE' },
-        { id: 'G002', code: 'G002', nom: 'Guichet Secondaire', situation: 'OU' },
-        { id: 'G003', code: 'G003', nom: 'Guichet VIP', situation: 'FE' },
-      ];
-      setGuichets(mockGuichets);
-    } else {
-      setGuichets([]);
+  // Fonction pour vérifier l'état du guichet
+  const checkGuichetSession = async () => {
+    try {
+      const guichetSessionId = localStorage.getItem('guichet_session_id');
+      const guichetId = localStorage.getItem('guichet_id');
+      const codeGuichet = localStorage.getItem('code_guichet');
+      
+      if (guichetSessionId && guichetId) {
+        console.log('✅ Guichet déjà ouvert:', { guichetSessionId, guichetId, codeGuichet });
+        
+        // Vérifier si la session guichet est toujours active
+        try {
+          setGuichetState({
+            isOpen: true,
+            sessionId: parseInt(guichetSessionId),
+            guichetId: parseInt(guichetId),
+            codeGuichet: codeGuichet || ''
+          });
+          
+          setFormDataFermeture({
+            guichet_session_id: guichetSessionId,
+            guichet_id: guichetId,
+            code_guichet: codeGuichet || ''
+          });
+          
+          setOperation('FE');
+          showSnackbar(`Guichet ${codeGuichet} est déjà ouvert`, 'info');
+          
+        } catch (error) {
+          // Si la session n'est plus valide, nettoyer
+          console.log('Session guichet invalide, nettoyage...');
+          clearGuichetStorage();
+        }
+      } else {
+        setOperation('OU');
+      }
+    } catch (error) {
+      console.error('Erreur vérification session guichet:', error);
     }
-  }, [formData.agence]);
+  };
 
-  const handleChange = (e) => {
+  const clearGuichetStorage = () => {
+    localStorage.removeItem('guichet_session_id');
+    localStorage.removeItem('guichet_id');
+    localStorage.removeItem('code_guichet');
+    setGuichetState({ isOpen: false });
+    setOperation('OU');
+  };
+
+  const loadGuichets = async () => {
+    try {
+      setLoadingGuichets(true);
+      console.log('📋 Chargement de tous les guichets...');
+      
+      const data = await guichetService.getGuichets();
+      console.log('📦 Réponse API getGuichets:', data);
+      
+      if (Array.isArray(data)) {
+        console.log('✅ Guichets chargés (tableau):', data);
+        setGuichets(data);
+      } else if (data && typeof data === 'object') {
+        console.log('✅ Guichet unique chargé (converti en tableau):', data);
+        setGuichets([data]);
+      } else if (data && data.statut === 'success' && Array.isArray(data.data)) {
+        console.log('✅ Guichets chargés depuis structure data:', data.data);
+        setGuichets(data.data);
+      } else {
+        console.warn('⚠️ Format de données inattendu:', data);
+        setGuichets([]);
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Erreur chargement guichets:', error);
+      let errorMessage = 'Erreur lors du chargement des guichets';
+      
+      if (error && typeof error === 'object') {
+        const err = error as any;
+        errorMessage = err.response?.data?.message || 
+                      err.message || 
+                      errorMessage;
+      }
+      
+      showSnackbar(errorMessage, 'error');
+      setGuichets([]);
+    } finally {
+      setLoadingGuichets(false);
+    }
+  };
+
+  const handleOperationChange = (e: React.ChangeEvent<{ value: unknown }>) => {
+    const value = e.target.value as 'OU' | 'FE';
+    setOperation(value);
+  };
+
+  const handleOuvertureChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    console.log(`🔄 handleOuvertureChange - name: ${name}, value: ${value}`);
+    
+    if (name && name in formDataOuverture) {
+      // Créer une copie des données actuelles
+      const updatedData = { ...formDataOuverture, [name]: value as string };
+      
+      // Si on change le guichet, récupérer automatiquement son code
+      if (name === 'guichet_id' && value) {
+        console.log('🔍 Recherche du guichet sélectionné...');
+        const selectedGuichet = guichets.find(g => g.id.toString() === value.toString());
+        console.log('🔍 Guichet trouvé:', selectedGuichet);
+        
+        if (selectedGuichet) {
+          console.log(`✅ Code guichet trouvé: ${selectedGuichet.code_guichet}`);
+          updatedData.code_guichet = selectedGuichet.code_guichet;
+        } else {
+          console.warn('⚠️ Aucun guichet trouvé avec cet ID');
+          updatedData.code_guichet = '';
+        }
+      }
+      
+      console.log('📝 Données mises à jour:', updatedData);
+      setFormDataOuverture(updatedData);
+    }
   };
 
-  const handleDateChange = (name, date) => {
-    setFormData(prev => ({ ...prev, [name]: date }));
+  const showSnackbar = (message: string, severity: SnackbarState['severity'] = 'success') => {
+    console.log(`📢 Snackbar ${severity}: ${message}`);
+    setSnackbar({ open: true, message, severity });
   };
 
-  const handleSubmit = async (e) => {
+  const handleOpenGuichet = async (): Promise<ApiResponse> => {
+    console.log('📞 Appel API ouverture guichet...', {
+      agence_session_id: parseInt(agenceSessionId),
+      guichet_id: parseInt(formDataOuverture.guichet_id),
+      guichet_code: formDataOuverture.code_guichet
+    });
+    
+    if (!formDataOuverture.guichet_id) {
+      throw new Error('Veuillez sélectionner un guichet');
+    }
+
+    if (!agenceSessionId) {
+      throw new Error('Session agence non disponible');
+    }
+
+    if (!formDataOuverture.code_guichet) {
+      throw new Error('Code guichet non disponible');
+    }
+
+    try {
+      const response = await sessionService.ouvrirGuichet(
+        parseInt(agenceSessionId),
+        parseInt(formDataOuverture.guichet_id),
+        formDataOuverture.code_guichet
+      );
+
+      console.log('✅ Réponse API ouverture guichet:', response);
+      
+      return {
+        statut: 'success',
+        message: response.data?.message || 'Guichet ouvert avec succès !',
+        data: response.data?.data || response.data
+      };
+      
+    } catch (err: any) {
+      console.error('❌ Erreur ouverture guichet:', err);
+      
+      const errorData = err.response?.data;
+      if (errorData) {
+        return {
+          statut: 'error',
+          message: errorData.message || errorData.error || 'Erreur lors de l\'ouverture',
+          data: errorData
+        };
+      }
+      
+      throw err;
+    }
+  };
+
+  const handleCloseGuichet = async (): Promise<ApiResponse> => {
+    const guichetSessionId = formDataFermeture.guichet_session_id || localStorage.getItem('guichet_session_id');
+    
+    if (!guichetSessionId) {
+      throw new Error('ID de session guichet manquant');
+    }
+
+    try {
+      console.log('📞 Appel API fermeture guichet...', { guichet_session_id: guichetSessionId });
+      const response = await sessionService.fermerGuichet(parseInt(guichetSessionId));
+      
+      console.log('✅ Réponse API fermeture guichet:', response);
+      
+      return {
+        statut: 'success',
+        message: response.data?.message || 'Guichet fermé avec succès !',
+        data: response.data
+      };
+      
+    } catch (err: any) {
+      console.error('❌ Erreur fermeture guichet:', err);
+      
+      const errorData = err.response?.data;
+      if (errorData) {
+        return {
+          statut: 'error',
+          message: errorData.message || errorData.error || 'Erreur lors de la fermeture',
+          data: errorData
+        };
+      }
+      
+      throw err;
+    }
+  };
+
+  const processOuvertureResponse = (responseData: ApiResponse): boolean => {
+    console.log('🔄 Traitement réponse ouverture:', responseData);
+    
+    if (responseData.statut !== 'success') {
+      showSnackbar(responseData.message || 'Erreur lors de l\'ouverture', 'error');
+      return false;
+    }
+    
+    console.log('✅ Ouverture réussie:', responseData.message);
+    showSnackbar(responseData.message || 'Guichet ouvert avec succès !', 'success');
+    
+    // Extraire les données
+    let guichetSessionId: number | undefined;
+    let codeGuichet: string | undefined;
+    let guichetId: number | undefined;
+    
+    if (responseData.data) {
+      guichetSessionId = responseData.data.id || responseData.data.guichet_session_id;
+      codeGuichet = responseData.data.code_guichet || responseData.data.code;
+      guichetId = responseData.data.guichet_id || responseData.data.guichetId;
+    }
+    
+    if (!guichetSessionId && responseData.data?.data) {
+      guichetSessionId = responseData.data.data.id;
+      codeGuichet = responseData.data.data.code_guichet;
+      guichetId = responseData.data.data.guichet_id;
+    }
+    
+    if (!guichetId) {
+      guichetId = parseInt(formDataOuverture.guichet_id);
+    }
+    
+    if (!codeGuichet) {
+      codeGuichet = formDataOuverture.code_guichet;
+    }
+    
+    const selectedGuichet = guichets.find(g => g.id.toString() === formDataOuverture.guichet_id);
+    
+    if (!codeGuichet && selectedGuichet) {
+      codeGuichet = selectedGuichet.code_guichet;
+    }
+    
+    // Préparer les données à stocker
+    const finalGuichetSessionId = guichetSessionId || Date.now();
+    const finalGuichetId = guichetId || selectedGuichet?.id || parseInt(formDataOuverture.guichet_id);
+    const finalCodeGuichet = codeGuichet || selectedGuichet?.code_guichet || formDataOuverture.code_guichet;
+    
+    console.log('💾 Données finales à stocker:', {
+      guichet_session_id: finalGuichetSessionId,
+      guichet_id: finalGuichetId,
+      code_guichet: finalCodeGuichet
+    });
+    
+    // Stocker dans localStorage
+    localStorage.setItem('guichet_session_id', finalGuichetSessionId.toString());
+    localStorage.setItem('guichet_id', finalGuichetId.toString());
+    localStorage.setItem('code_guichet', finalCodeGuichet);
+    
+    // Mettre à jour l'état
+    setGuichetState({
+      isOpen: true,
+      sessionId: finalGuichetSessionId,
+      guichetId: finalGuichetId,
+      codeGuichet: finalCodeGuichet
+    });
+    
+    setFormDataFermeture({
+      guichet_session_id: finalGuichetSessionId.toString(),
+      guichet_id: finalGuichetId.toString(),
+      code_guichet: finalCodeGuichet
+    });
+    
+    setOperation('FE');
+    
+    // Redirection vers caisse après 1.5 secondes
+    console.log('🔄 Redirection vers caisse dans 1.5s...');
+    setTimeout(() => {
+      console.log('🚀 Redirection vers /caisse/form');
+      navigate('/caisse/form');
+    }, 1500);
+    
+    return true;
+  };
+
+  const processFermetureResponse = (responseData: ApiResponse): boolean => {
+    console.log('🔄 Traitement réponse fermeture:', responseData);
+    
+    if (responseData.statut !== 'success') {
+      showSnackbar(responseData.message || 'Erreur lors de la fermeture', 'error');
+      return false;
+    }
+    
+    console.log('✅ Fermeture réussie:', responseData.message);
+    showSnackbar(responseData.message || 'Guichet fermé avec succès !', 'success');
+    
+    // Réinitialiser
+    clearGuichetStorage();
+    
+    setOperation('OU');
+    
+    setFormDataOuverture(prev => ({ 
+      ...prev, 
+      guichet_id: '',
+      code_guichet: ''
+    }));
+    
+    // Recharger les guichets
+    loadGuichets();
+    
+    return true;
+  };
+
+  const handleSubmitOuverture = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    console.log('🚀 Soumission ouverture guichet:', formDataOuverture);
+    
+    if (!agenceSessionId) {
+      showSnackbar('Session agence manquante', 'error');
+      return;
+    }
+
+    if (!formDataOuverture.guichet_id) {
+      showSnackbar('Veuillez sélectionner un guichet', 'error');
+      return;
+    }
+
+    if (!formDataOuverture.code_guichet) {
+      showSnackbar('Code guichet non disponible', 'error');
+      return;
+    }
+
     setLoading(true);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      alert(`Guichet ${formData.operation === 'OU' ? 'ouvert' : 'fermé'} avec succès !`);
-      navigate('/');
-    } catch (error) {
-      alert('Une erreur est survenue');
+      const responseData = await handleOpenGuichet();
+      processOuvertureResponse(responseData);
+    } catch (err: any) {
+      console.error('❌ Erreur lors de l\'ouverture:', err);
+      showSnackbar(err.message || 'Erreur lors de l\'ouverture', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitFermeture = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    console.log('🚀 Soumission fermeture guichet:', formDataFermeture);
+    
+    if (!formDataFermeture.guichet_session_id) {
+      showSnackbar('Session guichet manquante', 'error');
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      const responseData = await handleCloseGuichet();
+      processFermetureResponse(responseData);
+    } catch (err: any) {
+      console.error('❌ Erreur lors de la fermeture:', err);
+      showSnackbar(err.message || 'Erreur lors de la fermeture', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleCancel = () => {
-    navigate('/');
+    navigate('/agence/form');
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  const getButtonText = () => {
+    if (loading) return '';
+    return operation === 'OU' ? 'Ouvrir le Guichet' : 'Fermer le Guichet';
+  };
+
+  const isButtonDisabled = () => {
+    if (loading) return true;
+    if (!agenceSessionId) return true;
+    
+    if (operation === 'OU') {
+      if (!formDataOuverture.guichet_id || !formDataOuverture.code_guichet) return true;
+    } else if (operation === 'FE') {
+      if (!formDataFermeture.guichet_session_id) return true;
+    }
+    
+    return false;
   };
 
   return (
@@ -112,162 +537,241 @@ const GuichetForm = () => {
         <Box sx={{ px: { xs: 2, md: 4 }, py: 4 }}>
           <Box sx={{ mb: 4 }}>
             <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', mb: 0.5 }}>
-              Ouverture/Fermeture Guichet
+              {operation === 'OU' ? 'Ouverture du Guichet' : 'Fermeture du Guichet'}
             </Typography>
             <Typography variant="body2" sx={{ color: '#64748B' }}>
-              Gérer l'ouverture ou la fermeture des guichets
+              Étape 3 : Gérer l'ouverture ou la fermeture des guichets
             </Typography>
+            
+            {/* Indicateur d'état */}
+            <Box sx={{ mt: 2 }}>
+              {!agenceSessionId ? (
+                <Alert severity="warning">
+                  ⚠️ L'agence n'est pas ouverte. Ouvrez d'abord l'agence.
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={() => navigate('/agence/form')}
+                    sx={{ ml: 2 }}
+                  >
+                    Ouvrir l'agence
+                  </Button>
+                </Alert>
+              ) : guichetState.isOpen && operation === 'FE' ? (
+                <Alert severity="info">
+                  <Typography variant="body2" fontWeight="bold">
+                    ℹ️ Guichet {guichetState.codeGuichet} est OUVERT
+                  </Typography>
+                  <Typography variant="body2">
+                    Session ID: {guichetState.sessionId} | Guichet ID: {guichetState.guichetId}
+                  </Typography>
+                </Alert>
+              ) : (
+                <Alert severity="success">
+                  ✅ L'agence est OUVERTE (Session ID: {agenceSessionId})
+                </Alert>
+              )}
+            </Box>
           </Box>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
-            </Alert>
-          )}
-
-          <Card sx={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+          <Card sx={{ borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
             <CardContent>
-              <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={fr}>
-                <form onSubmit={handleSubmit}>
-                  <Grid container spacing={3}>
-                    {/* Agence */}
-                    <Grid item xs={12} md={6}>
-                      <FormControl fullWidth size="small" sx={{ minWidth: 200 }}>
-                        <InputLabel>Agence</InputLabel>
-                        <Select
-                          name="agence"
-                          value={formData.agence}
-                          onChange={handleChange}
-                          label="Agence"
-                          required
-                        >
-                          <MenuItem value=""><em>Sélectionner une agence</em></MenuItem>
-                          {agences.map((agence) => (
-                            <MenuItem key={agence.id} value={agence.id}>
-                              {agence.name} ({agence.code})
-                            </MenuItem>
-                          ))}
-                          {/* Option pour saisir manuellement */}
-                          <MenuItem value="autre">
-                            <em>Autre (saisir manuellement)</em>
-                          </MenuItem>
-                        </Select>
-                        {loadingAgences && (
-                          <CircularProgress size={20} sx={{ position: 'absolute', right: 40, top: '50%', transform: 'translateY(-50%)' }} />
-                        )}
-                      </FormControl>
-                      {formData.agence === 'autre' && (
+              <Grid container spacing={3}>
+                {/* Sélection Opération */}
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth size="small" disabled={!agenceSessionId}>
+                    <InputLabel>Opération *</InputLabel>
+                    <Select
+                      value={operation}
+                      onChange={handleOperationChange}
+                      label="Opération *"
+                      required
+                    >
+                      <MenuItem value="OU">Ouverture (OU)</MenuItem>
+                      <MenuItem value="FE">Fermeture (FE)</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                {/* Informations communes */}
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Session Agence ID"
+                    value={agenceSessionId || 'Non disponible'}
+                    disabled
+                    helperText="Récupéré automatiquement"
+                  />
+                </Grid>
+
+                {/* FORMULAIRE OUVERTURE */}
+                {operation === 'OU' ? (
+                  <form onSubmit={handleSubmitOuverture} style={{ width: '100%' }}>
+                    <Grid container spacing={3}>
+                      <Grid item xs={12} md={6}>
+                        <FormControl fullWidth size="small" required>
+                          <InputLabel>Sélectionner Guichet</InputLabel>
+                          <Select
+                            name="guichet_id"
+                            value={formDataOuverture.guichet_id}
+                            onChange={handleOuvertureChange}
+                            label="Guichet *"
+                            required
+                            disabled={loadingGuichets}
+                          >
+                            <MenuItem value=""><em>Sélectionner un guichet</em></MenuItem>
+                            {guichets.length > 0 ? (
+                              guichets.map((guichet) => (
+                                <MenuItem key={guichet.id} value={guichet.id.toString()}>
+                                  {guichet.nom_guichet} ({guichet.code_guichet})
+                                </MenuItem>
+                              ))
+                            ) : (
+                              <MenuItem value="" disabled>
+                                {loadingGuichets ? 'Chargement...' : 'Aucun guichet disponible'}
+                              </MenuItem>
+                            )}
+                          </Select>
+                          {loadingGuichets && (
+                            <CircularProgress size={20} sx={{ position: 'absolute', right: 40, top: '50%' }} />
+                          )}
+                        </FormControl>
+                      </Grid>
+
+                      <Grid item xs={12} md={6}>
                         <TextField
                           fullWidth
                           size="small"
-                          label="Nom de l'agence"
-                          sx={{ mt: 1 }}
-                          required
-                        />
-                      )}
-                    </Grid>
-
-                    {/* Guichet - Champ texte modifiable */}
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Code du guichet"
-                        name="guichet"
-                        value={formData.guichet}
-                        onChange={handleChange}
-                        required
-                        placeholder="Ex: G001"
-                      />
-                    </Grid>
-
-                    {/* Situation actuelle */}
-                    <Grid item xs={12} md={6}>
-                      <FormControl fullWidth size="small">
-                        <InputLabel>Situation actuelle</InputLabel>
-                        <Select
-                          name="situationActuelle"
-                          value={formData.situationActuelle}
-                          onChange={handleChange}
-                          label="Situation actuelle"
-                        >
-                          <MenuItem value="FE">Fermé (FE)</MenuItem>
-                          <MenuItem value="OU">Ouvert (OU)</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-
-                    {/* OUverture/FErmeture */}
-                    <Grid item xs={12} md={6}>
-                      <FormControl fullWidth size="small" sx={{ minWidth: 200 }}>
-                        <InputLabel>(OU)verture/(FE)rmeture</InputLabel>
-                        <Select
-                          name="operation"
-                          value={formData.operation}
-                          onChange={handleChange}
-                          label="(OU)verture/(FE)rmeture"
-                          required
-                        >
-                          <MenuItem value="OU">Ouverture (OU)</MenuItem>
-                          <MenuItem value="FE">Fermeture (FE)</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-
-                    {/* Date comptable */}
-                    <Grid item xs={12}>
-                      <DatePicker
-                        label="Date comptable"
-                        value={formData.dateComptable}
-                        onChange={(date) => handleDateChange('dateComptable', date)}
-                        slotProps={{ textField: { size: 'small', fullWidth: true, required: true } }}
-                      />
-                    </Grid>
-
-                    {/* Boutons */}
-                    <Grid item xs={12}>
-                      <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
-                        <Button
-                          variant="outlined"
-                          onClick={handleCancel}
-                          sx={{ 
-                            borderRadius: '8px', 
-                            px: 4, 
-                            py: 1,
-                            textTransform: 'none',
-                            fontWeight: 'bold'
+                          label="Code du Guichet"
+                          name="code_guichet"
+                          value={formDataOuverture.code_guichet}
+                          disabled
+                          helperText="Code généré automatiquement"
+                          InputProps={{
+                            readOnly: true,
                           }}
-                        >
-                          Annuler
-                        </Button>
+                        />
+                        <Typography variant="caption" color="textSecondary">
+                          Sélectionnez un guichet pour afficher son code
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                  </form>
+                ) : (
+                  /* FORMULAIRE FERMETURE */
+                  <form onSubmit={handleSubmitFermeture} style={{ width: '100%' }}>
+                    <Grid container spacing={3}>
+                      <Grid item xs={12} md={4}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Code du guichet"
+                          value={formDataFermeture.code_guichet || 'Non disponible'}
+                          disabled
+                          helperText="Guichet à fermer"
+                        />
+                      </Grid>
+
+                      <Grid item xs={12} md={4}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="ID Guichet"
+                          value={formDataFermeture.guichet_id || 'Non disponible'}
+                          disabled
+                          helperText="ID du guichet"
+                        />
+                      </Grid>
+
+                      <Grid item xs={12} md={4}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Session Guichet ID"
+                          value={formDataFermeture.guichet_session_id || 'Non disponible'}
+                          disabled
+                          helperText="ID de session du guichet"
+                        />
+                      </Grid>
+                    </Grid>
+                  </form>
+                )}
+
+                {/* Informations de session */}
+                <Grid item xs={12}>
+                  <Alert severity="info" icon={false}>
+                    <Typography variant="body2" fontWeight="bold">
+                      Informations stockées dans localStorage:
+                    </Typography>
+                    <Typography variant="body2" component="div" sx={{ mt: 1, fontFamily: 'monospace', fontSize: '12px' }}>
+                      session_agence_id: {localStorage.getItem('session_agence_id') || 'null'}<br/>
+                      guichet_session_id: {localStorage.getItem('guichet_session_id') || 'null'}<br/>
+                      guichet_id: {localStorage.getItem('guichet_id') || 'null'}<br/>
+                      code_guichet: {localStorage.getItem('code_guichet') || 'null'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      <strong>État actuel:</strong><br/>
+                      - Guichet sélectionné: {formDataOuverture.guichet_id || 'Aucun'}<br/>
+                      - Code guichet: {formDataOuverture.code_guichet || 'Aucun'}
+                    </Typography>
+                  </Alert>
+                </Grid>
+
+                {/* Boutons */}
+                <Grid item xs={12}>
+                  <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
+                    <Button
+                      variant="outlined"
+                      onClick={handleCancel}
+                      sx={{ 
+                        borderRadius: '8px', 
+                        px: 4, 
+                        py: 1,
+                        textTransform: 'none'
+                      }}
+                    >
+                      Annuler
+                    </Button>
+                    <Tooltip title={isButtonDisabled() ? "Remplissez tous les champs" : ""}>
+                      <span>
                         <Button
                           type="submit"
                           variant="contained"
-                          disabled={loading}
+                          disabled={isButtonDisabled()}
+                          onClick={operation === 'OU' ? handleSubmitOuverture : handleSubmitFermeture}
                           sx={{
-                            background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
+                            background: operation === 'OU' 
+                              ? 'linear-gradient(135deg, #3B82F6 0%, #1D4Ed8 100%)'
+                              : 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
                             borderRadius: '8px',
                             px: 4,
                             py: 1,
-                            textTransform: 'none',
-                            fontWeight: 'bold',
-                            boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.3)',
-                            '&:hover': {
-                              background: 'linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)',
-                            }
+                            textTransform: 'none'
                           }}
                         >
-                          {loading ? <CircularProgress size={24} /> : 'Ouvrir'}
+                          {loading ? <CircularProgress size={24} /> : getButtonText()}
                         </Button>
-                      </Box>
-                    </Grid>
-                  </Grid>
-                </form>
-              </LocalizationProvider>
+                      </span>
+                    </Tooltip>
+                  </Box>
+                </Grid>
+              </Grid>
             </CardContent>
           </Card>
         </Box>
       </Box>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

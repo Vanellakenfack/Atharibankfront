@@ -3,7 +3,8 @@ import {
   Box, Button, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Paper, Typography, IconButton, 
   Switch, Dialog, DialogTitle, DialogContent, TextField, Grid, DialogActions,
-  MenuItem, Avatar, Chip, InputAdornment, Divider, Stack
+  MenuItem, Avatar, Chip, InputAdornment, Divider, Stack,
+  Autocomplete
 } from "@mui/material";
 import { 
   Add, Edit, AccountBalance, Timer, MenuBook, History, 
@@ -233,42 +234,99 @@ export default function DatTypeManager() {
               </Grid>
 
               <Grid item xs={12}>
-                <TextField select fullWidth label="Compte de Capital (Bilan)" value={formData.plan_comptable_chapitre_id} 
-                  onChange={(e) => setFormData({...formData, plan_comptable_chapitre_id: e.target.value})}
-                  InputProps={{ startAdornment: <MenuBook sx={{ mr: 1, color: indigo[400] }} /> }}>
-                  {planComptable.map((cpte) => (
-                    <MenuItem key={cpte.id} value={cpte.id}>
-                        <Typography variant="body2" fontWeight="bold" sx={{ mr: 1 }}>{cpte.code}</Typography>
-                        <Typography variant="body2" color="textSecondary">{cpte.libelle}</Typography>
-                    </MenuItem>
-                  ))}
-                </TextField>
+                <Autocomplete
+                  options={planComptable}
+                  getOptionLabel={(option) => `${option.code} - ${option.libelle}`}
+                  value={planComptable.find(cpte => cpte.id === formData.plan_comptable_chapitre_id) || null}
+                  onChange={(event, newValue) => {
+                    setFormData({
+                      ...formData,
+                      plan_comptable_chapitre_id: newValue ? newValue.id : ''
+                    });
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Compte de Capital (Bilan)"
+                      placeholder="Rechercher un compte..."
+                      sx={{ minWidth: 200 }}
+                      InputProps={{
+                        ...params.InputProps,
+                        startAdornment: (
+                          <>
+                            <MenuBook sx={{ mr: 1, color: indigo[400] }} />
+                            {params.InputProps.startAdornment}
+                          </>
+                        )
+                      }}
+                    />
+                  )}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                />
               </Grid>
 
               <Grid item xs={12}>
-                <TextField select fullWidth label="Compte de Charges (Intérêts)" value={formData.plan_comptable_interet_id} 
-                  onChange={(e) => setFormData({...formData, plan_comptable_interet_id: e.target.value})}
-                  InputProps={{ startAdornment: <History sx={{ mr: 1, color: orange[400] }} /> }}>
-                  {planComptable.map((cpte) => (
-                    <MenuItem key={cpte.id} value={cpte.id}>
-                        <Typography variant="body2" fontWeight="bold" sx={{ mr: 1 }}>{cpte.code}</Typography>
-                        <Typography variant="body2" color="textSecondary">{cpte.libelle}</Typography>
-                    </MenuItem>
-                  ))}
-                </TextField>
+                <Autocomplete
+                  options={planComptable}
+                  getOptionLabel={(option) => `${option.code} - ${option.libelle}`}
+                  value={planComptable.find(cpte => cpte.id === formData.plan_comptable_interet_id) || null}
+                  onChange={(event, newValue) => {
+                    setFormData({
+                      ...formData,
+                      plan_comptable_interet_id: newValue ? newValue.id : ''
+                    });
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Compte de Charges (Intérêts)"
+                      placeholder="Rechercher un compte..."
+                      sx={{ minWidth: 200 }}
+                      InputProps={{
+                        ...params.InputProps,
+                        startAdornment: (
+                          <>
+                            <History sx={{ mr: 1, color: orange[400] }} />
+                            {params.InputProps.startAdornment}
+                          </>
+                        )
+                      }}
+                    />
+                  )}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                />
               </Grid>
 
               <Grid item xs={12}>
-                <TextField select fullWidth label="Compte de Produits (Pénalités)" value={formData.plan_comptable_penalite_id} 
-                  onChange={(e) => setFormData({...formData, plan_comptable_penalite_id: e.target.value})}
-                  InputProps={{ startAdornment: <Gavel sx={{ mr: 1, color: red[400] }} /> }}>
-                  {planComptable.map((cpte) => (
-                    <MenuItem key={cpte.id} value={cpte.id}>
-                        <Typography variant="body2" fontWeight="bold" sx={{ mr: 1 }}>{cpte.code}</Typography>
-                        <Typography variant="body2" color="textSecondary">{cpte.libelle}</Typography>
-                    </MenuItem>
-                  ))}
-                </TextField>
+                <Autocomplete
+                  options={planComptable}
+                  getOptionLabel={(option) => `${option.code} - ${option.libelle}`}
+                  value={planComptable.find(cpte => cpte.id === formData.plan_comptable_penalite_id) || null}
+                  onChange={(event, newValue) => {
+                    setFormData({
+                      ...formData,
+                      plan_comptable_penalite_id: newValue ? newValue.id : ''
+                    });
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Compte de Produits (Pénalités)"
+                      placeholder="Rechercher un compte..."
+                      sx={{ minWidth: 200 }}
+                      InputProps={{
+                        ...params.InputProps,
+                        startAdornment: (
+                          <>
+                            <Gavel sx={{ mr: 1, color: red[400] }} />
+                            {params.InputProps.startAdornment}
+                          </>
+                        )
+                      }}
+                    />
+                  )}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                />
               </Grid>
             </Grid>
           </DialogContent>
