@@ -231,7 +231,7 @@ return (
                     <Controller name="num_agence" control={control} render={({ field }) => (
                       <FormControl fullWidth size="small" error={!!errors.num_agence} required>
                         <InputLabel>Agence *</InputLabel>
-                        <Select label="Agence *" {...field} value={field.value || ""}>
+                        <Select sx={{minWidth: 200}} label="Agence *" {...field} value={field.value || ""}>
                           {agencies.map((a) => (<MenuItem key={a.id} value={a.id}>{a.code} - {a.agency_name}</MenuItem>))}
                         </Select>
                         {errors.num_agence && <FormHelperText>{errors.num_agence.message}</FormHelperText>}
@@ -252,7 +252,7 @@ return (
                   <Grid item xs={12} sx={{ mt: 2 }}><Typography variant="subtitle1" fontWeight="bold" color="primary">Identité</Typography></Grid>
                   <Grid item xs={12} md={8}><Controller name="nom_prenoms" control={control} render={({ field }) => (<TextField {...field} fullWidth size="small" label="Nom & Prénoms" required error={!!errors.nom_prenoms} helperText={errors.nom_prenoms?.message} />)} /></Grid>
                   <Grid item xs={12} md={4}><Controller name="sexe" control={control} render={({ field }) => (
-                    <FormControl fullWidth size="small" error={!!errors.sexe} required><InputLabel>Sexe *</InputLabel>
+                    <FormControl sx={{minWidth: 200}} size="small" error={!!errors.sexe} required><InputLabel>Sexe *</InputLabel>
                       <Select label="Sexe *" {...field} value={field.value || ""}><MenuItem value="M">Masculin</MenuItem><MenuItem value="F">Féminin</MenuItem></Select>
                     </FormControl>
                   )} /></Grid>
@@ -286,12 +286,12 @@ return (
                 <Grid container spacing={2}>
                   <Grid item xs={12}><Typography variant="subtitle1" fontWeight="bold" color="primary">Localisation</Typography></Grid>
                   <Grid item xs={12} md={4}><Controller name="adresse_ville" control={control} render={({ field }) => (
-                    <FormControl fullWidth size="small" error={!!errors.adresse_ville} required><InputLabel>Ville *</InputLabel>
+                    <FormControl sx={{minWidth: 200}} size="small" error={!!errors.adresse_ville} required><InputLabel>Ville *</InputLabel>
                       <Select label="Ville *" {...field} value={field.value || ""}>{Object.keys(CITY_DATA).map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}</Select>
                     </FormControl>
                   )} /></Grid>
                   <Grid item xs={12} md={4}><Controller name="adresse_quartier" control={control} render={({ field }) => (
-                    <FormControl fullWidth size="small"><InputLabel>Quartier</InputLabel>
+                    <FormControl sx={{minWidth: 200}} size="small"><InputLabel>Quartier</InputLabel>
                       <Select label="Quartier" {...field} value={field.value || ""}>{quartiersOptions.map(q => <MenuItem key={q} value={q}>{q}</MenuItem>)}</Select>
                     </FormControl>
                   )} /></Grid>

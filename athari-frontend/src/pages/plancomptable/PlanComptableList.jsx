@@ -3,7 +3,8 @@ import {
   Box, Button, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Chip, IconButton, TextField, 
   InputAdornment, Avatar, Paper, Typography, TablePagination,
-  Dialog, DialogTitle, DialogContent, DialogActions, Grid, MenuItem 
+  Dialog, DialogTitle, DialogContent, DialogActions, Grid, MenuItem,
+  Autocomplete
 } from "@mui/material";
 import { Add, Edit, Search, FilterList, AccountBalance } from "@mui/icons-material";
 import { indigo } from "@mui/material/colors";
@@ -249,17 +250,26 @@ export default function PlanComptableList() {
               />
             </Grid>
             <Grid item xs={12}>
-              <TextField
-                select fullWidth label="Catégorie"
-                value={newAccount.categorie_id}
-                onChange={(e) => setNewAccount({...newAccount, categorie_id: e.target.value})}
-              >
-                {categories.map((cat) => (
-                  <MenuItem key={cat.id} value={cat.id}>
-                    {cat.code} - {cat.nom || cat.libelle}
-                  </MenuItem>
-                ))}
-              </TextField>
+              <Autocomplete
+                options={categories}
+                getOptionLabel={(option) => `${option.code} - ${option.nom || option.libelle}`}
+                value={categories.find(cat => cat.id === newAccount.categorie_id) || null}
+                onChange={(event, newValue) => {
+                  setNewAccount({
+                    ...newAccount,
+                    categorie_id: newValue ? newValue.id : ''
+                  });
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Catégorie"
+                    placeholder="Rechercher une catégorie..."
+                    sx={{ minWidth: 200 }}
+                  />
+                )}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+              />
             </Grid>
             <Grid item xs={12}>
               <TextField

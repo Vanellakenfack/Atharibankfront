@@ -29,6 +29,15 @@ import JournalComptablePage from '../pages/journal/JournalComptablePage.js';
 import AgenceForm from '../pages/TransactionsAdministratives/AgenceForm.js';
 import GuichetForm from '../pages/TransactionsAdministratives/GuichetForm.js';
 import CaisseForm from '../pages/TransactionsAdministratives/CaisseForm.js';
+import Versement from '../pages/TransactionFrontOffice/TransactionCaisseEspece/Versement.js';
+import BordereauVersementAC from '../pages/TransactionFrontOffice/TransactionCaisseEspece/BordereauVersementAC.js';
+import BordereauVersementClient from '../pages/TransactionFrontOffice/TransactionCaisseEspece/BordereauVersementClient.js';
+import EntreesSortiesCaisse from '../pages/TransactionFrontOffice/TransactionCaisseEspece/EntreesSortiesCaisse.js';
+import TransfertInterCaisse from '../pages/TransactionFrontOffice/TransactionCaisseEspece/TransfertInterCaisse.js';
+import DashboardCaissieres from '../pages/TransactionFrontOffice/DasbordCaisse/DashboardCaissieres.js';
+import RetraitEspeces from '../pages/TransactionFrontOffice/TransactionCaisseEspece/RetraitEspeces.js';
+import ValidationTransaction from '../pages/TransactionsAdministratives/ValidationTransaction.js';
+import JournalCaissePage from '../pages/journal/JournalCaissePage.js';
 
 // Ajoute "Link" dans l'importation existante
 
@@ -95,16 +104,22 @@ const AppRoutes = () => {
 
       {/* Gestion  des journaux */}
       <Route path='/Journal-Comptable' element={<JournalComptablePage/>} />
+      <Route path='/Journal-Caisse' element={<JournalCaissePage/>}/>
 
       {/* Gestion  des Transactions administratives  */}
       <Route path='/agence/form' element={<AgenceForm />} />
       <Route path='/guichet/form' element={<GuichetForm />} />
       <Route path='/caisse/form' element={<CaisseForm />} />
 
-
-
-            
-
+      {/* Gestion des transactions front office */}
+      <Route path='/Versement' element={<Versement />} />
+      <Route path='/versement/client' element={<BordereauVersementClient />} />
+      <Route path='/versement/ac' element={<BordereauVersementAC />} />
+      <Route path='/entrees-sorties-caisse' element={<EntreesSortiesCaisse />} />
+      <Route path='/Transfert-Inter-Caisse' element={<TransfertInterCaisse />} />
+      <Route path='/Dashboard-Caissieres' element={<DashboardCaissieres />} />            
+      <Route path='/Retrait-Especes' element={<RetraitEspeces />} />
+      <Route path='/validation-transaction' element={<ValidationTransaction />} />
 
       </Route>
 
