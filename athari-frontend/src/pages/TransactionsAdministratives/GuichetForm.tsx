@@ -16,6 +16,10 @@ interface Guichet {
   nom_guichet: string;
   code_guichet: string;
   statut?: string;
+  agence_id: number;
+  est_actif: number;
+  created_at: string;
+  updated_at: string;
 }
 
 interface SnackbarState {
@@ -60,6 +64,7 @@ const GuichetForm: React.FC = () => {
   const [formDataOuverture, setFormDataOuverture] = useState({
     agence_session_id: '',
     guichet_id: '',
+    code_guichet: ''
   });
 
   // États du formulaire FERMETURE
@@ -119,7 +124,6 @@ const GuichetForm: React.FC = () => {
         
         // Vérifier si la session guichet est toujours active
         try {
-          // Vous pouvez ajouter une vérification API ici si nécessaire
           setGuichetState({
             isOpen: true,
             sessionId: parseInt(guichetSessionId),
@@ -162,20 +166,16 @@ const GuichetForm: React.FC = () => {
       setLoadingGuichets(true);
       console.log('📋 Chargement de tous les guichets...');
       
-      // Utiliser la méthode corrigée du service
       const data = await guichetService.getGuichets();
       console.log('📦 Réponse API getGuichets:', data);
       
-      // Vérifier si la réponse est un tableau
       if (Array.isArray(data)) {
         console.log('✅ Guichets chargés (tableau):', data);
         setGuichets(data);
       } else if (data && typeof data === 'object') {
-        // Si c'est un objet unique, le mettre dans un tableau
         console.log('✅ Guichet unique chargé (converti en tableau):', data);
         setGuichets([data]);
       } else if (data && data.statut === 'success' && Array.isArray(data.data)) {
-        // Si la réponse a une structure { statut, message, data: [...] }
         console.log('✅ Guichets chargés depuis structure data:', data.data);
         setGuichets(data.data);
       } else {
@@ -208,8 +208,29 @@ const GuichetForm: React.FC = () => {
 
   const handleOuvertureChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
     const { name, value } = e.target;
+    console.log(`🔄 handleOuvertureChange - name: ${name}, value: ${value}`);
+    
     if (name && name in formDataOuverture) {
-      setFormDataOuverture(prev => ({ ...prev, [name]: value as string }));
+      // Créer une copie des données actuelles
+      const updatedData = { ...formDataOuverture, [name]: value as string };
+      
+      // Si on change le guichet, récupérer automatiquement son code
+      if (name === 'guichet_id' && value) {
+        console.log('🔍 Recherche du guichet sélectionné...');
+        const selectedGuichet = guichets.find(g => g.id.toString() === value.toString());
+        console.log('🔍 Guichet trouvé:', selectedGuichet);
+        
+        if (selectedGuichet) {
+          console.log(`✅ Code guichet trouvé: ${selectedGuichet.code_guichet}`);
+          updatedData.code_guichet = selectedGuichet.code_guichet;
+        } else {
+          console.warn('⚠️ Aucun guichet trouvé avec cet ID');
+          updatedData.code_guichet = '';
+        }
+      }
+      
+      console.log('📝 Données mises à jour:', updatedData);
+      setFormDataOuverture(updatedData);
     }
   };
 
@@ -219,16 +240,29 @@ const GuichetForm: React.FC = () => {
   };
 
   const handleOpenGuichet = async (): Promise<ApiResponse> => {
-    console.log('📞 Appel API ouverture guichet...');
+    console.log('📞 Appel API ouverture guichet...', {
+      agence_session_id: parseInt(agenceSessionId),
+      guichet_id: parseInt(formDataOuverture.guichet_id),
+      guichet_code: formDataOuverture.code_guichet
+    });
     
     if (!formDataOuverture.guichet_id) {
       throw new Error('Veuillez sélectionner un guichet');
     }
 
+    if (!agenceSessionId) {
+      throw new Error('Session agence non disponible');
+    }
+
+    if (!formDataOuverture.code_guichet) {
+      throw new Error('Code guichet non disponible');
+    }
+
     try {
       const response = await sessionService.ouvrirGuichet(
-        agenceSessionId,
-        parseInt(formDataOuverture.guichet_id)
+        parseInt(agenceSessionId),
+        parseInt(formDataOuverture.guichet_id),
+        formDataOuverture.code_guichet
       );
 
       console.log('✅ Réponse API ouverture guichet:', response);
@@ -263,8 +297,8 @@ const GuichetForm: React.FC = () => {
     }
 
     try {
-      console.log('📞 Appel API fermeture guichet...');
-      const response = await sessionService.fermerGuichet(guichetSessionId);
+      console.log('📞 Appel API fermeture guichet...', { guichet_session_id: guichetSessionId });
+      const response = await sessionService.fermerGuichet(parseInt(guichetSessionId));
       
       console.log('✅ Réponse API fermeture guichet:', response);
       
@@ -301,42 +335,41 @@ const GuichetForm: React.FC = () => {
     console.log('✅ Ouverture réussie:', responseData.message);
     showSnackbar(responseData.message || 'Guichet ouvert avec succès !', 'success');
     
-    // Extraire les données - Vérifier différents formats possibles
+    // Extraire les données
     let guichetSessionId: number | undefined;
     let codeGuichet: string | undefined;
     let guichetId: number | undefined;
     
-    // Format 1: responseData.data contient directement les informations
     if (responseData.data) {
       guichetSessionId = responseData.data.id || responseData.data.guichet_session_id;
       codeGuichet = responseData.data.code_guichet || responseData.data.code;
       guichetId = responseData.data.guichet_id || responseData.data.guichetId;
     }
     
-    // Format 2: responseData contient directement les informations
     if (!guichetSessionId && responseData.data?.data) {
       guichetSessionId = responseData.data.data.id;
       codeGuichet = responseData.data.data.code_guichet;
       guichetId = responseData.data.data.guichet_id;
     }
     
-    // Si guichetId n'est pas dans la réponse, utiliser celui du formulaire
     if (!guichetId) {
       guichetId = parseInt(formDataOuverture.guichet_id);
     }
     
-    // Trouver le guichet sélectionné
+    if (!codeGuichet) {
+      codeGuichet = formDataOuverture.code_guichet;
+    }
+    
     const selectedGuichet = guichets.find(g => g.id.toString() === formDataOuverture.guichet_id);
     
-    // Si pas de codeGuichet dans la réponse, utiliser celui du guichet
     if (!codeGuichet && selectedGuichet) {
       codeGuichet = selectedGuichet.code_guichet;
     }
     
     // Préparer les données à stocker
-    const finalGuichetSessionId = guichetSessionId || Date.now(); // Fallback si pas d'ID
-    const finalGuichetId = guichetId || selectedGuichet?.id || 0;
-    const finalCodeGuichet = codeGuichet || selectedGuichet?.code_guichet || '';
+    const finalGuichetSessionId = guichetSessionId || Date.now();
+    const finalGuichetId = guichetId || selectedGuichet?.id || parseInt(formDataOuverture.guichet_id);
+    const finalCodeGuichet = codeGuichet || selectedGuichet?.code_guichet || formDataOuverture.code_guichet;
     
     console.log('💾 Données finales à stocker:', {
       guichet_session_id: finalGuichetSessionId,
@@ -393,7 +426,8 @@ const GuichetForm: React.FC = () => {
     
     setFormDataOuverture(prev => ({ 
       ...prev, 
-      guichet_id: ''
+      guichet_id: '',
+      code_guichet: ''
     }));
     
     // Recharger les guichets
@@ -414,6 +448,11 @@ const GuichetForm: React.FC = () => {
 
     if (!formDataOuverture.guichet_id) {
       showSnackbar('Veuillez sélectionner un guichet', 'error');
+      return;
+    }
+
+    if (!formDataOuverture.code_guichet) {
+      showSnackbar('Code guichet non disponible', 'error');
       return;
     }
 
@@ -471,7 +510,7 @@ const GuichetForm: React.FC = () => {
     if (!agenceSessionId) return true;
     
     if (operation === 'OU') {
-      if (!formDataOuverture.guichet_id) return true;
+      if (!formDataOuverture.guichet_id || !formDataOuverture.code_guichet) return true;
     } else if (operation === 'FE') {
       if (!formDataFermeture.guichet_session_id) return true;
     }
@@ -570,8 +609,8 @@ const GuichetForm: React.FC = () => {
                 {operation === 'OU' ? (
                   <form onSubmit={handleSubmitOuverture} style={{ width: '100%' }}>
                     <Grid container spacing={3}>
-                      <Grid item xs={12}>
-                        <FormControl sx={{minWidth: 200}} size="small" required>
+                      <Grid item xs={12} md={6}>
+                        <FormControl fullWidth size="small" required>
                           <InputLabel>Sélectionner Guichet</InputLabel>
                           <Select
                             name="guichet_id"
@@ -584,7 +623,7 @@ const GuichetForm: React.FC = () => {
                             <MenuItem value=""><em>Sélectionner un guichet</em></MenuItem>
                             {guichets.length > 0 ? (
                               guichets.map((guichet) => (
-                                <MenuItem key={guichet.id} value={guichet.id}>
+                                <MenuItem key={guichet.id} value={guichet.id.toString()}>
                                   {guichet.nom_guichet} ({guichet.code_guichet})
                                 </MenuItem>
                               ))
@@ -599,13 +638,31 @@ const GuichetForm: React.FC = () => {
                           )}
                         </FormControl>
                       </Grid>
+
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Code du Guichet"
+                          name="code_guichet"
+                          value={formDataOuverture.code_guichet}
+                          disabled
+                          helperText="Code généré automatiquement"
+                          InputProps={{
+                            readOnly: true,
+                          }}
+                        />
+                        <Typography variant="caption" color="textSecondary">
+                          Sélectionnez un guichet pour afficher son code
+                        </Typography>
+                      </Grid>
                     </Grid>
                   </form>
                 ) : (
                   /* FORMULAIRE FERMETURE */
                   <form onSubmit={handleSubmitFermeture} style={{ width: '100%' }}>
                     <Grid container spacing={3}>
-                      <Grid item xs={12} md={6}>
+                      <Grid item xs={12} md={4}>
                         <TextField
                           fullWidth
                           size="small"
@@ -616,7 +673,18 @@ const GuichetForm: React.FC = () => {
                         />
                       </Grid>
 
-                      <Grid item xs={12} md={6}>
+                      <Grid item xs={12} md={4}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="ID Guichet"
+                          value={formDataFermeture.guichet_id || 'Non disponible'}
+                          disabled
+                          helperText="ID du guichet"
+                        />
+                      </Grid>
+
+                      <Grid item xs={12} md={4}>
                         <TextField
                           fullWidth
                           size="small"
@@ -641,6 +709,11 @@ const GuichetForm: React.FC = () => {
                       guichet_session_id: {localStorage.getItem('guichet_session_id') || 'null'}<br/>
                       guichet_id: {localStorage.getItem('guichet_id') || 'null'}<br/>
                       code_guichet: {localStorage.getItem('code_guichet') || 'null'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      <strong>État actuel:</strong><br/>
+                      - Guichet sélectionné: {formDataOuverture.guichet_id || 'Aucun'}<br/>
+                      - Code guichet: {formDataOuverture.code_guichet || 'Aucun'}
                     </Typography>
                   </Alert>
                 </Grid>

@@ -60,6 +60,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     compte: '/compte',
     listeComptes: '/liste-des-comptes',
     journalComptable: '/Journal-Comptable',
+    journalCaisse: '/Journal-Caisse', // Ajout du Journal de caisse
     reporting2: '/reporting-2',
     agenceForm: '/agence/form',
     guichetForm: '/guichet/form',
@@ -78,7 +79,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     usersRoles: '/users/roles',
     agence: '/agence',
     listeTypeCompte: '/Liste-type-de-compte',
-    fraisApplications: '/frais/applications'
+    fraisApplications: '/frais/applications',
+    validerTransaction: '/validation-transaction'
   };
 
   // Groupes de chemins pour les menus déroulants
@@ -86,8 +88,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     DAT: [menuPaths.datContracts, menuPaths.datTypes],
     PlanComptable: [menuPaths.planComptable, menuPaths.planComptableCategories],
     Account: [menuPaths.compte, menuPaths.listeComptes],
-    Reporting: [menuPaths.journalComptable, menuPaths.reporting2],
-    TransactionsAdmin: [menuPaths.agenceForm, menuPaths.guichetForm, menuPaths.caisseForm],
+    Reporting: [menuPaths.journalComptable, menuPaths.journalCaisse, menuPaths.reporting2], // Ajout du journalCaisse
+    TransactionsAdmin: [menuPaths.agenceForm, menuPaths.guichetForm, menuPaths.caisseForm, menuPaths.validerTransaction],
     FrontOffice: [
       menuPaths.dashboardCaissieres,
       menuPaths.entreesSortiesCaisse,
@@ -561,7 +563,25 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
                 onClick={(e) => e.stopPropagation()}
               >
                 <BookOpen size={16} strokeWidth={isActivePath(menuPaths.journalComptable) ? 3 : 2} />
-                Journal-Comptable
+                Journal Comptable
+              </Link>
+              
+              {/* Ajout du Journal de caisse */}
+              <Link
+                to={menuPaths.journalCaisse}
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  isActivePath(menuPaths.journalCaisse) 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: isActivePath(menuPaths.journalCaisse) ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileText size={16} strokeWidth={isActivePath(menuPaths.journalCaisse) ? 3 : 2} />
+                Journal de caisse
               </Link>
               
               <Link
@@ -665,6 +685,23 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               >
                 <FileType size={16} strokeWidth={isActivePath(menuPaths.caisseForm) ? 3 : 2} />
                 Ouverture/Fermeture de la caisse
+              </Link>
+
+              <Link
+                to={menuPaths.validerTransaction}
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                  isActivePath(menuPaths.validerTransaction) 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: isActivePath(menuPaths.validerTransaction) ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileType size={16} strokeWidth={isActivePath(menuPaths.validerTransaction) ? 3 : 2} />
+                Valider une transaction
               </Link>
             </div>
           )}

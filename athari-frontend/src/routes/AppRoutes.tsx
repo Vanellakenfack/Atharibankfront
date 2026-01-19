@@ -36,7 +36,8 @@ import EntreesSortiesCaisse from '../pages/TransactionFrontOffice/TransactionCai
 import TransfertInterCaisse from '../pages/TransactionFrontOffice/TransactionCaisseEspece/TransfertInterCaisse.js';
 import DashboardCaissieres from '../pages/TransactionFrontOffice/DasbordCaisse/DashboardCaissieres.js';
 import RetraitEspeces from '../pages/TransactionFrontOffice/TransactionCaisseEspece/RetraitEspeces.js';
-
+import ValidationTransaction from '../pages/TransactionsAdministratives/ValidationTransaction.js';
+import JournalCaissePage from '../pages/journal/JournalCaissePage.js';
 
 // Ajoute "Link" dans l'importation existante
 
@@ -103,6 +104,7 @@ const AppRoutes = () => {
 
       {/* Gestion  des journaux */}
       <Route path='/Journal-Comptable' element={<JournalComptablePage/>} />
+      <Route path='/Journal-Caisse' element={<JournalCaissePage/>}/>
 
       {/* Gestion  des Transactions administratives  */}
       <Route path='/agence/form' element={<AgenceForm />} />
@@ -117,7 +119,7 @@ const AppRoutes = () => {
       <Route path='/Transfert-Inter-Caisse' element={<TransfertInterCaisse />} />
       <Route path='/Dashboard-Caissieres' element={<DashboardCaissieres />} />            
       <Route path='/Retrait-Especes' element={<RetraitEspeces />} />
-      
+      <Route path='/validation-transaction' element={<ValidationTransaction />} />
 
       </Route>
 
