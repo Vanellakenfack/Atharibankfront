@@ -1375,14 +1375,14 @@ const JournalCaissePage: React.FC = () => {
                           </Typography>
                         </Box>
                       </Box>
-                      <Box sx={{ mt: 3, p: 2, background: 'rgba(255, 255, 255, 0.1)', borderRadius: 2 }}>
+                     {/** <Box sx={{ mt: 3, p: 2, background: 'rgba(255, 255, 255, 0.1)', borderRadius: 2 }}>
                         <Typography variant="h6">
                           Solde d'ouverture : {formatMontant(donneesJournal.soldeOuverture)} FCFA
                         </Typography>
                         <Typography variant="h6">
                           Solde de clôture : {formatMontant(donneesJournal.soldeCloture)} FCFA
                         </Typography>
-                      </Box>
+                      </Box> */}
                     </Box>
                   </Box>
 
