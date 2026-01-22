@@ -1,4 +1,3 @@
-// src/pages/compte/Formulaire.tsx
 import React, { useState, useEffect } from 'react';
 import {
   Container,
@@ -11,8 +10,6 @@ import {
   CircularProgress,
   Box,
   Snackbar,
-  IconButton,
-  Tooltip,
   Typography,
   styled
 } from '@mui/material';
@@ -23,7 +20,6 @@ import Step2AccountType from './etape/Step2AccountType';
 import Step3Mandataires from './etape/Step3Mandataires';
 import Step4Documents from './etape/Step4Documents';
 import { useNavigate } from 'react-router-dom';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { compteService, type CompteData } from '../../services/api/compteApi';
 
 const steps = [
@@ -132,10 +128,13 @@ const defaultFormData: CompteData = {
   },
   documents: {
     cni_client: null,
+    cni_recto_url: null,  // Nouveau champ pour CNI recto
+    cni_verso_url: null,  // Nouveau champ pour CNI verso
     autres_documents: []
   },
   engagementAccepted: false,
-  clientSignature: null
+  clientSignature: null,
+  clientSignatureUrl: null
 };
 
 interface AccountFormProps {
@@ -175,7 +174,35 @@ const AccountForm: React.FC<AccountFormProps> = ({
   const updateFormData = (field: keyof CompteData | string, value: any) => {
     console.log(`Updating field: ${field}`, value);
 
-    if (field === 'options' && typeof value === 'object' && value !== null) {
+    // Gestion spéciale pour la sélection du client
+    if (field === 'client' && value) {
+      console.log('Client sélectionné:', value);
+      
+      // Récupérer l'URL de la signature depuis le client
+      const signatureUrl = value.physique?.signature_url;
+      const cniRectoUrl = value.physique?.cni_recto_url;
+      const cniVersoUrl = value.physique?.cni_verso_url;
+      
+      setFormData(prev => ({
+        ...prev,
+        client: value,
+        clientSignatureUrl: signatureUrl,
+        documents: {
+          ...prev.documents,
+          cni_recto_url: cniRectoUrl,
+          cni_verso_url: cniVersoUrl
+        }
+      }));
+      
+    } else if (field === 'documents' && typeof value === 'object' && value !== null) {
+      setFormData(prev => ({
+        ...prev,
+        documents: {
+          ...(prev.documents || {}),
+          ...value
+        }
+      }));
+    } else if (field === 'options' && typeof value === 'object' && value !== null) {
       setFormData(prev => ({
         ...prev,
         options: {
@@ -183,7 +210,7 @@ const AccountForm: React.FC<AccountFormProps> = ({
           ...value
         }
       }));
-    } else if (field === 'documents' || field === 'engagementAccepted' || field === 'clientSignature') {
+    } else if (field === 'engagementAccepted' || field === 'clientSignature' || field === 'clientSignatureUrl') {
       setFormData(prev => ({
         ...prev,
         [field]: value
@@ -202,6 +229,33 @@ const AccountForm: React.FC<AccountFormProps> = ({
         [field]: value
       }));
     }
+  };
+
+  // Gestion de la sélection du client avec CNI
+  const handleClientSelect = (client: any, cniData?: { cniRectoUrl: string | null, cniVersoUrl: string | null }) => {
+    console.log('Client sélectionné avec CNI:', client, cniData);
+    
+    // Récupérer l'URL de la signature depuis le client
+    const signatureUrl = client.physique?.signature_url;
+    
+    // Mettre à jour formData avec le client, signature et CNI
+    setFormData(prev => ({
+      ...prev,
+      client: client,
+      clientSignatureUrl: signatureUrl,
+      documents: {
+        ...prev.documents,
+        cni_recto_url: cniData?.cniRectoUrl || null,
+        cni_verso_url: cniData?.cniVersoUrl || null
+      }
+    }));
+    
+    console.log('FormData mis à jour:', {
+      client: client,
+      signatureUrl: signatureUrl,
+      cniRecto: cniData?.cniRectoUrl,
+      cniVerso: cniData?.cniVersoUrl
+    });
   };
 
   // Valider l'étape 1
@@ -223,7 +277,8 @@ const AccountForm: React.FC<AccountFormProps> = ({
       setError('');
       
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Erreur lors de la validation de l\'étape 1');
+      console.error('Erreur détaillée étape 1:', err);
+      setError(err.response?.data?.message || err.message || 'Erreur lors de la validation de l\'étape 1');
     } finally {
       setLoading(false);
     }
@@ -249,12 +304,12 @@ const AccountForm: React.FC<AccountFormProps> = ({
         categorie_id: etape2Data.categorie_id    
       });
 
-    // Mettre à jour l'objet gestionnaire
-    updateFormData('gestionnaire', {
-      nom: etape2Data.gestionnaire_nom || '',
-      prenom: etape2Data.gestionnaire_prenom || '',
-      code: etape2Data.gestionnaire_code || ''
-    });
+      // Mettre à jour l'objet gestionnaire
+      updateFormData('gestionnaire', {
+        nom: etape2Data.gestionnaire_nom || '',
+        prenom: etape2Data.gestionnaire_prenom || '',
+        code: etape2Data.gestionnaire_code || ''
+      });
       
       // Marquer l'étape comme validée
       if (!stepValidated.includes(2)) {
@@ -336,7 +391,7 @@ const AccountForm: React.FC<AccountFormProps> = ({
         return (
           <Step1ClientInfo
             selectedClient={formData.client}
-            onClientSelect={(client) => updateFormData('client', client)}
+            onClientSelect={handleClientSelect}
             onNext={handleValidateStep1}
             accountSubType={formData.accountSubType}
           />
@@ -366,10 +421,11 @@ const AccountForm: React.FC<AccountFormProps> = ({
             documents={formData.documents}
             engagementAccepted={formData.engagementAccepted}
             clientSignature={formData.clientSignature}
+            clientSignatureUrl={formData.clientSignatureUrl}
             onChange={updateFormData}
             formData={formData}
             onSave={handleSaveSuccess}
-            onPrevious={handleBack}  // Ajout de la prop manquante
+            onPrevious={handleBack}
             mode={mode}
           />
         );
@@ -394,23 +450,6 @@ const AccountForm: React.FC<AccountFormProps> = ({
         <TopBar sidebarOpen={sidebarOpen} />
         <Container maxWidth="lg" sx={{ py: 4, flex: 1 }}>
           <Card sx={{ p: 3, mt: 3, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-            {/* Bouton retour 
-            <Tooltip title="Retour au menu principal" arrow>
-              <IconButton
-                onClick={() => navigate('/dashboard')}
-                sx={{ 
-                  mb: 2,
-                  background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
-                  color: 'white',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #43A047 0%, #1B5E20 100%)',
-                  }
-                }}
-              >
-                <ArrowBackIcon />
-              </IconButton>
-            </Tooltip>
-            */}
             <Typography variant="h4" component="h2" gutterBottom sx={{ 
               fontWeight: 'bold', 
               mb: 4,

@@ -1,7 +1,4 @@
-//update
-
 import ApiClient from './ApiClient';
-
 
 // Fonction pour gérer les erreurs d'authentification
 const handleAuthError = (error: any) => {
@@ -37,6 +34,7 @@ export interface CompteData {
   };
   engagementAccepted: boolean;
   clientSignature: File | null;
+  clientSignatureUrl?: string | null;
 }
 
 export const compteService = {
@@ -63,11 +61,27 @@ export const compteService = {
   // Valider étape 1
   async validerEtape1(data: any): Promise<any> {
     try {
-      console.log('Données étape 1:', data);
+      console.log('Données étape 1 envoyées:', JSON.stringify(data, null, 2));
       const response = await ApiClient.post('/comptes/etape1/valider', data);
+      console.log('Réponse étape 1:', response.data);
       return response.data;
     } catch (error: any) {
-      console.error('Erreur validation étape 1:', error);
+      console.error('Erreur détaillée validation étape 1:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      // Afficher les erreurs de validation détaillées
+      if (error.response?.status === 422 && error.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        console.error('Erreurs de validation:', errors);
+        const errorMessages = Object.entries(errors)
+          .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+          .join('; ');
+        throw new Error(`Erreur de validation: ${errorMessages}`);
+      }
+      
       return handleAuthError(error);
     }
   },
@@ -236,9 +250,6 @@ export const compteService = {
       formData.append('etape1[devise]', compteData.options?.devise || 'FCFA');
       formData.append('etape1[type_compte_id]', String(typeCompteId));
       
-      // Ajouter type_compte_id à la racine pour la compatibilité
-      //formData.append('type_compte_id', String(typeCompteId));
-      
       // Ajout des champs du gestionnaire depuis le formulaire
       if (compteData.gestionnaire) {
         formData.append('etape2[gestionnaire_nom]', compteData.gestionnaire.nom );
@@ -306,7 +317,13 @@ export const compteService = {
 
     // Signature
     if (compteData.clientSignature) {
+      // Si l'utilisateur a téléchargé une signature manuelle
       formData.append('signature', compteData.clientSignature);
+      formData.append('signature_source', 'upload');
+    } else if (compteData.clientSignatureUrl) {
+      // Si on a une URL de signature
+      formData.append('signature_url', compteData.clientSignatureUrl);
+      formData.append('signature_source', 'client_profile');
     }
 
     // Log du contenu du FormData pour débogage

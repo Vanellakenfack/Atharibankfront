@@ -59,6 +59,9 @@ import {
   AccountBalanceWallet,
   Print,
   Download,
+  CloudUpload,
+  CloudDownload,
+  Badge,
 } from '@mui/icons-material';
 
 import logo from '../../../assets/img/logo.png';
@@ -205,6 +208,17 @@ interface ReceiptData {
   guichet?: string;
   motif?: string;
   billetage?: BilletageItem[];
+}
+
+// Interface pour le retrait à distance
+interface RetraitDistanceData {
+  numeroCompte: string;
+  montant: string;
+  procurationFile: File | null;
+  demandeRetraitFile: File | null;
+  nomGestionnaire: string;
+  prenomGestionnaire: string;
+  codeGestionnaire: string;
 }
 
 // Fonction utilitaire pour obtenir le nom complet du mandataire
@@ -391,6 +405,21 @@ const SignatureContainer = styled(Box)({
   justifyContent: 'center',
   alignItems: 'center',
   minHeight: 100,
+});
+
+// Composant pour l'upload de fichiers
+const FileUploadBox = styled(Box)({
+  border: '2px dashed #1976D2',
+  borderRadius: 8,
+  padding: 24,
+  textAlign: 'center',
+  backgroundColor: '#f8f9fa',
+  cursor: 'pointer',
+  transition: 'all 0.3s ease',
+  '&:hover': {
+    backgroundColor: '#e3f2fd',
+    borderColor: '#0D47A1',
+  },
 });
 
 // Constante pour l'URL de l'API
@@ -594,6 +623,17 @@ const RetraitEspeces: React.FC = () => {
   // Référence pour le reçu caché
   const receiptRef = useRef<HTMLDivElement>(null);
 
+  // État pour le retrait à distance
+  const [retraitDistanceData, setRetraitDistanceData] = useState<RetraitDistanceData>({
+    numeroCompte: '',
+    montant: '',
+    procurationFile: null,
+    demandeRetraitFile: null,
+    nomGestionnaire: '',
+    prenomGestionnaire: '',
+    codeGestionnaire: '',
+  });
+
   // Initialisation avec RetraitFormData
   const [formData, setFormData] = useState<RetraitFormData>({
     // Onglet Retrait Espèces
@@ -638,6 +678,101 @@ const RetraitEspeces: React.FC = () => {
     netAEncaisser: '0',
     netADebiter: '0',
   });
+
+  // Gestion des changements pour le retrait à distance
+  const handleRetraitDistanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, files } = e.target;
+    
+    if (name === 'procurationFile' || name === 'demandeRetraitFile') {
+      setRetraitDistanceData(prev => ({
+        ...prev,
+        [name]: files ? files[0] : null,
+      }));
+    } else {
+      setRetraitDistanceData(prev => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+  };
+
+  // Gestion du téléchargement de fichier
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, fileType: 'procurationFile' | 'demandeRetraitFile') => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setRetraitDistanceData(prev => ({
+        ...prev,
+        [fileType]: file,
+      }));
+    }
+  };
+
+  // Validation du retrait à distance
+  const validateRetraitDistance = async () => {
+    // Validation des champs obligatoires
+    if (!retraitDistanceData.numeroCompte) {
+      showSnackbar('Veuillez saisir le numéro de compte', 'error');
+      return;
+    }
+
+    if (!retraitDistanceData.montant || parseFloat(retraitDistanceData.montant) <= 0) {
+      showSnackbar('Veuillez saisir un montant valide', 'error');
+      return;
+    }
+
+    if (!retraitDistanceData.procurationFile) {
+      showSnackbar('Veuillez télécharger la procuration', 'error');
+      return;
+    }
+
+    if (!retraitDistanceData.demandeRetraitFile) {
+      showSnackbar('Veuillez télécharger la demande de retrait', 'error');
+      return;
+    }
+
+    if (!retraitDistanceData.nomGestionnaire) {
+      showSnackbar('Veuillez saisir le nom du gestionnaire', 'error');
+      return;
+    }
+
+    if (!retraitDistanceData.prenomGestionnaire) {
+      showSnackbar('Veuillez saisir le prénom du gestionnaire', 'error');
+      return;
+    }
+
+    if (!retraitDistanceData.codeGestionnaire) {
+      showSnackbar('Veuillez saisir le code du gestionnaire', 'error');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Ici, vous ajouterez l'appel API pour valider le retrait à distance
+      // Pour l'instant, on simule un succès
+      
+      // Simuler un délai de traitement
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      showSnackbar('Retrait à distance validé avec succès par le CA', 'success');
+      
+      // Réinitialiser le formulaire
+      setRetraitDistanceData({
+        numeroCompte: '',
+        montant: '',
+        procurationFile: null,
+        demandeRetraitFile: null,
+        nomGestionnaire: '',
+        prenomGestionnaire: '',
+        codeGestionnaire: '',
+      });
+      
+    } catch (error) {
+      console.error('Erreur lors de la validation du retrait à distance:', error);
+      showSnackbar('Erreur lors de la validation du retrait à distance', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Fonction pour générer et télécharger le reçu PDF amélioré
   const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
@@ -754,7 +889,7 @@ const RetraitEspeces: React.FC = () => {
         </div>
         
         <div style="margin-bottom: 25px;">
-          <div style="background-color: #1976d2; color: white; padding: 8px 12px; font-weight: 600; font-size: 13px; border-radius: 4px 4px 0 0;">
+          <div style="background-color: #1976D2; color: white; padding: 8px 12px; font-weight: 600; font-size: 13px; border-radius: 4px 4px 0 0;">
             INFORMATIONS PORTEUR
           </div>
           <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-top: none;">
@@ -770,7 +905,7 @@ const RetraitEspeces: React.FC = () => {
         </div>
         
         <div style="margin-bottom: 25px;">
-          <div style="background-color: #1976d2; color: white; padding: 8px 12px; font-weight: 600; font-size: 13px; border-radius: 4px 4px 0 0;">
+          <div style="background-color: #1976D2; color: white; padding: 8px 12px; font-weight: 600; font-size: 13px; border-radius: 4px 4px 0 0;">
             DÉTAILS DU MONTANT
           </div>
           <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-top: none;">
@@ -791,7 +926,7 @@ const RetraitEspeces: React.FC = () => {
         
         ${billetageFiltre.length > 0 ? `
         <div style="margin-bottom: 25px;">
-          <div style="background-color: #1976d2; color: white; padding: 8px 12px; font-weight: 600; font-size: 13px; border-radius: 4px 4px 0 0;">
+          <div style="background-color: #1976D2; color: white; padding: 8px 12px; font-weight: 600; font-size: 13px; border-radius: 4px 4px 0 0;">
             BILLETAGE - COMPOSITION
           </div>
           <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-top: none;">
@@ -1833,6 +1968,11 @@ const RetraitEspeces: React.FC = () => {
                   icon={<Photo fontSize="small" />} 
                   iconPosition="start"
                 />
+                <Tab 
+                  label="Retrait à distance" 
+                  icon={<CloudDownload fontSize="small" />} 
+                  iconPosition="start"
+                />
               </StyledTabs>
             </Box>
 
@@ -1859,11 +1999,12 @@ const RetraitEspeces: React.FC = () => {
                               variant="outlined"
                               disabled
                               helperText="Récupéré automatiquement"
+                              sx={{ minWidth: 250 }}
                             />
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small">
+                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Agence *</InputLabel>
                               <Select
                                 name="selectedAgence"
@@ -1884,7 +2025,7 @@ const RetraitEspeces: React.FC = () => {
                           </Grid>
 
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small">
+                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Guichet *</InputLabel>
                               <Select
                                 name="guichet"
@@ -1907,7 +2048,7 @@ const RetraitEspeces: React.FC = () => {
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small">
+                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Caisse *</InputLabel>
                               <Select
                                 name="caisse"
@@ -1930,7 +2071,7 @@ const RetraitEspeces: React.FC = () => {
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small">
+                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Type retrait *</InputLabel>
                               <Select
                                 name="typeRetrait"
@@ -1952,6 +2093,7 @@ const RetraitEspeces: React.FC = () => {
                               value={formData.agenceCompte}
                               onChange={handleChange}
                               placeholder="Code agence du compte"
+                              sx={{ minWidth: 250 }}
                             />
                           </Grid>
                         </Grid>
@@ -2010,10 +2152,11 @@ const RetraitEspeces: React.FC = () => {
                                   value={formData.numero_bordereau}
                                   onChange={handleChange}
                                   placeholder="Ex: BDR-2023-001"
+                                  sx={{ minWidth: 250 }}
                                 />
                               </Grid>
                               <Grid item xs={6}>
-                                <FormControl fullWidth size="small">
+                                <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                                   <InputLabel>Type bordereau</InputLabel>
                                   <Select
                                     name="type_bordereau"
@@ -2044,7 +2187,7 @@ const RetraitEspeces: React.FC = () => {
                                   variant="outlined"
                                   size="small"
                                   required
-                                  sx={{minWidth: 200}}
+                                  sx={{ minWidth: 250 }}
                                   InputProps={{
                                     ...params.InputProps,
                                     endAdornment: (
@@ -2107,6 +2250,7 @@ const RetraitEspeces: React.FC = () => {
                               placeholder="Objet du retrait"
                               multiline
                               rows={2}
+                              sx={{ minWidth: 250 }}
                             />
                           </Grid>
                           
@@ -2124,6 +2268,7 @@ const RetraitEspeces: React.FC = () => {
                                   onChange={handleChange}
                                   InputLabelProps={{ shrink: true }}
                                   disabled
+                                  sx={{ minWidth: 250 }}
                                 />
                               </Grid>
                               <Grid item xs={6}>
@@ -2137,6 +2282,7 @@ const RetraitEspeces: React.FC = () => {
                                   onChange={handleChange}
                                   InputLabelProps={{ shrink: true }}
                                   disabled
+                                  sx={{ minWidth: 250 }}
                                 />
                               </Grid>
                             </Grid>
@@ -2172,7 +2318,7 @@ const RetraitEspeces: React.FC = () => {
                                   value={formData.telephone}
                                   onChange={handleChange}
                                   placeholder="Numéro SMS"
-                                  sx={{ flexGrow: 1 }}
+                                  sx={{ flexGrow: 1, minWidth: 250 }}
                                 />
                               )}
                             </Box>
@@ -2207,6 +2353,7 @@ const RetraitEspeces: React.FC = () => {
                                   placeholder="0"
                                   type="number"
                                   required
+                                  sx={{ minWidth: 250 }}
                                   InputProps={{
                                     startAdornment: <InputAdornment position="start">FCFA</InputAdornment>,
                                   }}
@@ -2221,6 +2368,7 @@ const RetraitEspeces: React.FC = () => {
                                   value={formData.commissions}
                                   onChange={handleChange}
                                   type="number"
+                                  sx={{ minWidth: 250 }}
                                 />
                               </Grid>
                               <Grid item xs={4}>
@@ -2232,6 +2380,7 @@ const RetraitEspeces: React.FC = () => {
                                   value={formData.taxes}
                                   onChange={handleChange}
                                   type="number"
+                                  sx={{ minWidth: 250 }}
                                 />
                               </Grid>
                               <Grid item xs={12}>
@@ -2242,6 +2391,7 @@ const RetraitEspeces: React.FC = () => {
                                   name="refLettrage"
                                   value={formData.refLettrage}
                                   onChange={handleChange}
+                                  sx={{ minWidth: 250 }}
                                 />
                               </Grid>
                             </Grid>
@@ -2259,7 +2409,7 @@ const RetraitEspeces: React.FC = () => {
                           Billetage - Saisie des coupures *
                         </Typography>
                         
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                           <TextField
                             size="small"
                             label="Montant à diviser"
@@ -2269,13 +2419,14 @@ const RetraitEspeces: React.FC = () => {
                               calculateBilletageFromAmount(e.target.value);
                             }}
                             type="number"
-                            sx={{ width: 200 }}
+                            sx={{ minWidth: 250 }}
                           />
                           <Button
                             variant="outlined"
                             startIcon={calculating ? <CircularProgress size={20} /> : <CalculateIcon />}
                             onClick={() => calculateBilletageFromAmount(formData.montant)}
                             disabled={calculating || !formData.montant || parseFloat(formData.montant) <= 0}
+                            sx={{ minWidth: 250 }}
                           >
                             Calculer billetage
                           </Button>
@@ -2383,7 +2534,7 @@ const RetraitEspeces: React.FC = () => {
                               }}
                               placeholder="Ex: A1B2C3"
                               size="medium"
-                              sx={{ width: 300 }}
+                              sx={{ minWidth: 250 }}
                               inputProps={{ maxLength: 6 }}
                               error={!!codeValidationError}
                               helperText={codeValidationError || "Code à 6 caractères fourni par l'assistant"}
@@ -2401,6 +2552,7 @@ const RetraitEspeces: React.FC = () => {
                               onClick={handleVerifyCode}
                               disabled={validationCode.length !== 6}
                               startIcon={<CheckCircle />}
+                              sx={{ minWidth: 250 }}
                             >
                               Vérifier le code
                             </Button>
@@ -2420,6 +2572,7 @@ const RetraitEspeces: React.FC = () => {
                                 setIsCodeValid(false);
                                 setCodeValidationError('');
                               }}
+                              sx={{ minWidth: 250 }}
                             >
                               Annuler
                             </Button>
@@ -2531,7 +2684,7 @@ const RetraitEspeces: React.FC = () => {
                         {/* Sélection du mandataire */}
                         {formData.typePorteur === 'mandataire' && compteDetails?.mandataires && compteDetails.mandataires.length > 0 && (
                           <Box sx={{ mb: 3 }}>
-                            <FormControl fullWidth size="small">
+                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Mandataire *</InputLabel>
                               <Select
                                 name="selectedMandataireId"
@@ -2584,6 +2737,7 @@ const RetraitEspeces: React.FC = () => {
                                 formData.typePorteur === 'mandataire' ? `Mandataire: ${getSelectedMandataireName()}` :
                                 ''
                               }
+                              sx={{ minWidth: 250 }}
                             />
                           </Grid>
                           <Grid item xs={12}>
@@ -2599,10 +2753,11 @@ const RetraitEspeces: React.FC = () => {
                               rows={2}
                               disabled={shouldDisableField('adresse')}
                               helperText={formData.typePorteur === 'autre' ? '' : 'Modifiable si nécessaire'}
+                              sx={{ minWidth: 250 }}
                             />
                           </Grid>
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small">
+                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Type pièce *</InputLabel>
                               <Select
                                 name="typeId"
@@ -2634,6 +2789,7 @@ const RetraitEspeces: React.FC = () => {
                                 formData.typePorteur === 'mandataire' ? `Numéro CNI: ${getSelectedMandataireNumeroCni()}` :
                                 ''
                               }
+                              sx={{ minWidth: 250 }}
                             />
                           </Grid>
                           <Grid item xs={6}>
@@ -2648,6 +2804,7 @@ const RetraitEspeces: React.FC = () => {
                               InputLabelProps={{ shrink: true }}
                               disabled={shouldDisableField('delivreLe')}
                               helperText={formData.typePorteur === 'client' || formData.typePorteur === 'mandataire' ? 'Modifiable si nécessaire' : ''}
+                              sx={{ minWidth: 250 }}
                             />
                           </Grid>
                           <Grid item xs={6}>
@@ -2661,6 +2818,7 @@ const RetraitEspeces: React.FC = () => {
                               placeholder="Lieu de délivrance"
                               disabled={shouldDisableField('delivreA')}
                               helperText={formData.typePorteur === 'client' || formData.typePorteur === 'mandataire' ? 'Modifiable si nécessaire' : ''}
+                              sx={{ minWidth: 250 }}
                             />
                           </Grid>
                         </Grid>
@@ -2902,31 +3060,287 @@ const RetraitEspeces: React.FC = () => {
                 </Grid>
               </TabPanel>
 
+              {/* Onglet Retrait à distance */}
+              <TabPanel value={tabValue} index={4}>
+                <Grid container spacing={3}>
+                  {/* Informations du compte */}
+                  <Grid item xs={12}>
+                    <StyledCard>
+                      <CardContent>
+                        <Typography variant="subtitle2" sx={{ mb: 3, color: '#1976D2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <AccountBalanceWallet />
+                          Informations du compte client
+                        </Typography>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} md={6}>
+                            <TextField
+                              fullWidth
+                              label="Numéro de compte *"
+                              name="numeroCompte"
+                              value={retraitDistanceData.numeroCompte}
+                              onChange={handleRetraitDistanceChange}
+                              placeholder="Ex: 1234567890"
+                              sx={{ minWidth: 250 }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={6}>
+                            <TextField
+                              fullWidth
+                              label="Montant du retrait *"
+                              name="montant"
+                              value={retraitDistanceData.montant}
+                              onChange={handleRetraitDistanceChange}
+                              placeholder="Montant en FCFA"
+                              type="number"
+                              InputProps={{
+                                startAdornment: <InputAdornment position="start">FCFA</InputAdornment>,
+                              }}
+                              sx={{ minWidth: 250 }}
+                            />
+                          </Grid>
+                        </Grid>
+                      </CardContent>
+                    </StyledCard>
+                  </Grid>
+
+                  {/* Upload de la procuration */}
+                  <Grid item xs={12} md={6}>
+                    <StyledCard sx={{ height: '100%' }}>
+                      <CardContent>
+                        <Typography variant="subtitle2" sx={{ mb: 3, color: '#1976D2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <CloudUpload />
+                          Procuration (Image requise) *
+                        </Typography>
+                        
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleFileUpload(e, 'procurationFile')}
+                          style={{ display: 'none' }}
+                          id="procuration-file-input"
+                        />
+                        
+                        <label htmlFor="procuration-file-input">
+                          <FileUploadBox>
+                            {retraitDistanceData.procurationFile ? (
+                              <Box>
+                                <CheckCircle sx={{ fontSize: 48, color: '#4CAF50', mb: 2 }} />
+                                <Typography variant="body1" fontWeight={500} gutterBottom>
+                                  Procuration téléchargée
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {retraitDistanceData.procurationFile.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                                  Taille: {(retraitDistanceData.procurationFile.size / 1024).toFixed(2)} KB
+                                </Typography>
+                                <Button 
+                                  variant="outlined" 
+                                  sx={{ mt: 2 }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRetraitDistanceData(prev => ({ ...prev, procurationFile: null }));
+                                  }}
+                                >
+                                  Supprimer
+                                </Button>
+                              </Box>
+                            ) : (
+                              <Box>
+                                <CloudUpload sx={{ fontSize: 48, color: '#1976D2', mb: 2 }} />
+                                <Typography variant="body1" fontWeight={500} gutterBottom>
+                                  Cliquez pour télécharger la procuration
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  Formats acceptés: JPG, PNG, GIF
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                                  Taille maximale: 5 MB
+                                </Typography>
+                              </Box>
+                            )}
+                          </FileUploadBox>
+                        </label>
+                        
+                        <Alert severity="info" sx={{ mt: 2 }}>
+                          La procuration doit être signée et inclure les informations d'identification complètes
+                        </Alert>
+                      </CardContent>
+                    </StyledCard>
+                  </Grid>
+
+                  {/* Upload de la demande de retrait */}
+                  <Grid item xs={12} md={6}>
+                    <StyledCard sx={{ height: '100%' }}>
+                      <CardContent>
+                        <Typography variant="subtitle2" sx={{ mb: 3, color: '#1976D2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <CloudUpload />
+                          Demande de retrait (Image requise) *
+                        </Typography>
+                        
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleFileUpload(e, 'demandeRetraitFile')}
+                          style={{ display: 'none' }}
+                          id="demande-retrait-file-input"
+                        />
+                        
+                        <label htmlFor="demande-retrait-file-input">
+                          <FileUploadBox>
+                            {retraitDistanceData.demandeRetraitFile ? (
+                              <Box>
+                                <CheckCircle sx={{ fontSize: 48, color: '#4CAF50', mb: 2 }} />
+                                <Typography variant="body1" fontWeight={500} gutterBottom>
+                                  Demande de retrait téléchargée
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {retraitDistanceData.demandeRetraitFile.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                                  Taille: {(retraitDistanceData.demandeRetraitFile.size / 1024).toFixed(2)} KB
+                                </Typography>
+                                <Button 
+                                  variant="outlined" 
+                                  sx={{ mt: 2 }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRetraitDistanceData(prev => ({ ...prev, demandeRetraitFile: null }));
+                                  }}
+                                >
+                                  Supprimer
+                                </Button>
+                              </Box>
+                            ) : (
+                              <Box>
+                                <CloudUpload sx={{ fontSize: 48, color: '#1976D2', mb: 2 }} />
+                                <Typography variant="body1" fontWeight={500} gutterBottom>
+                                  Cliquez pour télécharger la demande de retrait
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  Formats acceptés: JPG, PNG, GIF
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                                  Taille maximale: 5 MB
+                                </Typography>
+                              </Box>
+                            )}
+                          </FileUploadBox>
+                        </label>
+                        
+                        <Alert severity="info" sx={{ mt: 2 }}>
+                          La demande doit être datée et signée par le client
+                        </Alert>
+                      </CardContent>
+                    </StyledCard>
+                  </Grid>
+
+                  {/* Informations du gestionnaire */}
+                  <Grid item xs={12}>
+                    <StyledCard>
+                      <CardContent>
+                        <Typography variant="subtitle2" sx={{ mb: 3, color: '#1976D2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Badge />
+                          Informations du gestionnaire CA
+                        </Typography>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} md={4}>
+                            <TextField
+                              fullWidth
+                              label="Nom du gestionnaire *"
+                              name="nomGestionnaire"
+                              value={retraitDistanceData.nomGestionnaire}
+                              onChange={handleRetraitDistanceChange}
+                              placeholder="Nom"
+                              sx={{ minWidth: 250 }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={4}>
+                            <TextField
+                              fullWidth
+                              label="Prénom du gestionnaire *"
+                              name="prenomGestionnaire"
+                              value={retraitDistanceData.prenomGestionnaire}
+                              onChange={handleRetraitDistanceChange}
+                              placeholder="Prénom"
+                              sx={{ minWidth: 250 }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={4}>
+                            <TextField
+                              fullWidth
+                              label="Code du gestionnaire *"
+                              name="codeGestionnaire"
+                              value={retraitDistanceData.codeGestionnaire}
+                              onChange={handleRetraitDistanceChange}
+                              placeholder="Code d'identification"
+                              sx={{ minWidth: 250 }}
+                            />
+                          </Grid>
+                        </Grid>
+                        
+                        <Alert severity="warning" sx={{ mt: 3 }}>
+                          Le retrait à distance ne sera validé qu'après vérification et approbation par le CA
+                        </Alert>
+                      </CardContent>
+                    </StyledCard>
+                  </Grid>
+
+                  {/* Bouton de validation */}
+                  <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                      <GradientButton
+                        variant="contained"
+                        onClick={validateRetraitDistance}
+                        startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <CheckCircle />}
+                        disabled={
+                          !retraitDistanceData.numeroCompte ||
+                          !retraitDistanceData.montant ||
+                          parseFloat(retraitDistanceData.montant) <= 0 ||
+                          !retraitDistanceData.procurationFile ||
+                          !retraitDistanceData.demandeRetraitFile ||
+                          !retraitDistanceData.nomGestionnaire ||
+                          !retraitDistanceData.prenomGestionnaire ||
+                          !retraitDistanceData.codeGestionnaire ||
+                          loading
+                        }
+                        sx={{ minWidth: 250, py: 1.5, px: 4 }}
+                      >
+                        {loading ? 'Validation en cours...' : 'Valider le retrait à distance'}
+                      </GradientButton>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </TabPanel>
+
               {/* Boutons d'action */}
-              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                <SecondaryButton onClick={() => window.history.back()}>
-                  Annuler
-                </SecondaryButton>
-                <GradientButton
-                  variant="contained"
-                  onClick={processRetrait}
-                  startIcon={<CheckCircle />}
-                  disabled={
-                    !formData.compte_id || 
-                    !formData.montant || 
-                    parseFloat(formData.montant) <= 0 ||
-                    !formData.nomPorteur ||
-                    !formData.numeroId ||
-                    billetage.every(item => item.quantite === 0) ||
-                    !formData.selectedAgence ||
-                    !formData.guichet ||
-                    !formData.caisse ||
-                    (showValidationInput && !isCodeValid) // Si validation requise, doit avoir un code valide
-                  }
-                >
-                  {showValidationInput ? 'Valider le retrait avec code' : 'Valider le retrait'}
-                </GradientButton>
-              </Box>
+              {tabValue !== 4 && (
+                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                  <SecondaryButton onClick={() => window.history.back()}>
+                    Annuler
+                  </SecondaryButton>
+                  <GradientButton
+                    variant="contained"
+                    onClick={processRetrait}
+                    startIcon={<CheckCircle />}
+                    disabled={
+                      !formData.compte_id || 
+                      !formData.montant || 
+                      parseFloat(formData.montant) <= 0 ||
+                      !formData.nomPorteur ||
+                      !formData.numeroId ||
+                      billetage.every(item => item.quantite === 0) ||
+                      !formData.selectedAgence ||
+                      !formData.guichet ||
+                      !formData.caisse ||
+                      (showValidationInput && !isCodeValid) // Si validation requise, doit avoir un code valide
+                    }
+                    sx={{ minWidth: 250 }}
+                  >
+                    {showValidationInput ? 'Valider le retrait avec code' : 'Valider le retrait'}
+                  </GradientButton>
+                </Box>
+              )}
             </Box>
           </Paper>
         </Box>
@@ -3146,7 +3560,7 @@ const RetraitEspeces: React.FC = () => {
               startIcon={downloading ? <CircularProgress size={20} color="inherit" /> : <Download />}
               onClick={() => successModal.transactionData && downloadReceipt(successModal.transactionData)}
               disabled={downloading || !successModal.transactionData}
-              sx={{ px: 4, py: 1.5 }}
+              sx={{ px: 4, py: 1.5, minWidth: 250 }}
             >
               {downloading ? 'Téléchargement en cours...' : 'Télécharger le reçu PDF'}
             </Button>
@@ -3158,6 +3572,7 @@ const RetraitEspeces: React.FC = () => {
               startIcon={<Print />}
               onClick={() => successModal.transactionData && downloadReceipt(successModal.transactionData)}
               disabled={downloading || !successModal.transactionData}
+              sx={{ minWidth: 250 }}
             >
               Imprimer le reçu
             </Button>

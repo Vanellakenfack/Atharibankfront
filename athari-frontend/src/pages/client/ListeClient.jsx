@@ -14,8 +14,6 @@ import {
     Add as AddIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-
-// --- IMPORT DES COMPOSANTS LOGICIELS ---
 import Sidebar from '../../components/layout/Sidebar';
 import TopBar from '../../components/layout/TopBar';
 import apiClient from '../../services/api/ApiClient';
@@ -23,7 +21,8 @@ import apiClient from '../../services/api/ApiClient';
 const headCells = [
     { id: 'nom', label: 'Client / Raison Sociale' },
     { id: 'type_client', label: 'Type' },
-    { id: 'num_client', label: 'N° Cni/rccm' },
+    { id: 'num_client', label: 'N° Client' },
+    { id: 'identite', label: 'N° CNI/RCCM' },
     { id: 'telephone', label: 'Contact' },
     { id: 'adresse_quartier', label: 'Localisation' },
     { id: 'actions', label: 'Actions', disableSorting: true },
@@ -32,10 +31,7 @@ const headCells = [
 export default function ListeClient() {
     const navigate = useNavigate();
     
-    // --- États pour le Layout ---
     const [sidebarOpen, setSidebarOpen] = useState(true);
-
-    // --- États pour les données ---
     const [clients, setClients] = useState([]);
     const [loading, setLoading] = useState(true);
     const [order, setOrder] = useState('asc');
@@ -47,7 +43,6 @@ export default function ListeClient() {
     const [selectedClientId, setSelectedClientId] = useState(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
 
-    // --- Logique API ---
     const fetchClients = async () => {
         try {
             setLoading(true);
@@ -74,24 +69,31 @@ export default function ListeClient() {
             setClients(clients.filter(c => c.id !== selectedClientId));
             setOpenConfirm(false);
         } catch (error) {
-            alert("Une erreur est survenue.");
+            alert("Une erreur est survenue lors de la suppression.");
         } finally {
             setDeleteLoading(false);
             setSelectedClientId(null);
         }
     };
 
-    // --- Tri & Filtrage ---
     const getDisplayName = (client) => {
         return client.type_client === 'physique' 
             ? client.physique?.nom_prenoms 
             : client.morale?.raison_sociale;
     };
 
+    const getIdentite = (client) => {
+        return client.type_client === 'physique'
+            ? client.physique?.cni_numero
+            : client.morale?.rccm;
+    };
+
     const filteredData = clients.filter(client => {
         const name = getDisplayName(client)?.toLowerCase() || '';
+        const identite = getIdentite(client)?.toLowerCase() || '';
         const search = searchTerm.toLowerCase();
         return name.includes(search) || 
+               identite.includes(search) ||
                client.num_client?.includes(search) ||
                client.telephone?.includes(search);
     });
@@ -107,10 +109,8 @@ export default function ListeClient() {
     return (
         <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#F8FAFC' }}>
             
-            {/* 1. SIDEBAR */}
             <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-            {/* 2. CONTENU PRINCIPAL */}
             <Box 
                 component="main" 
                 sx={{ 
@@ -121,13 +121,10 @@ export default function ListeClient() {
                     transition: 'width 0.3s ease'
                 }}
             >
-                {/* 3. TOPBAR */}
                 <TopBar sidebarOpen={sidebarOpen} />
 
-                {/* 4. ZONE DE TRAVAIL (Tableau) */}
                 <Box sx={{ px: { xs: 2, md: 4 }, py: 4 }}>
                     
-                    {/* Header de la page */}
                     <Box sx={{ 
                         display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 
                     }}>
@@ -155,7 +152,6 @@ export default function ListeClient() {
                         </Button>
                     </Box>
 
-                    {/* Barre de Recherche et Table */}
                     <Paper sx={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid #edf2f7', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
                         <Box sx={{ p: 2.5, borderBottom: '1px solid #edf2f7' }}>
                             <TextField
@@ -189,6 +185,7 @@ export default function ListeClient() {
                                         {visibleRows.map((client) => {
                                             const isPhysique = client.type_client === 'physique';
                                             const nom = getDisplayName(client);
+                                            const identite = getIdentite(client);
                                             return (
                                                 <TableRow key={client.id} hover>
                                                     <TableCell>
@@ -202,7 +199,7 @@ export default function ListeClient() {
                                                             </Avatar>
                                                             <Box>
                                                                 <Typography sx={{ fontWeight: 600, fontSize: '0.95rem' }}>{nom}</Typography>
-                                                                <Typography variant="caption" sx={{ color: '#94A3B8' }}>{client.num_client}</Typography>
+                                                                <Typography variant="caption" sx={{ color: '#94A3B8' }}>{client.email}</Typography>
                                                             </Box>
                                                         </Box>
                                                     </TableCell>
@@ -215,7 +212,16 @@ export default function ListeClient() {
                                                             variant="soft"
                                                         />
                                                     </TableCell>
-                                                    <TableCell>{isPhysique ? client.physique?.cni_numero : client.morale?.rccm}</TableCell>
+                                                    <TableCell>
+                                                        <Typography variant="body2" fontWeight="bold">
+                                                            {client.num_client}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Typography variant="body2">
+                                                            {identite || 'Non spécifié'}
+                                                        </Typography>
+                                                    </TableCell>
                                                     <TableCell>{client.telephone}</TableCell>
                                                     <TableCell>
                                                         <Typography variant="body2">{client.adresse_ville}</Typography>
@@ -248,7 +254,6 @@ export default function ListeClient() {
                 </Box>
             </Box>
 
-            {/* Dialog suppression reste identique mais avec un style bouton dégradé possible */}
             <Dialog open={openConfirm} onClose={() => setOpenConfirm(false)}>
                 <DialogTitle sx={{ fontWeight: 'bold' }}>Confirmer la suppression</DialogTitle>
                 <DialogContent><DialogContentText>Voulez-vous supprimer ce client ? Cette action est irréversible.</DialogContentText></DialogContent>
