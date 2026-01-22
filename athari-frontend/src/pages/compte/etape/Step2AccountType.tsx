@@ -126,12 +126,12 @@ const formatPourcentage = (value: string): string => {
 const categorizeParameters = (typeCompte: TypeCompte) => {
   const fraisKeys = [
     'frais_ouverture', 'frais_deblocage', 'frais_cloture_anticipe', 
-    'frais_carnet', 'frais_perte_carnet', 'frais_renouvellement_carnet'
+    'frais_carnet', 'frais_perte_carnet', 'frais_renouvellement_carnet', 'frais_livret', 'frais_renouvellement_livret'
   ];
   
   const commissionKeys = [
     'commission_retrait', 'commission_sms', 'taux_interet_annuel',
-    'seuil_commission', 'commission_si_inferieur', 'commission_si_superieur'
+    'seuil_commission', 'commission_si_inferieur', 'commission_si_superieur', 'commission_mensuel'
   ];
   
   const caracteristiqueKeys = [
@@ -144,7 +144,7 @@ const categorizeParameters = (typeCompte: TypeCompte) => {
     'frais_ouverture_actif', 'frais_deblocage_actif', 'frais_cloture_actif',
     'frais_carnet_actif', 'commission_retrait_actif', 'commission_sms_actif',
     'penalite_actif', 'interets_actifs', 'minimum_compte_actif',
-    'frais_perte_actif', 'frais_renouvellement_actif', 'commission_mensuelle_actif'
+    'frais_perte_actif', 'frais_renouvellement_actif', 'commission_mensuelle_actif', 'frais_livret_actif'
   ];
 
   const autresKeys = Object.keys(typeCompte).filter(key => 
@@ -199,14 +199,13 @@ const getLabelForKey = (key: string): string => {
     frais_carnet: 'Frais de carnet',
     frais_perte_carnet: 'Frais perte carnet',
     frais_renouvellement_carnet: 'Frais renouvellement carnet',
+   frais_livret: 'Frais de livret',
     
     // Commissions
     commission_retrait: 'Commission de retrait',
     commission_sms: 'Commission SMS',
     taux_interet_annuel: 'Taux intérêt annuel',
-    seuil_commission: 'Seuil commission',
-    commission_si_inferieur: 'Commission si inférieur',
-    commission_si_superieur: 'Commission si supérieur',
+    commission_mensuelle: 'Commission mensuelle',
     penalite_retrait_anticipe: 'Pénalité retrait anticipé',
     
     // Caractéristiques
@@ -225,13 +224,15 @@ const getLabelForKey = (key: string): string => {
     frais_deblocage_actif: 'Frais déblocage actif',
     frais_cloture_actif: 'Frais clôture actif',
     frais_carnet_actif: 'Frais carnet actif',
+     frais_livret_actif: 'Frais li actif',
+
     commission_retrait_actif: 'Commission retrait actif',
     commission_sms_actif: 'Commission SMS actif',
     penalite_actif: 'Pénalité actif',
     interets_actifs: 'Intérêts actifs',
     minimum_compte_actif: 'Minimum compte actif',
     frais_perte_actif: 'Frais perte actif',
-    frais_renouvellement_actif: 'Frais renouvellement actif',
+    frais_renouvellement_actif: 'Frais renouvellement carnet/livret actif',
     commission_mensuelle_actif: 'Commission mensuelle actif',
     
     // Autres
@@ -657,7 +658,7 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
 
         {/* MODIFICATION: Remplacer l'Autocomplete par un TextField en lecture seule */}
         <Grid item xs={12} md={6}>
-          <FormControl fullWidth variant="outlined" margin="normal">
+          <FormControl sx={{minWidth:500}} variant="outlined" margin="normal">
             <TextField
               label="Chapitre comptable *"
               value={chapitreDefaut ? `${chapitreDefaut.code} - ${chapitreDefaut.libelle}` : 'Aucun chapitre par défaut'}
@@ -909,9 +910,9 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
                                   <TableCell align="right">
                                     <Chip 
                                       label={
-                                        key.includes('taux') || key.includes('commission') ? 
+                                        key.includes('taux') ? 
                                         formatPourcentage(value) : 
-                                        key.includes('seuil') ? 
+                                        key.includes('commission') || key.includes('seuil') ? 
                                         formatsolde(value) : 
                                         formatValue(value)
                                       } 
@@ -943,22 +944,30 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
                           Caractéristiques ({caracteristiquesActiveInactive.active.length})
                         </Typography>
                         <Grid container spacing={2}>
-                          {caracteristiquesActiveInactive.active.map(({ key, value, label }) => (
-                            <Grid item xs={12} sm={6} md={3} key={key}>
-                              <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                                <Tooltip title={key}>
-                                  <Typography variant="caption" color="text.secondary">
-                                    {label}
+                          {caracteristiquesActiveInactive.active.map(({ key, value, label }) => {
+                            // Afficher heure_calcul_interet et frequence_calcul_interet seulement si interets_actifs = 1
+                            if ((key === 'heure_calcul_interet' || key === 'frequence_calcul_interet') && 
+                                selectedTypeDetails?.interets_actifs !== 1) {
+                              return null;
+                            }
+                            
+                            return (
+                              <Grid item xs={12} sm={6} md={3} key={key}>
+                                <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                                  <Tooltip title={key}>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {label}
+                                    </Typography>
+                                  </Tooltip>
+                                  <Typography variant="h6" sx={{ fontWeight: 'bold', mt: 0.5 }}>
+                                    {key.includes('heure') ? value : 
+                                     key.includes('minimum') ? formatsolde(value) : 
+                                     formatValue(value)}
                                   </Typography>
-                                </Tooltip>
-                                <Typography variant="h6" sx={{ fontWeight: 'bold', mt: 0.5 }}>
-                                  {key.includes('heure') ? value : 
-                                   key.includes('minimum') ? formatsolde(value) : 
-                                   formatValue(value)}
-                                </Typography>
-                              </Box>
-                            </Grid>
-                          ))}
+                                </Box>
+                              </Grid>
+                            );
+                          })}
                         </Grid>
                       </CardContent>
                     </Card>
