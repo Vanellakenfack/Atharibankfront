@@ -25,6 +25,7 @@ export interface CompteData {
     devise?: string;
   };
   gestionnaire?: {
+    id?: number | null;
     nom: string;
     prenom: string;
     code: string;
@@ -241,6 +242,10 @@ export const compteService = {
       
       // Ajout des champs du gestionnaire depuis le formulaire
       if (compteData.gestionnaire) {
+        // Include gestionnaire_id when available (selected existing gestionnaire)
+        if ((compteData.gestionnaire as any).id !== undefined && (compteData.gestionnaire as any).id !== null) {
+          formData.append('etape2[gestionnaire_id]', String((compteData.gestionnaire as any).id));
+        }
         formData.append('etape2[gestionnaire_nom]', compteData.gestionnaire.nom );
         formData.append('etape2[gestionnaire_prenom]', compteData.gestionnaire.prenom );
         formData.append('etape2[gestionnaire_code]', compteData.gestionnaire.code );

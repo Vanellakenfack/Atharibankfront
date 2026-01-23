@@ -39,12 +39,15 @@ type Client = {
     nom_prenoms: string;
     sexe: 'M' | 'F';
     date_naissance: string;
+    signature_url?: string;
+    cni_recto_url?: string;      // Nouveau champ CNI recto
+    cni_verso_url?: string;      // Nouveau champ CNI verso
   };
 };
 
 interface Step1ClientInfoProps {
   selectedClient: Client | null;
-  onClientSelect: (client: Client) => void;
+  onClientSelect: (client: Client, cniData?: { cniRectoUrl: string | null, cniVersoUrl: string | null }) => void;
   onNext: (clientId: number, accountSubType: string) => Promise<void>;
   accountSubType: string;
 }
@@ -119,7 +122,12 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
   };
 
   const handleSelectClient = async (client: Client) => {
-    onClientSelect(client);
+    // Récupérer les URLs des CNI depuis le client
+    const cniRectoUrl = client.physique?.cni_recto_url || null;
+    const cniVersoUrl = client.physique?.cni_verso_url || null;
+    
+    // Envoyer le client ET les URLs CNI au parent
+    onClientSelect(client, { cniRectoUrl, cniVersoUrl });
     
     // Valider automatiquement l'étape 1
     if (client && accountSubType) {
@@ -149,6 +157,10 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
         </Typography>
         <Alert severity="info" sx={{ mb: 2 }}>
           Sélectionnez un client dans le tableau. L'étape sera validée automatiquement.
+          <br />
+          <strong>Note :</strong> 
+          <br />- La signature du client sera automatiquement récupérée dans l'étape 4.
+          <br />- Les CNI (recto et verso) du client seront également récupérées automatiquement si disponibles.
         </Alert>
         
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
@@ -414,6 +426,34 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
                     InputProps={{
                       readOnly: true,
                     }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Signature disponible"
+                    value={selectedClient.physique?.signature_url ? 'Oui' : 'Non'}
+                    variant="outlined"
+                    size="small"
+                    margin="normal"
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                    helperText={selectedClient.physique?.signature_url ? 'La signature sera automatiquement chargée à l\'étape 4' : 'Aucune signature trouvée pour ce client'}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="CNI disponible"
+                    value={selectedClient.physique?.cni_recto_url ? 'Oui (Recto & Verso)' : 'Non'}
+                    variant="outlined"
+                    size="small"
+                    margin="normal"
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                    helperText={selectedClient.physique?.cni_recto_url ? 'Les CNI seront automatiquement chargées à l\'étape 4' : 'Aucune CNI trouvée pour ce client'}
                   />
                 </Grid>
               </Grid>

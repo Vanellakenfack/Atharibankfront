@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { planComptableService } from '../../../services/api/clientApi';
 import { typeCompteService } from '../../../services/api/typeCompteApi';
+// AJOUT: Importer le service des gestionnaires
+import { gestionnaireService } from '../../../services/gestionnaireService/gestionnaireApi'; // Assurez-vous que le chemin est correct
 import type { SelectChangeEvent } from '@mui/material/Select';
 import {
   FormControl,
@@ -31,7 +33,7 @@ import {
   AccordionDetails,
   Tooltip,
 } from '@mui/material';
-import { Search as SearchIcon, ExpandMore, Info, Euro, AttachMoney, AccountBalance, Settings } from '@mui/icons-material';
+import { Search as SearchIcon, ExpandMore, Info, Euro, AttachMoney, AccountBalance, Settings, Person } from '@mui/icons-material';
 
 // Types pour les données
 interface CategorieComptable {
@@ -59,7 +61,7 @@ interface TypeCompte {
   est_islamique: boolean;
   actif: boolean;
   chapitre_defaut_id?: string | null;
-  [key: string]: any; // Permet d'accepter n'importe quel champ supplémentaire
+  [key: string]: any;
 }
 
 interface FormOptions {
@@ -81,6 +83,21 @@ interface Step2AccountTypeProps {
   onChange: (field: string, value: unknown) => void;
   onNext: (data: any) => Promise<void>;
   isLastStep?: boolean;
+}
+
+// AJOUT: Interface pour les gestionnaires
+interface Gestionnaire {
+  id: number;
+  gestionnaire_code: string;
+  gestionnaire_nom: string;
+  gestionnaire_prenom: string;
+  telephone: string | null;
+  email: string | null;
+  agence?: {
+    id: number;
+    code: string;
+    name: string;
+  };
 }
 
 const MODULES = [
@@ -118,7 +135,7 @@ const formatsolde = (value: string): string => {
 // Helper pour formater les pourcentages
 const formatPourcentage = (value: string): string => {
   if (!value || value === '0.00' || value === '0') return '-';
-  if (value.includes('%')) return value;
+  if (value.includes('FCFA')) return value;
   return `${value}%`;
 };
 
@@ -126,12 +143,12 @@ const formatPourcentage = (value: string): string => {
 const categorizeParameters = (typeCompte: TypeCompte) => {
   const fraisKeys = [
     'frais_ouverture', 'frais_deblocage', 'frais_cloture_anticipe', 
-    'frais_carnet', 'frais_perte_carnet', 'frais_renouvellement_carnet', 'frais_livret', 'frais_renouvellement_livret'
+    'frais_carnet', 'frais_perte_carnet', 'frais_renouvellement_carnet'
   ];
   
   const commissionKeys = [
     'commission_retrait', 'commission_sms', 'taux_interet_annuel',
-    'seuil_commission', 'commission_si_inferieur', 'commission_si_superieur', 'commission_mensuel'
+    'seuil_commission', 'commission_si_inferieur', 'commission_si_superieur'
   ];
   
   const caracteristiqueKeys = [
@@ -144,7 +161,7 @@ const categorizeParameters = (typeCompte: TypeCompte) => {
     'frais_ouverture_actif', 'frais_deblocage_actif', 'frais_cloture_actif',
     'frais_carnet_actif', 'commission_retrait_actif', 'commission_sms_actif',
     'penalite_actif', 'interets_actifs', 'minimum_compte_actif',
-    'frais_perte_actif', 'frais_renouvellement_actif', 'commission_mensuelle_actif', 'frais_livret_actif'
+    'frais_perte_actif', 'frais_renouvellement_actif', 'commission_mensuelle_actif'
   ];
 
   const autresKeys = Object.keys(typeCompte).filter(key => 
@@ -199,13 +216,14 @@ const getLabelForKey = (key: string): string => {
     frais_carnet: 'Frais de carnet',
     frais_perte_carnet: 'Frais perte carnet',
     frais_renouvellement_carnet: 'Frais renouvellement carnet',
-   frais_livret: 'Frais de livret',
     
     // Commissions
     commission_retrait: 'Commission de retrait',
     commission_sms: 'Commission SMS',
     taux_interet_annuel: 'Taux intérêt annuel',
-    commission_mensuelle: 'Commission mensuelle',
+    seuil_commission: 'Seuil commission',
+    commission_si_inferieur: 'Commission si inférieur',
+    commission_si_superieur: 'Commission si supérieur',
     penalite_retrait_anticipe: 'Pénalité retrait anticipé',
     
     // Caractéristiques
@@ -224,22 +242,19 @@ const getLabelForKey = (key: string): string => {
     frais_deblocage_actif: 'Frais déblocage actif',
     frais_cloture_actif: 'Frais clôture actif',
     frais_carnet_actif: 'Frais carnet actif',
-     frais_livret_actif: 'Frais li actif',
-
     commission_retrait_actif: 'Commission retrait actif',
     commission_sms_actif: 'Commission SMS actif',
     penalite_actif: 'Pénalité actif',
     interets_actifs: 'Intérêts actifs',
     minimum_compte_actif: 'Minimum compte actif',
     frais_perte_actif: 'Frais perte actif',
-    frais_renouvellement_actif: 'Frais renouvellement carnet/livret actif',
+    frais_renouvellement_actif: 'Frais renouvellement actif',
     commission_mensuelle_actif: 'Commission mensuelle actif',
     
     // Autres
     observations: 'Observations',
   };
 
-  // Si la clé n'est pas dans le dictionnaire, formater en français
   if (!labels[key]) {
     return key
       .split('_')
@@ -271,9 +286,14 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
   const [chapitres, setChapitres] = useState<ChapitreComptable[]>([]);
   const [selectedChapitre, setSelectedChapitre] = useState<ChapitreComptable | null>(null);
   const [natureSolde, setNatureSolde] = useState<string>('');
-  const [chapitreDefaut, setChapitreDefaut] = useState<ChapitreComptable | null>(null); // NOUVEAU ÉTAT
+  const [chapitreDefaut, setChapitreDefaut] = useState<ChapitreComptable | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [loadingChapitres, setLoadingChapitres] = useState<boolean>(false);
+  
+  // AJOUT: États pour les gestionnaires
+  const [gestionnaires, setGestionnaires] = useState<Gestionnaire[]>([]);
+  const [loadingGestionnaires, setLoadingGestionnaires] = useState<boolean>(false);
+  const [selectedGestionnaireId, setSelectedGestionnaireId] = useState<number | ''>('');
 
   // Charger les types de comptes
   useEffect(() => {
@@ -292,16 +312,12 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
             setSelectedType(type.code);
             setSelectedTypeDetails(type);
             
-            // Chercher un chapitre par défaut
             let chapitreIdToFind = null;
-            
-            // Chercher d'abord dans les chapitres spécifiques
             const chapitreKeys = Object.keys(type).filter(key => 
               key.includes('chapitre_') && key.includes('_id') && type[key]
             );
             
             if (chapitreKeys.length > 0) {
-              // Prendre le premier chapitre non-null trouvé
               chapitreIdToFind = type[chapitreKeys[0]];
             }
             
@@ -314,7 +330,7 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
                 if (chapitre) {
                   console.log('Chapitre associé trouvé:', chapitre);
                   setSelectedChapitre(chapitre);
-                  setChapitreDefaut(chapitre); // INITIALISER LE CHAPITRE DÉFAUT
+                  setChapitreDefaut(chapitre);
                 }
               } catch (err) {
                 console.error('Erreur lors du chargement du chapitre:', err);
@@ -348,7 +364,7 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
           );
           if (chapitre) {
             setSelectedChapitre(chapitre);
-            setChapitreDefaut(chapitre); // METTRE À JOUR LE CHAPITRE DÉFAUT
+            setChapitreDefaut(chapitre);
           }
         }
       } catch (err) {
@@ -361,6 +377,27 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
 
     loadAllChapitres();
   }, [options.chapitre_id]);
+
+  // AJOUT: Charger les gestionnaires
+  useEffect(() => {
+    const fetchGestionnaires = async () => {
+      try {
+        setLoadingGestionnaires(true);
+        // Récupérer tous les gestionnaires (vous pouvez ajuster la pagination si nécessaire)
+        const response = await gestionnaireService.getAllGestionnaires(1, 100);
+        if (response.success) {
+          setGestionnaires(response.data);
+        }
+      } catch (err) {
+        console.error('Erreur lors du chargement des gestionnaires:', err);
+        // Ne pas bloquer l'interface en cas d'erreur
+      } finally {
+        setLoadingGestionnaires(false);
+      }
+    };
+
+    fetchGestionnaires();
+  }, []);
 
   // Mettre à jour la liste des chapitres filtrés
   useEffect(() => {
@@ -389,18 +426,56 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  // AJOUT: Gestion du changement de gestionnaire
+  const handleGestionnaireChange = (event: SelectChangeEvent<number>) => {
+    const gestionnaireId = event.target.value as number;
+    setSelectedGestionnaireId(gestionnaireId);
+    
+    // Trouver le gestionnaire sélectionné
+    const gestionnaire = gestionnaires.find(g => g.id === gestionnaireId);
+    if (gestionnaire) {
+      // Remplir automatiquement les champs gestionnaire
+      onChange('options', {
+        ...options,
+        gestionnaire_nom: gestionnaire.gestionnaire_nom,
+        gestionnaire_prenom: gestionnaire.gestionnaire_prenom,
+        gestionnaire_code: gestionnaire.gestionnaire_code
+      });
+
+      // Also set top-level gestionnaire so prepareFormData can include gestionnaire_id
+      onChange('gestionnaire', {
+        id: gestionnaire.id,
+        nom: gestionnaire.gestionnaire_nom,
+        prenom: gestionnaire.gestionnaire_prenom,
+        code: gestionnaire.gestionnaire_code
+      });
+    } else {
+      // Si aucun gestionnaire sélectionné, vider les champs
+      onChange('options', {
+        ...options,
+        gestionnaire_nom: '',
+        gestionnaire_prenom: '',
+        gestionnaire_code: ''
+      });
+
+      // Clear top-level gestionnaire as well
+      onChange('gestionnaire', {
+        nom: '',
+        prenom: '',
+        code: ''
+      });
+    }
+  };
+
   // Gestion du changement de chapitre
   const handleChapitreChange = (event: SelectChangeEvent<string>) => {
     const chapitreId = event.target.value;
     onChange('chapitre_id', chapitreId);
     
-    // Trouver le chapitre sélectionné
     const chapitre = chapitres.find(c => c.id === chapitreId);
     if (chapitre) {
       setSelectedChapitre(chapitre);
-      // Utiliser nature_technique comme nature du solde
       setNatureSolde(chapitre.comptabilite?.nature_technique || 'Non spécifiée');
-      // Mettre à jour la catégorie associée
       onChange('categorie_id', chapitre.categorie_id || '');
     } else {
       setSelectedChapitre(null);
@@ -412,13 +487,12 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
   // Gestion du changement de type de compte
   const handleTypeCompteChange = async (event: SelectChangeEvent<number>) => {
     const typeCompteId = Number(event.target.value);
-    const selectedType = typesComptes.find(tc => tc.id === typeCompteId);
+    const selectedType = typesComptes.find(tc => tc.code === typeCompteId.toString());
   
     if (selectedType) {
       setSelectedType(selectedType.code);
       setSelectedTypeDetails(selectedType);
       
-      // Mettre à jour le formulaire avec les valeurs du type de compte sélectionné
       const updates: any = {};
       Object.entries(selectedType).forEach(([key, value]) => {
         if (value !== null && value !== undefined) {
@@ -426,14 +500,12 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
         }
       });
       
-      // Mettre à jour le type de compte et sous-type
       updates.accountType = selectedType.id;
       updates.accountSubType = selectedType.code;
       
       try {
         setLoadingChapitres(true);
         
-        // Vérifier d'abord s'il y a un chapitre_defaut_id
         if (selectedType.chapitre_defaut_id) {
           console.log('Chargement du chapitre par défaut:', selectedType.chapitre_defaut_id);
           const chapitre = await planComptableService.getChapitre(selectedType.chapitre_defaut_id);
@@ -444,10 +516,8 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
             setSelectedChapitre(chapitre);
             updates.chapitre_id = chapitre.id;
             updates.categorie_id = chapitre.categorie_id || '';
-            // Mettre à jour la nature du solde avec nature_technique
             setNatureSolde(chapitre.comptabilite?.nature_technique || 'Non spécifiée');
           } else {
-            // Fallback sur l'ancienne méthode si pas de chapitre_defaut_id
             const chapitreKeys = Object.keys(selectedType).filter(key => 
               key.includes('chapitre_') && key.endsWith('_id') && selectedType[key]
             );
@@ -464,10 +534,8 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
                 setSelectedChapitre(chapitre);
                 updates.chapitre_id = chapitre.id;
                 updates.categorie_id = chapitre.categorie_id || '';
-                // Mettre à jour la nature du solde avec nature_technique
                 setNatureSolde(chapitre.comptabilite?.nature_technique || 'Non spécifiée');
               } else {
-                // Si aucun chapitre n'est trouvé, réinitialiser
                 setChapitreDefaut(null);
                 setSelectedChapitre(null);
                 setNatureSolde('');
@@ -478,7 +546,6 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
           }
         }
         
-        // Mettre à jour les options
         onChange('options', {
           ...options,
           ...updates
@@ -488,7 +555,6 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
         console.error('Erreur lors du chargement du chapitre par défaut:', err);
         setError('Erreur lors du chargement du chapitre par défaut');
         
-        // En cas d'erreur, réinitialiser les chapitres
         setChapitreDefaut(null);
         setSelectedChapitre(null);
         onChange('options', {
@@ -518,7 +584,6 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
       throw new Error('Veuillez sélectionner un type de compte');
     }
     
-    // Vérifier si un solde est saisi, et s'il est valide
     if (options.solde && options.solde.trim() !== '') {
       const solde = parseFloat(options.solde);
       if (isNaN(solde) || solde < 0) {
@@ -545,11 +610,13 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
   // Valider l'étape 2
   const handleValidateStep2 = async () => {
     try {
-      // Valider le formulaire
       validateForm();
 
       setValidating(true);
       setError(null);
+        if (!selectedGestionnaireId) {
+        throw new Error('Veuillez sélectionner un gestionnaire');
+      }
       
       const etape2Data = {
         account_type: selectedTypeDetails?.id || accountType,
@@ -560,6 +627,7 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
         plan_comptable_id: selectedChapitre.plan_comptable_id || selectedChapitre.id,
         chapitre_comptable_id: selectedChapitre.id,
         categorie_id: selectedChapitre.categorie_id || '',
+        gestionnaire_id: selectedGestionnaireId || null,
         gestionnaire_nom: options.gestionnaire_nom || '',
         gestionnaire_prenom: options.gestionnaire_prenom || '',
         gestionnaire_code: options.gestionnaire_code || '',
@@ -614,7 +682,6 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
         Étape 2 : Sélection du type de compte et des paramètres
       </Typography>
 
-
       <Alert severity="info" sx={{ mb: 4, borderRadius: 1 }}>
         Veuillez sélectionner un type de compte et renseigner les informations requises.
         <strong> Le chapitre comptable est obligatoire.</strong>
@@ -656,9 +723,9 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
           </FormControl>
         </Grid>
 
-        {/* MODIFICATION: Remplacer l'Autocomplete par un TextField en lecture seule */}
+        {/* Chapitre comptable en lecture seule */}
         <Grid item xs={12} md={6}>
-          <FormControl sx={{minWidth:500}} variant="outlined" margin="normal">
+          <FormControl fullWidth variant="outlined" margin="normal">
             <TextField
               label="Chapitre comptable *"
               value={chapitreDefaut ? `${chapitreDefaut.code} - ${chapitreDefaut.libelle}` : 'Aucun chapitre par défaut'}
@@ -677,10 +744,49 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
         </Grid>
       </Grid>
 
-            {/* Section Informations du gestionnaire */}
+      {/* AJOUT: Section Sélection du gestionnaire */}
       <Card sx={{ mb: 4, p: 2, backgroundColor: '#f8f9fa' }}>
         <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main', display: 'flex', alignItems: 'center' }}>
-          <AccountBalance sx={{ mr: 1 }} />
+          <Person sx={{ mr: 1 }} />
+          Sélection du gestionnaire
+        </Typography>
+        
+        {/* Select pour choisir un gestionnaire existant */}
+        <Grid item xs={12} >
+          <FormControl sx={{  minWidth: 200 }} variant="outlined" margin="normal">
+            <InputLabel id="gestionnaire-select-label">Sélectionner un gestionnaire existant</InputLabel>
+            <Select
+             sx={{  minWidth: 250 }}
+              labelId="gestionnaire-select-label"
+              id="gestionnaire-select"
+              value={selectedGestionnaireId}
+              onChange={handleGestionnaireChange}
+              label="Sélectionner un gestionnaire existant"
+              disabled={loadingGestionnaires}
+              displayEmpty
+            >
+              <MenuItem value="">
+                <em>Sélectionnez un gestionnaire...</em>
+              </MenuItem>
+              {loadingGestionnaires ? (
+                <MenuItem value="">Chargement des gestionnaires...</MenuItem>
+              ) : (
+                gestionnaires.map((gestionnaire) => (
+                  <MenuItem key={gestionnaire.id} value={gestionnaire.id}>
+                    {`${gestionnaire.gestionnaire_nom} ${gestionnaire.gestionnaire_prenom} (${gestionnaire.gestionnaire_code})`}
+                    {gestionnaire.agence && ` - ${gestionnaire.agence.name}`}
+                  </MenuItem>
+                ))
+              )}
+            </Select>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+              La sélection d'un gestionnaire remplira automatiquement les champs ci-dessous.
+            </Typography>
+          </FormControl>
+        </Grid>
+
+        {/* Informations du gestionnaire (champs en lecture seule quand un gestionnaire est sélectionné) */}
+        <Typography variant="subtitle2" gutterBottom sx={{ mt: 2, mb: 2, fontStyle: 'italic' }}>
           Informations du gestionnaire
         </Typography>
         <Grid container spacing={2}>
@@ -694,6 +800,11 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
               variant="outlined"
               size="small"
               required
+              disabled={!!selectedGestionnaireId} // Désactivé quand un gestionnaire est sélectionné
+              InputProps={{
+                readOnly: !!selectedGestionnaireId, // Lecture seule quand un gestionnaire est sélectionné
+              }}
+              helperText={selectedGestionnaireId ? "Champ rempli automatiquement" : "Saisissez manuellement ou sélectionnez un gestionnaire"}
             />
           </Grid>
           <Grid item xs={12} md={4}>
@@ -706,6 +817,11 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
               variant="outlined"
               size="small"
               required
+              disabled={!!selectedGestionnaireId}
+              InputProps={{
+                readOnly: !!selectedGestionnaireId,
+              }}
+              helperText={selectedGestionnaireId ? "Champ rempli automatiquement" : "Saisissez manuellement ou sélectionnez un gestionnaire"}
             />
           </Grid>
           <Grid item xs={12} md={4}>
@@ -718,9 +834,35 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
               variant="outlined"
               size="small"
               required
+              disabled={!!selectedGestionnaireId}
+              InputProps={{
+                readOnly: !!selectedGestionnaireId,
+              }}
+              helperText={selectedGestionnaireId ? "Champ rempli automatiquement" : "Saisissez manuellement ou sélectionnez un gestionnaire"}
             />
           </Grid>
         </Grid>
+        
+        {/* Bouton pour effacer la sélection */}
+        {selectedGestionnaireId && (
+          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => {
+                setSelectedGestionnaireId('');
+                onChange('options', {
+                  ...options,
+                  gestionnaire_nom: '',
+                  gestionnaire_prenom: '',
+                  gestionnaire_code: ''
+                });
+              }}
+            >
+              Effacer la sélection
+            </Button>
+          </Box>
+        )}
       </Card>
 
       {/* SECTION DES PARAMÈTRES */}
@@ -910,9 +1052,9 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
                                   <TableCell align="right">
                                     <Chip 
                                       label={
-                                        key.includes('taux') ? 
+                                        key.includes('taux') || key.includes('commission') ? 
                                         formatPourcentage(value) : 
-                                        key.includes('commission') || key.includes('seuil') ? 
+                                        key.includes('seuil') ? 
                                         formatsolde(value) : 
                                         formatValue(value)
                                       } 
@@ -944,30 +1086,22 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
                           Caractéristiques ({caracteristiquesActiveInactive.active.length})
                         </Typography>
                         <Grid container spacing={2}>
-                          {caracteristiquesActiveInactive.active.map(({ key, value, label }) => {
-                            // Afficher heure_calcul_interet et frequence_calcul_interet seulement si interets_actifs = 1
-                            if ((key === 'heure_calcul_interet' || key === 'frequence_calcul_interet') && 
-                                selectedTypeDetails?.interets_actifs !== 1) {
-                              return null;
-                            }
-                            
-                            return (
-                              <Grid item xs={12} sm={6} md={3} key={key}>
-                                <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                                  <Tooltip title={key}>
-                                    <Typography variant="caption" color="text.secondary">
-                                      {label}
-                                    </Typography>
-                                  </Tooltip>
-                                  <Typography variant="h6" sx={{ fontWeight: 'bold', mt: 0.5 }}>
-                                    {key.includes('heure') ? value : 
-                                     key.includes('minimum') ? formatsolde(value) : 
-                                     formatValue(value)}
+                          {caracteristiquesActiveInactive.active.map(({ key, value, label }) => (
+                            <Grid item xs={12} sm={6} md={3} key={key}>
+                              <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                                <Tooltip title={key}>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {label}
                                   </Typography>
-                                </Box>
-                              </Grid>
-                            );
-                          })}
+                                </Tooltip>
+                                <Typography variant="h6" sx={{ fontWeight: 'bold', mt: 0.5 }}>
+                                  {key.includes('heure') ? value : 
+                                   key.includes('minimum') ? formatsolde(value) : 
+                                   formatValue(value)}
+                                </Typography>
+                              </Box>
+                            </Grid>
+                          ))}
                         </Grid>
                       </CardContent>
                     </Card>

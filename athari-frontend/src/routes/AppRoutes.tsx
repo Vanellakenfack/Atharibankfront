@@ -38,6 +38,11 @@ import DashboardCaissieres from '../pages/TransactionFrontOffice/DasbordCaisse/D
 import RetraitEspeces from '../pages/TransactionFrontOffice/TransactionCaisseEspece/RetraitEspeces.js';
 import ValidationTransaction from '../pages/TransactionsAdministratives/ValidationTransaction.js';
 import JournalCaissePage from '../pages/journal/JournalCaissePage.js';
+import AddGestionnaire from '../pages/gestionnaire/AddGestionnaire.js';
+import ListGestionnaire from '../pages/gestionnaire/ListGestionnaire.js';
+import EditGestionnaire from '../pages/gestionnaire/EditGestionnaire.js';
+//import ValidationComptes from '../pages/validerCompte/ValidationComptes.js';
+
 
 // Ajoute "Link" dans l'importation existante
 
@@ -120,6 +125,10 @@ const AppRoutes = () => {
       <Route path='/Dashboard-Caissieres' element={<DashboardCaissieres />} />            
       <Route path='/Retrait-Especes' element={<RetraitEspeces />} />
       <Route path='/validation-transaction' element={<ValidationTransaction />} />
+
+      <Route path='/AddGestionnaire' element={<AddGestionnaire />} />
+      <Route path='/ListGestionnaire' element={<ListGestionnaire />} />
+     {/* <Route path='/ValidationComptes' element={<ValidationComptes />} />*/}
 
       </Route>
 

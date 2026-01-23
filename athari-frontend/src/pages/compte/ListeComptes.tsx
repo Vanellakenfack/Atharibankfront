@@ -73,7 +73,7 @@ interface Compte {
   numero_compte: string;
   solde: number;
   devise: string;
-  statut: 'actif' | 'inactif' | 'cloture';
+  statut: 'actif' | 'cloture'| 'en attente'| 'rejete';
   type_compte: {
     libelle: string;
   };
@@ -244,7 +244,7 @@ const ListeComptes: React.FC = () => {
       await compteService.toggleStatus(selectedCompte.id);
       setComptes(comptes.map(compte => 
         compte.id === selectedCompte.id 
-          ? { ...compte, statut: compte.statut === 'actif' ? 'inactif' : 'actif' } 
+          ? { ...compte, statut: compte.statut === 'actif' ? 'attente' : 'actif' } 
           : compte
       ));
       
@@ -487,7 +487,7 @@ const ListeComptes: React.FC = () => {
                               </StyledTableCell>
                               <StyledTableCell>
                                 <Chip 
-                                  label={compte.statut === 'actif' ? 'Actif' : 'Inactif'} 
+                                  label={compte.statut === 'actif' ? 'Actif' : 'en attente' } 
                                   size="small" 
                                   sx={{ 
                                     bgcolor: compte.statut === 'actif' ? '#D1FAE5' : '#FEE2E2', 

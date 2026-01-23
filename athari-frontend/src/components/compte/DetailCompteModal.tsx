@@ -50,6 +50,11 @@ interface Compte {
     categorie_id?: number;
     nature_solde?: string;
   };
+created_by: number;
+  utilisateur_createur?: {
+    id: number;
+    name: string; // ou 'nom_prenoms' selon votre colonne dans la table users
+  };
   gestionnaire_nom?: string;
   gestionnaire_prenom?: string;
   gestionnaire_code?: string;
@@ -178,6 +183,15 @@ const DetailCompteModal: React.FC<DetailCompteModalProps> = ({ open, onClose, co
                 readOnly: true,
               }}
             />
+                 <TextField
+                    label="Compte créé par"
+                    // On affiche le nom de l'utilisateur, sinon l'ID si le nom n'est pas chargé
+                    value={compte.utilisateur_createur ? compte.utilisateur_createur.name : `ID: ${compte.created_by}`}
+                    fullWidth
+                    margin="normal"
+                    InputProps={{ readOnly: true }}
+                  />
+            
             {compte.plan_comptable && (
               <TextField
                 label="Plan comptable"
