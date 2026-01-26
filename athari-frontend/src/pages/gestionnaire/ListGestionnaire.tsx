@@ -52,6 +52,7 @@ import {
   CloudUpload as CloudUploadIcon,
   Delete as DeleteFileIcon,
   Close as CloseIcon,
+  Image as ImageIcon,
 } from '@mui/icons-material';
 import { indigo, blueGrey, cyan, red, green, orange } from '@mui/material/colors';
 import Layout from '../../components/layout/Layout';
@@ -122,19 +123,23 @@ export default function ListGestionnaire() {
     cni_recto: File | null;
     cni_verso: File | null;
     plan_localisation_domicile: File | null;
+    signature: File | null;
   }>({
     cni_recto: null,
     cni_verso: null,
     plan_localisation_domicile: null,
+    signature: null,
   });
   const [editPreviews, setEditPreviews] = useState<{
     cni_recto: string | null;
     cni_verso: string | null;
     plan_localisation_domicile: string | null;
+    signature: string | null;
   }>({
     cni_recto: null,
     cni_verso: null,
     plan_localisation_domicile: null,
+    signature: null,
   });
 
   // Charger les gestionnaires
@@ -249,6 +254,7 @@ export default function ListGestionnaire() {
       cni_recto: gestionnaire.cni_recto_url || null,
       cni_verso: gestionnaire.cni_verso_url || null,
       plan_localisation_domicile: gestionnaire.plan_localisation_domicile_url || null,
+      signature: gestionnaire.signature_url || null,
     });
     
     // Réinitialiser les fichiers
@@ -256,6 +262,7 @@ export default function ListGestionnaire() {
       cni_recto: null,
       cni_verso: null,
       plan_localisation_domicile: null,
+      signature: null,
     });
   };
 
@@ -310,11 +317,13 @@ export default function ListGestionnaire() {
       cni_recto: null,
       cni_verso: null,
       plan_localisation_domicile: null,
+      signature: null,
     });
     setEditPreviews({
       cni_recto: null,
       cni_verso: null,
       plan_localisation_domicile: null,
+      signature: null,
     });
   };
 
@@ -334,7 +343,14 @@ export default function ListGestionnaire() {
       
       // Vérifier la taille (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
-        showSnackbar(`Le fichier ${field === 'cni_recto' ? 'CNI Recto' : field === 'cni_verso' ? 'CNI Verso' : 'Plan de localisation'} ne doit pas dépasser 2MB.`, 'error');
+        const fileNames = {
+          cni_recto: 'CNI Recto',
+          cni_verso: 'CNI Verso',
+          plan_localisation_domicile: 'Plan de localisation',
+          signature: 'Signature'
+        };
+        
+        showSnackbar(`Le fichier ${fileNames[field]} ne doit pas dépasser 2MB.`, 'error');
         return;
       }
       
@@ -348,7 +364,14 @@ export default function ListGestionnaire() {
       setEditFiles(prev => ({ ...prev, [field]: file }));
       setEditPreviews(prev => ({ ...prev, [field]: URL.createObjectURL(file) }));
       
-      showSnackbar(`Fichier ${field === 'cni_recto' ? 'CNI Recto' : field === 'cni_verso' ? 'CNI Verso' : 'Plan de localisation'} téléchargé avec succès.`, 'success');
+      const fileNames = {
+        cni_recto: 'CNI Recto',
+        cni_verso: 'CNI Verso',
+        plan_localisation_domicile: 'Plan de localisation',
+        signature: 'Signature'
+      };
+      
+      showSnackbar(`Fichier ${fileNames[field]} téléchargé avec succès.`, 'success');
     }
   };
 
@@ -362,13 +385,18 @@ export default function ListGestionnaire() {
       return { ...prev, [field]: null };
     });
     
-    // Si on veut supprimer l'image existante, envoyer une chaîne vide
-    setEditFormData(prev => ({ 
-      ...prev, 
-      [field]: '' 
-    }));
+    // CORRECTION : Ne pas mettre à jour editFormData car on veut
+    // envoyer explicitement null au backend pour supprimer l'image
+    // La logique de suppression est gérée dans le service
     
-    showSnackbar(`Fichier ${field === 'cni_recto' ? 'CNI Recto' : field === 'cni_verso' ? 'CNI Verso' : 'Plan de localisation'} supprimé.`, 'info');
+    const fileNames = {
+      cni_recto: 'CNI Recto',
+      cni_verso: 'CNI Verso',
+      plan_localisation_domicile: 'Plan de localisation',
+      signature: 'Signature'
+    };
+    
+    showSnackbar(`Fichier ${fileNames[field]} marqué pour suppression.`, 'info');
   };
 
   const validateEditForm = (): { isValid: boolean; errors: string[] } => {
@@ -421,14 +449,38 @@ export default function ListGestionnaire() {
     setLoadingEdit(true);
 
     try {
+      // Préparer les données pour l'update
+      const updateData: UpdateGestionnaireData = { ...editFormData };
+      
+      // CORRECTION : Gérer les fichiers correctement
+      // Pour chaque fichier, si editFiles[field] est null mais qu'il y avait une preview,
+      // on envoie null pour supprimer. Si editFiles[field] est un File, on l'envoie.
+      
+      if (editFiles.cni_recto !== undefined) {
+        updateData.cni_recto = editFiles.cni_recto;
+      }
+      
+      if (editFiles.cni_verso !== undefined) {
+        updateData.cni_verso = editFiles.cni_verso;
+      }
+      
+      if (editFiles.plan_localisation_domicile !== undefined) {
+        updateData.plan_localisation_domicile = editFiles.plan_localisation_domicile;
+      }
+      
+      // CORRECTION CRITIQUE pour la signature
+      if (editFiles.signature === null && editPreviews.signature) {
+        // Si on a cliqué sur "supprimer" et qu'il y avait une signature, envoyer null
+        updateData.signature = null;
+      } else if (editFiles.signature instanceof File) {
+        // Si un nouveau fichier a été téléchargé
+        updateData.signature = editFiles.signature;
+      }
+      // Note: Si signature n'est pas défini, on ne l'envoie pas (garder l'existant)
+
       const result = await gestionnaireService.updateGestionnaire(
         editDialog.gestionnaire.id,
-        {
-          ...editFormData,
-          cni_recto: editFiles.cni_recto,
-          cni_verso: editFiles.cni_verso,
-          plan_localisation_domicile: editFiles.plan_localisation_domicile,
-        }
+        updateData
       );
 
       if (result.success) {
@@ -967,9 +1019,12 @@ export default function ListGestionnaire() {
                                 }}
                               />
                             ) : (
-                              <Typography variant="caption" color="text.secondary">
-                                Non disponible
-                              </Typography>
+                              <Box sx={{ py: 3 }}>
+                                <ImageIcon sx={{ fontSize: 40, color: blueGrey[300] }} />
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Non disponible
+                                </Typography>
+                              </Box>
                             )}
                           </CardContent>
                         </Card>
@@ -994,9 +1049,12 @@ export default function ListGestionnaire() {
                                 }}
                               />
                             ) : (
-                              <Typography variant="caption" color="text.secondary">
-                                Non disponible
-                              </Typography>
+                              <Box sx={{ py: 3 }}>
+                                <ImageIcon sx={{ fontSize: 40, color: blueGrey[300] }} />
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Non disponible
+                                </Typography>
+                              </Box>
                             )}
                           </CardContent>
                         </Card>
@@ -1021,9 +1079,52 @@ export default function ListGestionnaire() {
                                 }}
                               />
                             ) : (
-                              <Typography variant="caption" color="text.secondary">
-                                Non disponible
-                              </Typography>
+                              <Box sx={{ py: 3 }}>
+                                <ImageIcon sx={{ fontSize: 40, color: blueGrey[300] }} />
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Non disponible
+                                </Typography>
+                              </Box>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </Grid>
+
+                      {/* Signature */}
+                      <Grid item xs={12} md={6}>
+                        <Card variant="outlined">
+                          <CardContent sx={{ textAlign: 'center' }}>
+                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                              Signature
+                            </Typography>
+                            {detailDialog.gestionnaire.signature_url ? (
+                              <Box sx={{ 
+                                bgcolor: '#f5f5f5', 
+                                p: 2, 
+                                borderRadius: '4px',
+                                border: '1px solid #ddd',
+                                minHeight: '120px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                <img
+                                  src={detailDialog.gestionnaire.signature_url}
+                                  alt="Signature"
+                                  style={{
+                                    width: '100%',
+                                    maxHeight: '150px',
+                                    objectFit: 'contain',
+                                  }}
+                                />
+                              </Box>
+                            ) : (
+                              <Box sx={{ py: 3 }}>
+                                <ImageIcon sx={{ fontSize: 40, color: blueGrey[300] }} />
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Non disponible
+                                </Typography>
+                              </Box>
                             )}
                           </CardContent>
                         </Card>
@@ -1077,7 +1178,9 @@ export default function ListGestionnaire() {
                           Modification
                         </Typography>
                         <Typography variant="body2">
-                          Modifiez les informations du gestionnaire. Les fichiers image doivent être au format JPG ou PNG et ne pas dépasser 2MB.
+                          Modifiez les informations du gestionnaire. Les fichiers image doivent être au format JPG, PNG ou GIF et ne pas dépasser 2MB.
+                          <br />
+                          <strong>Note:</strong> Cliquez sur l'icône de suppression pour supprimer un fichier existant.
                         </Typography>
                       </Alert>
                     </Box>
@@ -1204,7 +1307,13 @@ export default function ListGestionnaire() {
                             Documents
                           </Typography>
                           <Alert severity="warning" sx={{ mb: 2 }}>
-                            Laissez les champs de fichier vides si vous ne souhaitez pas modifier les documents existants.
+                            <strong>Instructions:</strong>
+                            <br />
+                            • Pour garder le fichier existant, ne touchez pas au champ.
+                            <br />
+                            • Pour changer le fichier, téléchargez un nouveau.
+                            <br />
+                            • Pour supprimer le fichier existant, cliquez sur l'icône de suppression.
                           </Alert>
                         </Grid>
 
@@ -1329,7 +1438,7 @@ export default function ListGestionnaire() {
                         </Grid>
 
                         {/* Plan de localisation */}
-                        <Grid item xs={12}>
+                        <Grid item xs={12} md={6}>
                           <Card variant="outlined">
                             <CardContent>
                               <Typography variant="subtitle2" sx={{ mb: 2, color: indigo[600] }}>
@@ -1347,10 +1456,11 @@ export default function ListGestionnaire() {
                                     alt="Plan localisation"
                                     style={{
                                       width: '100%',
-                                      maxHeight: '200px',
-                                      objectFit: 'contain',
+                                      height: '150px',
+                                      objectFit: 'cover',
                                       borderRadius: '8px',
                                       marginBottom: '10px',
+                                      border: editPreviews.plan_localisation_domicile.startsWith('blob:') ? '2px solid #4caf50' : '1px solid #ddd',
                                     }}
                                   />
                                   <IconButton
@@ -1383,6 +1493,77 @@ export default function ListGestionnaire() {
                                   onChange={(e) => handleEditFileChange('plan_localisation_domicile', e)}
                                 />
                               </Button>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+
+                        {/* Signature - Section corrigée */}
+                        <Grid item xs={12} md={6}>
+                          <Card variant="outlined">
+                            <CardContent>
+                              <Typography variant="subtitle2" sx={{ mb: 2, color: indigo[600] }}>
+                                Signature
+                                {editPreviews.signature && (
+                                  <Typography variant="caption" color="success" sx={{ ml: 1 }}>
+                                    {editPreviews.signature.startsWith('blob:') ? 'Nouveau fichier' : 'Fichier existant'}
+                                  </Typography>
+                                )}
+                              </Typography>
+                              {editPreviews.signature ? (
+                                <Box sx={{ position: 'relative' }}>
+                                  <Box sx={{ 
+                                    bgcolor: '#f5f5f5', 
+                                    p: 2, 
+                                    borderRadius: '8px',
+                                    border: editPreviews.signature.startsWith('blob:') ? '2px solid #4caf50' : '1px solid #ddd',
+                                    minHeight: '150px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}>
+                                    <img
+                                      src={editPreviews.signature}
+                                      alt="Signature"
+                                      style={{
+                                        width: '100%',
+                                        maxHeight: '140px',
+                                        objectFit: 'contain',
+                                      }}
+                                    />
+                                  </Box>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => removeEditFile('signature')}
+                                    sx={{
+                                      position: 'absolute',
+                                      top: 5,
+                                      right: 5,
+                                      backgroundColor: 'white',
+                                      '&:hover': { backgroundColor: '#f5f5f5' },
+                                    }}
+                                  >
+                                    <DeleteFileIcon />
+                                  </IconButton>
+                                </Box>
+                              ) : null}
+                              <Button
+                                component="label"
+                                variant="outlined"
+                                fullWidth
+                                startIcon={<CloudUploadIcon />}
+                                sx={{ py: 1, mt: editPreviews.signature ? 2 : 0 }}
+                              >
+                                {editPreviews.signature ? 'Changer la signature' : 'Télécharger la signature'}
+                                <input
+                                  type="file"
+                                  hidden
+                                  accept="image/*"
+                                  onChange={(e) => handleEditFileChange('signature', e)}
+                                />
+                              </Button>
+                              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                Recommandé : Image avec fond transparent (PNG)
+                              </Typography>
                             </CardContent>
                           </Card>
                         </Grid>

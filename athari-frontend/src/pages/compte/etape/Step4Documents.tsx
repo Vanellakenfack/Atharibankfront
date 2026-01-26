@@ -27,6 +27,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DescriptionIcon from '@mui/icons-material/Description';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ArticleIcon from '@mui/icons-material/Article';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { styled } from '@mui/material/styles';
 import { compteService, type CompteData } from '../../../services/api/compteApi';
 
@@ -45,9 +47,12 @@ const VisuallyHiddenInput = styled('input')({
 interface Step4DocumentsProps {
   documents: {
     cni_client: File | null;
-    cni_recto_url: string | null;  // Nouveau champ
-    cni_verso_url: string | null;  // Nouveau champ
+    cni_recto_url: string | null;
+    cni_verso_url: string | null;
     autres_documents: File[];
+    // AJOUT DES NOUVEAUX CHAMPS
+    demande_ouverture_pdf: File | null;
+    formulaire_ouverture_pdf: File | null;
   };
   engagementAccepted: boolean;
   clientSignature: File | null;
@@ -77,7 +82,7 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
   const [successOpen, setSuccessOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleFileUpload = (field: 'cni_client' | 'autres', files: FileList | null) => {
+  const handleFileUpload = (field: 'cni_client' | 'autres' | 'demande_ouverture_pdf' | 'formulaire_ouverture_pdf', files: FileList | null) => {
     if (!files || files.length === 0) return;
 
     const file = files[0];
@@ -88,11 +93,18 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
       return;
     }
 
-    // Vérifier le type de fichier
-    const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-    if (!validTypes.includes(file.type)) {
-      alert('Type de fichier non supporté. Utilisez PDF, JPG ou PNG.');
-      return;
+    // Vérifier le type de fichier - pour les PDF, n'accepter que PDF
+    if (field === 'demande_ouverture_pdf' || field === 'formulaire_ouverture_pdf') {
+      if (file.type !== 'application/pdf') {
+        alert('Le fichier doit être au format PDF');
+        return;
+      }
+    } else {
+      const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+      if (!validTypes.includes(file.type)) {
+        alert('Type de fichier non supporté. Utilisez PDF, JPG ou PNG.');
+        return;
+      }
     }
 
     if (field === 'cni_client') {
@@ -100,10 +112,20 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
         ...documents,
         cni_client: file
       });
-    } else {
+    } else if (field === 'autres') {
       onChange('documents', {
         ...documents,
         autres_documents: [...documents.autres_documents, file]
+      });
+    } else if (field === 'demande_ouverture_pdf') {
+      onChange('documents', {
+        ...documents,
+        demande_ouverture_pdf: file
+      });
+    } else if (field === 'formulaire_ouverture_pdf') {
+      onChange('documents', {
+        ...documents,
+        formulaire_ouverture_pdf: file
       });
     }
   };
@@ -114,6 +136,13 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
     onChange('documents', {
       ...documents,
       autres_documents: newDocuments
+    });
+  };
+
+  const handleRemoveSpecificDocument = (field: 'demande_ouverture_pdf' | 'formulaire_ouverture_pdf') => {
+    onChange('documents', {
+      ...documents,
+      [field]: null
     });
   };
 
@@ -141,6 +170,17 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
     // Vérifier qu'on a soit une signature uploadée, soit une URL de signature
     if (!clientSignature && !clientSignatureUrl) {
       setError('La signature du client est requise');
+      return;
+    }
+
+    // Vérifier les nouveaux documents PDF obligatoires
+    if (!documents.demande_ouverture_pdf) {
+      setError('La demande d\'ouverture en PDF est obligatoire');
+      return;
+    }
+
+    if (!documents.formulaire_ouverture_pdf) {
+      setError('Le formulaire d\'ouverture en PDF est obligatoire');
       return;
     }
 
@@ -208,8 +248,15 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
     }
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-        <DescriptionIcon sx={{ mr: 1 }} />
-        <Typography>{file.name}</Typography>
+        {file.type === 'application/pdf' ? (
+          <PictureAsPdfIcon sx={{ mr: 1, color: '#d32f2f' }} />
+        ) : (
+          <DescriptionIcon sx={{ mr: 1 }} />
+        )}
+        <Typography variant="body2">{file.name}</Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ ml: 2 }}>
+          ({(file.size / 1024 / 1024).toFixed(2)} Mo)
+        </Typography>
       </Box>
     );
   };
@@ -230,21 +277,179 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
         Téléchargez les documents nécessaires ou utilisez les documents existants du client.
         <br />
         Formats acceptés: PDF, JPG, PNG (max 8 Mo chacun).
+        <br />
+        <strong>Note:</strong> Les demandes et formulaires doivent être au format PDF.
       </Alert>
 
       <Grid container spacing={3}>
-        {/* Section Documents */}
+        {/* Section Documents PDF Obligatoires */}
+        <Grid item xs={12}>
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ color: '#d32f2f', display: 'flex', alignItems: 'center' }}>
+                <ArticleIcon sx={{ mr: 1 }} />
+                Documents PDF obligatoires
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                Ces documents sont requis pour l'ouverture du compte. Ils doivent être au format PDF.
+              </Typography>
+
+              {/* Demande d'ouverture PDF */}
+              <Box sx={{ mb: 3, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} sm={4}>
+                    <Typography fontWeight="bold" color="primary">
+                      Demande d'ouverture (PDF) *
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Document formalisant la demande d'ouverture
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={8}>
+                    {!documents.demande_ouverture_pdf ? (
+                      <Button
+                        component="label"
+                        variant="outlined"
+                        startIcon={<CloudUploadIcon />}
+                        fullWidth
+                        disabled={saving}
+                        sx={{
+                          background: 'linear-gradient(135deg, #1976d2 0%, #0d47a1 100%)',
+                          boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
+                          border: 'none',
+                          padding: '10px 16px',
+                          color: 'white',
+                          '&:hover': {
+                            background: 'linear-gradient(135deg, #1565c0 0%, #0a3d91 100%)',
+                          }
+                        }}
+                      >
+                        Télécharger la demande d'ouverture (PDF)
+                        <VisuallyHiddenInput
+                          type="file"
+                          accept=".pdf"
+                          onChange={(e) => handleFileUpload('demande_ouverture_pdf', e.target.files)}
+                        />
+                      </Button>
+                    ) : (
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <PictureAsPdfIcon sx={{ mr: 2, color: '#d32f2f', fontSize: 30 }} />
+                          <Box>
+                            <Typography fontWeight="bold">
+                              {documents.demande_ouverture_pdf.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {(documents.demande_ouverture_pdf.size / 1024 / 1024).toFixed(2)} Mo • PDF
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleRemoveSpecificDocument('demande_ouverture_pdf')}
+                          disabled={saving}
+                          sx={{ color: '#d32f2f' }}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Box>
+                    )}
+                    {!documents.demande_ouverture_pdf && (
+                      <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                        Ce document est obligatoire
+                      </Typography>
+                    )}
+                  </Grid>
+                </Grid>
+              </Box>
+
+              {/* Formulaire d'ouverture PDF */}
+              <Box sx={{ mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} sm={4}>
+                    <Typography fontWeight="bold" color="primary">
+                      Formulaire d'ouverture (PDF) *
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Formulaire officiel d'ouverture de compte
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={8}>
+                    {!documents.formulaire_ouverture_pdf ? (
+                      <Button
+                        component="label"
+                        variant="outlined"
+                        startIcon={<CloudUploadIcon />}
+                        fullWidth
+                        disabled={saving}
+                        sx={{
+                          background: 'linear-gradient(135deg, #1976d2 0%, #0d47a1 100%)',
+                          boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
+                          border: 'none',
+                          padding: '10px 16px',
+                          color: 'white',
+                          '&:hover': {
+                            background: 'linear-gradient(135deg, #1565c0 0%, #0a3d91 100%)',
+                          }
+                        }}
+                      >
+                        Télécharger le formulaire d'ouverture (PDF)
+                        <VisuallyHiddenInput
+                          type="file"
+                          accept=".pdf"
+                          onChange={(e) => handleFileUpload('formulaire_ouverture_pdf', e.target.files)}
+                        />
+                      </Button>
+                    ) : (
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <PictureAsPdfIcon sx={{ mr: 2, color: '#d32f2f', fontSize: 30 }} />
+                          <Box>
+                            <Typography fontWeight="bold">
+                              {documents.formulaire_ouverture_pdf.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {(documents.formulaire_ouverture_pdf.size / 1024 / 1024).toFixed(2)} Mo • PDF
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleRemoveSpecificDocument('formulaire_ouverture_pdf')}
+                          disabled={saving}
+                          sx={{ color: '#d32f2f' }}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Box>
+                    )}
+                    {!documents.formulaire_ouverture_pdf && (
+                      <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                        Ce document est obligatoire
+                      </Typography>
+                    )}
+                  </Grid>
+                </Grid>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* CNI du client */}
         <Grid item xs={12}>
           <Card variant="outlined">
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Documents requis
+                Documents d'identité
               </Typography>
 
               {/* CNI du client - avec options automatiques */}
               <Grid container spacing={2} alignItems="center" sx={{ mb: 3 }}>
                 <Grid item xs={12} sm={4}>
                   <Typography fontWeight="bold">CNI du client *</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Recto et verso ou document unique
+                  </Typography>
                 </Grid>
                 <Grid item xs={12} sm={8}>
                   {/* Afficher les CNI automatiques si disponibles */}
@@ -369,35 +574,10 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                 </Grid>
               </Grid>
 
-              {/* Autres documents (CNI verso dans cette section si pas dans CNI automatique) */}
+              {/* Autres documents */}
               <Typography variant="subtitle1" gutterBottom>
                 Autres documents (optionnels)
               </Typography>
-              
-              {/* Si CNI verso n'est pas dans la section automatique, l'ajouter ici */}
-              {documents.cni_verso_url && !documents.cni_recto_url && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>
-                    CNI Verso (récupérée automatiquement)
-                  </Typography>
-                  <Box sx={{ 
-                    border: '2px solid #4CAF50', 
-                    borderRadius: '4px', 
-                    padding: '8px',
-                    maxWidth: 200
-                  }}>
-                    <img 
-                      src={documents.cni_verso_url} 
-                      alt="CNI Verso" 
-                      style={{ 
-                        maxWidth: '100%', 
-                        maxHeight: 150,
-                        display: 'block'
-                      }}
-                    />
-                  </Box>
-                </Box>
-              )}
               
               <Button
                 component="label"
@@ -413,7 +593,7 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                   color:' #ffff'
                 }}
               >
-                Ajouter un document
+                Ajouter un document supplémentaire
                 <VisuallyHiddenInput
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
@@ -426,10 +606,14 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                 <List dense>
                   {documents.autres_documents.map((doc, index) => (
                     <ListItem key={index}>
-                      <DescriptionIcon sx={{ mr: 2 }} />
+                      {doc.type === 'application/pdf' ? (
+                        <PictureAsPdfIcon sx={{ mr: 2, color: '#d32f2f' }} />
+                      ) : (
+                        <DescriptionIcon sx={{ mr: 2 }} />
+                      )}
                       <ListItemText
                         primary={doc.name}
-                        secondary={`${(doc.size / 1024 / 1024).toFixed(2)} Mo`}
+                        secondary={`${(doc.size / 1024 / 1024).toFixed(2)} Mo • ${doc.type.split('/')[1].toUpperCase()}`}
                       />
                       <ListItemSecondaryAction>
                         <IconButton
@@ -485,7 +669,6 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                       }}
                       onError={(e) => {
                         console.error('Erreur de chargement de l\'image:', e);
-                        // Remplacer par un placeholder si l'image ne se charge pas
                         e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZmFmYWZhIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzg4OCI+U2lnbmF0dXJlIGR1IGNsaWVudDwvdGV4dD48L3N2Zz4=';
                       }}
                     />
@@ -625,7 +808,9 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
             severity={
               engagementAccepted && 
               (documents.cni_client || (documents.cni_recto_url && documents.cni_verso_url)) && 
-              (clientSignature || clientSignatureUrl) ? "success" : "warning"
+              (clientSignature || clientSignatureUrl) &&
+              documents.demande_ouverture_pdf &&
+              documents.formulaire_ouverture_pdf ? "success" : "warning"
             }
             sx={{ mb: 3 }}
           >
@@ -633,6 +818,18 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
               Récapitulatif des documents
             </Typography>
             <List dense>
+              <ListItem>
+                <Typography>
+                  <strong>Demande d'ouverture (PDF):</strong> 
+                  {documents.demande_ouverture_pdf ? '✓ Fournie' : '✗ Manquante'}
+                </Typography>
+              </ListItem>
+              <ListItem>
+                <Typography>
+                  <strong>Formulaire d'ouverture (PDF):</strong> 
+                  {documents.formulaire_ouverture_pdf ? '✓ Fournie' : '✗ Manquante'}
+                </Typography>
+              </ListItem>
               <ListItem>
                 <Typography>
                   <strong>CNI du client:</strong> 
@@ -687,9 +884,14 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
             <Button
               variant="contained"
               onClick={handleSaveCompte}
-              disabled={saving || !engagementAccepted || 
+              disabled={
+                saving || 
+                !engagementAccepted || 
                 (!documents.cni_client && !(documents.cni_recto_url && documents.cni_verso_url)) || 
-                (!clientSignature && !clientSignatureUrl)}
+                (!clientSignature && !clientSignatureUrl) ||
+                !documents.demande_ouverture_pdf ||
+                !documents.formulaire_ouverture_pdf
+              }
               startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <CheckCircleIcon />}
               sx={{
                 background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
@@ -721,6 +923,19 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
           <Alert severity="info" sx={{ mt: 2 }}>
             Vérifiez que toutes les informations sont correctes avant de continuer.
           </Alert>
+          
+          {/* Information sur les documents PDF */}
+          {documents.demande_ouverture_pdf && (
+            <Alert severity="success" sx={{ mt: 2 }}>
+              Demande d'ouverture (PDF): ✓ Prêt
+            </Alert>
+          )}
+          
+          {documents.formulaire_ouverture_pdf && (
+            <Alert severity="success" sx={{ mt: 2 }}>
+              Formulaire d'ouverture (PDF): ✓ Prêt
+            </Alert>
+          )}
           
           {/* Information sur les CNI */}
           {documents.cni_recto_url && documents.cni_verso_url && !documents.cni_client && (

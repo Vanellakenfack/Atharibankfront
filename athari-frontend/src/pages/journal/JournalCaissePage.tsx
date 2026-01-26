@@ -118,7 +118,7 @@ const typeVersementColors: Record<string, string> = {
   'AUTRE': '#757575',
 };
 
-// Fonction pour grouper les mouvements par type de versement
+// CORRECTION : Fonction pour grouper les mouvements par type de versement
 const groupMovementsByTypeVersement = (mouvements: CaisseMovement[]): CaisseSection[] => {
   const groupedData: Record<string, CaisseMovement[]> = {};
   
@@ -131,16 +131,17 @@ const groupMovementsByTypeVersement = (mouvements: CaisseMovement[]): CaisseSect
   });
   
   const sections: CaisseSection[] = Object.entries(groupedData).map(([typeVersement, entries]) => {
-    const totalDebit = entries.reduce((sum, entry) => sum + (entry.montant_debit || 0), 0);
-    const totalCredit = entries.reduce((sum, entry) => sum + (entry.montant_credit || 0), 0);
+    // CORRECTION : Assurez-vous que les totaux sont des NOMBRES
+    const totalDebit = entries.reduce((sum, entry) => sum + (Number(entry.montant_debit) || 0), 0);
+    const totalCredit = entries.reduce((sum, entry) => sum + (Number(entry.montant_credit) || 0), 0);
     
     return {
       sectionTitle: `${typeVersement} - ${entries.length} opération${entries.length > 1 ? 's' : ''}`,
       totalLabel: typeVersement,
       entries: entries,
       count: entries.length,
-      totalDebit,
-      totalCredit
+      totalDebit, // Nombre, pas chaîne
+      totalCredit // Nombre, pas chaîne
     };
   });
   
@@ -150,7 +151,7 @@ const groupMovementsByTypeVersement = (mouvements: CaisseMovement[]): CaisseSect
   return sections;
 };
 
-// Fonction pour transformer les données API
+// CORRECTION : Fonction pour transformer les données API
 const transformCaisseApiData = (
   apiData: CaisseJournalApiResponse, 
   filtres: CaisseFilterParams, 
@@ -190,10 +191,10 @@ const transformCaisseApiData = (
   // Créer les sections par type de versement
   const sections = groupMovementsByTypeVersement(apiData.mouvements);
   
-  // Calculer les totaux
-  const totalGeneral = sections.reduce((total, section) => total + section.count, 0);
-  const totalDebit = sections.reduce((total, section) => total + section.totalDebit, 0);
-  const totalCredit = sections.reduce((total, section) => total + section.totalCredit, 0);
+  // CORRECTION : Calculer les totaux - utiliser les totaux API si disponibles
+  const totalGeneral = apiData.mouvements.length || 0;
+  const totalDebit = apiData.total_debit || sections.reduce((total, section) => total + section.totalDebit, 0);
+  const totalCredit = apiData.total_credit || sections.reduce((total, section) => total + section.totalCredit, 0);
   
   // Déterminer les labels
   let agenceLabel = 'TOUTES LES AGENCES';
@@ -227,10 +228,50 @@ const transformCaisseApiData = (
     soldeCloture: apiData.solde_cloture || 0,
     sections: sections,
     totalGeneral: totalGeneral,
-    totalDebit: totalDebit,
-    totalCredit: totalCredit,
+    totalDebit: totalDebit, // Nombre, pas chaîne
+    totalCredit: totalCredit, // Nombre, pas chaîne
     synthese: apiData.synthese || {}
   };
+};
+
+// FONCTION CORRIGÉE POUR FORMATER LES MONTANTS
+const formatMontant = (montant: number | undefined | null): string => {
+  // Vérifier si le montant est valide
+  if (montant === undefined || montant === null || isNaN(montant)) {
+    return '0,00';
+  }
+  
+  // Formater le montant en français avec séparateurs de milliers
+  return new Intl.NumberFormat('fr-FR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: true
+  }).format(Math.abs(montant));
+};
+
+// Fonction pour formater le solde (avec signe)
+const formatSolde = (montant: number | undefined | null): string => {
+  if (montant === undefined || montant === null || isNaN(montant)) {
+    return '0,00';
+  }
+  
+  const formatted = formatMontant(montant);
+  return montant < 0 ? `-${formatted}` : formatted;
+};
+
+// Fonction pour afficher un montant avec la devise
+const formatMontantAvecDevise = (montant: number | undefined | null): string => {
+  return `${formatMontant(montant)} FCFA`;
+};
+
+// Fonction pour formater le solde avec devise
+const formatSoldeAvecDevise = (montant: number | undefined | null): string => {
+  if (montant === undefined || montant === null || isNaN(montant)) {
+    return '0,00 FCFA';
+  }
+  
+  const formatted = formatMontant(montant);
+  return montant < 0 ? `-${formatted} FCFA` : `${formatted} FCFA`;
 };
 
 const JournalCaissePage: React.FC = () => {
@@ -457,6 +498,8 @@ const JournalCaissePage: React.FC = () => {
       
       const transformedData = transformCaisseApiData(apiData, filtres, agences, caisses);
       console.log('✅ Données transformées:', transformedData);
+      console.log('Total débit transformé:', transformedData.totalDebit, 'Type:', typeof transformedData.totalDebit);
+      console.log('Total crédit transformé:', transformedData.totalCredit, 'Type:', typeof transformedData.totalCredit);
       setDonneesJournal(transformedData);
       
       if (transformedData.totalGeneral === 0) {
@@ -648,17 +691,6 @@ const JournalCaissePage: React.FC = () => {
     } finally {
       setChargement(false);
     }
-  };
-
-  // Fonction pour formater le montant
-  const formatMontant = (montant: number): string => {
-    return montant.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-
-  // Fonction pour formater le solde (avec couleur selon le signe)
-  const formatSolde = (montant: number): string => {
-    const formatted = formatMontant(Math.abs(montant));
-    return montant < 0 ? `-${formatted}` : formatted;
   };
 
   // Couleur du solde selon le signe
@@ -1012,7 +1044,7 @@ const JournalCaissePage: React.FC = () => {
                                   <Typography variant="caption" color="text.secondary">
                                     Code: {caisse.code_caisse} | 
                                     Solde: <span style={{ color: getSoldeColor(caisse.solde_actuel) }}>
-                                      {formatSolde(caisse.solde_actuel)} FCFA
+                                      {formatSoldeAvecDevise(caisse.solde_actuel)}
                                     </span>
                                   </Typography>
                                 </Box>
@@ -1137,10 +1169,10 @@ const JournalCaissePage: React.FC = () => {
                       fontSize: '0.9rem'
                     }}>
                       <Typography variant="body2">
-                        Solde d'ouverture : {formatMontant(donneesJournal.soldeOuverture)} FCFA
+                        Solde d'ouverture : {formatMontantAvecDevise(donneesJournal.soldeOuverture)}
                       </Typography>
                       <Typography variant="body2">
-                        Solde de clôture : {formatMontant(donneesJournal.soldeCloture)} FCFA
+                        Solde de clôture : {formatMontantAvecDevise(donneesJournal.soldeCloture)}
                       </Typography>
                       <Typography variant="body2">
                         Page 1 / 1
@@ -1182,10 +1214,10 @@ const JournalCaissePage: React.FC = () => {
                           </Box>
                           <Box sx={{ textAlign: 'right' }}>
                             <Typography variant="body1">
-                              Débit : {formatMontant(section.totalDebit)} FCFA
+                              Débit : {formatMontantAvecDevise(section.totalDebit)}
                             </Typography>
                             <Typography variant="body1">
-                              Crédit : {formatMontant(section.totalCredit)} FCFA
+                              Crédit : {formatMontantAvecDevise(section.totalCredit)}
                             </Typography>
                           </Box>
                         </Box>
@@ -1280,7 +1312,7 @@ const JournalCaissePage: React.FC = () => {
                                     fontSize: '1rem'
                                   }}>
                                     {entry.montant_debit > 0 
-                                      ? formatMontant(entry.montant_debit)
+                                      ? formatMontantAvecDevise(entry.montant_debit)
                                       : '-'}
                                   </TableCell>
                                   <TableCell align="right" sx={{ 
@@ -1289,7 +1321,7 @@ const JournalCaissePage: React.FC = () => {
                                     fontSize: '1rem'
                                   }}>
                                     {entry.montant_credit > 0 
-                                      ? formatMontant(entry.montant_credit)
+                                      ? formatMontantAvecDevise(entry.montant_credit)
                                       : '-'}
                                   </TableCell>
                                   <TableCell>
@@ -1327,13 +1359,13 @@ const JournalCaissePage: React.FC = () => {
                                   color: '#f44336',
                                   pr: 4
                                 }}>
-                                  {formatMontant(section.totalDebit)} FCFA
+                                  {formatMontantAvecDevise(section.totalDebit)}
                                 </TableCell>
                                 <TableCell align="right" sx={{ 
                                   color: '#4caf50',
                                   pr: 4
                                 }}>
-                                  {formatMontant(section.totalCredit)} FCFA
+                                  {formatMontantAvecDevise(section.totalCredit)}
                                 </TableCell>
                                 <TableCell></TableCell>
                               </TableRow>
@@ -1364,25 +1396,17 @@ const JournalCaissePage: React.FC = () => {
                         <Box>
                           <Typography variant="h6">DÉBIT TOTAL</Typography>
                           <Typography variant="h5">
-                            {formatMontant(donneesJournal.totalDebit)} FCFA
+                            {formatMontantAvecDevise(donneesJournal.totalDebit)}
                           </Typography>
                         </Box>
                         <Box sx={{ borderLeft: '2px solid white', height: '60px' }}></Box>
                         <Box>
                           <Typography variant="h6">CRÉDIT TOTAL</Typography>
                           <Typography variant="h5">
-                            {formatMontant(donneesJournal.totalCredit)} FCFA
+                            {formatMontantAvecDevise(donneesJournal.totalCredit)}
                           </Typography>
                         </Box>
                       </Box>
-                     {/** <Box sx={{ mt: 3, p: 2, background: 'rgba(255, 255, 255, 0.1)', borderRadius: 2 }}>
-                        <Typography variant="h6">
-                          Solde d'ouverture : {formatMontant(donneesJournal.soldeOuverture)} FCFA
-                        </Typography>
-                        <Typography variant="h6">
-                          Solde de clôture : {formatMontant(donneesJournal.soldeCloture)} FCFA
-                        </Typography>
-                      </Box> */}
                     </Box>
                   </Box>
 

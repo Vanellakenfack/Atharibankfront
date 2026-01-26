@@ -41,6 +41,7 @@ import JournalCaissePage from '../pages/journal/JournalCaissePage.js';
 import AddGestionnaire from '../pages/gestionnaire/AddGestionnaire.js';
 import ListGestionnaire from '../pages/gestionnaire/ListGestionnaire.js';
 import EditGestionnaire from '../pages/gestionnaire/EditGestionnaire.js';
+import ValidationComptes from '../pages/validerCompte/ValidationComptes.js';
 
 
 // Ajoute "Link" dans l'importation existante
@@ -127,6 +128,7 @@ const AppRoutes = () => {
 
       <Route path='/AddGestionnaire' element={<AddGestionnaire />} />
       <Route path='/ListGestionnaire' element={<ListGestionnaire />} />
+      <Route path='/ValidationComptes' element={<ValidationComptes />} />
 
       </Route>
 

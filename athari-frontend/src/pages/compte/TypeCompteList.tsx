@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef  } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
@@ -7,7 +7,7 @@ import {
   FormControlLabel, Checkbox, InputAdornment, Snackbar, Alert,
   Tooltip, Select, MenuItem, Pagination, FormControl, InputLabel,
   Tabs, Tab, Divider, Grid, Card, CardContent, CardHeader, List, ListItem, ListItemText,
-  Autocomplete, LinearProgress
+  Autocomplete
 } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import { useForm, Controller } from 'react-hook-form';
@@ -25,12 +25,133 @@ import PercentIcon from '@mui/icons-material/Percent';
 import WarningIcon from '@mui/icons-material/Warning';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import CloseIcon from '@mui/icons-material/Close';
-import BlockIcon from '@mui/icons-material/Block';
 import SaveIcon from '@mui/icons-material/Save';
 import CheckIcon from '@mui/icons-material/Check';
 import ApiClient from '@/services/api/ApiClient';
 import Sidebar from '@/components/layout/Sidebar';
 import TopBar from '@/components/layout/TopBar';
+
+// Interface pour les chapitres
+interface Chapitre {
+  id: number;
+  code: string;
+  libelle: string;
+  categorie?: {
+    id: number;
+    code: string;
+    libelle: string; // Changé de 'nom' à 'libelle'
+  };
+}
+
+// Hook personnalisé pour la gestion des chapitres
+const useChapitres = () => {
+  const [searchResults, setSearchResults] = useState<Chapitre[]>([]);
+  const [loading, setLoading] = useState(false);
+  const cache = useRef<Map<number, Chapitre>>(new Map());
+  const searchTimeout = useRef<NodeJS.Timeout>();
+
+  // Options fréquemment utilisées (préchargées)
+  const { 
+    data: frequentOptions = [], 
+    isLoading: loadingFrequent 
+  } = useQuery({
+    queryKey: ['frequentChapitres'],
+    queryFn: async () => {
+      try {
+        const response = await ApiClient.get('/plan-comptable/comptes/options', {
+          params: { limit: 30 }
+        });
+        return response.data?.data || [];
+      } catch (error) {
+        console.error('Erreur chargement chapitres fréquents:', error);
+        return [];
+      }
+    },
+    staleTime: 10 * 60 * 1000,
+    retry: 1,
+  });
+
+  // Recherche avec debounce
+  const searchChapitres = useCallback(async (query: string): Promise<Chapitre[]> => {
+    if (!query || query.trim().length < 2) {
+      setSearchResults([]);
+      return [];
+    }
+
+    // Debounce
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current);
+    }
+
+    return new Promise((resolve) => {
+      searchTimeout.current = setTimeout(async () => {
+        setLoading(true);
+        try {
+          const response = await ApiClient.get('/plan-comptable/comptes/search', {
+            params: { q: query, limit: 50 }
+          });
+
+          const results = response.data?.data || [];
+          setSearchResults(results);
+          
+          // Mettre en cache
+          results.forEach((chapitre: Chapitre) => {
+            cache.current.set(chapitre.id, chapitre);
+          });
+          
+          resolve(results);
+        } catch (error) {
+          console.error('Erreur recherche chapitres:', error);
+          setSearchResults([]);
+          resolve([]);
+        } finally {
+          setLoading(false);
+        }
+      }, 300);
+    });
+  }, []);
+
+  // Récupérer un chapitre par ID
+  const getChapitreById = useCallback(async (id: number): Promise<Chapitre | null> => {
+    // Vérifier le cache
+    if (cache.current.has(id)) {
+      return cache.current.get(id) || null;
+    }
+
+    try {
+      const response = await ApiClient.get(`/plan-comptable/comptes/${id}`);
+      const chapitre = response.data?.data || null;
+      
+      if (chapitre) {
+        cache.current.set(id, chapitre);
+      }
+      
+      return chapitre;
+    } catch (error) {
+      console.error('Erreur chargement chapitre:', error);
+      return null;
+    }
+  }, []);
+
+  // Nettoyage du timeout
+  useEffect(() => {
+    return () => {
+      if (searchTimeout.current) {
+        clearTimeout(searchTimeout.current);
+      }
+    };
+  }, []);
+
+  return {
+    searchResults,
+    loading,
+    loadingFrequent,
+    searchChapitres,
+    getChapitreById,
+    frequentOptions,
+    cache: cache.current
+  };
+};
 
 // Composant DetailItem réutilisable
 interface DetailItemProps {
@@ -138,29 +259,222 @@ interface TypeCompte {
   minimum_compte?: number | null;
 }
 
-// Interface pour les chapitres
-interface Chapitre {
-  id: number;
-  code: string;
-  libelle: string;
-  categorie?: {
-    id: number;
-    code: string;
-    nom: string;
-  };
+// Composant ChapitreSelect réutilisable
+interface ChapitreSelectProps {
+  field: any;
+  fieldState: any;
+  label: string;
+  helperText?: string;
+  disabled?: boolean;
 }
+
+const ChapitreSelectComponent: React.FC<ChapitreSelectProps> = ({
+  field,
+  fieldState,
+  label,
+  helperText = "",
+  disabled = false
+}) => {
+  const {
+    searchResults,
+    loading,
+    loadingFrequent,
+    searchChapitres,
+    getChapitreById,
+    frequentOptions
+  } = useChapitres();
+
+  const [inputValue, setInputValue] = useState('');
+  const [options, setOptions] = useState<any[]>([]);
+  const [selectedOption, setSelectedOption] = useState<any>(null);
+
+  // Charger le chapitre sélectionné
+  useEffect(() => {
+    const loadSelectedChapitre = async () => {
+      if (field.value && typeof field.value === 'number') {
+        const chapitre = await getChapitreById(field.value);
+        if (chapitre) {
+          const option = {
+            id: chapitre.id,
+            label: `${chapitre.code} - ${chapitre.libelle}`,
+            value: chapitre.id,
+            chapitre
+          };
+          setSelectedOption(option);
+        }
+      } else {
+        setSelectedOption(null);
+      }
+    };
+
+    loadSelectedChapitre();
+  }, [field.value, getChapitreById]);
+
+  // Initialiser avec les options fréquentes
+  useEffect(() => {
+    if (frequentOptions.length > 0) {
+      const frequentOpts = frequentOptions.map(chapitre => ({
+        id: chapitre.id,
+        label: `${chapitre.code} - ${chapitre.libelle}`,
+        value: chapitre.id,
+        chapitre
+      }));
+      setOptions(frequentOpts);
+    }
+  }, [frequentOptions]);
+
+  // Mettre à jour avec les résultats de recherche
+  useEffect(() => {
+    if (searchResults.length > 0) {
+      const searchOpts = searchResults.map(chapitre => ({
+        id: chapitre.id,
+        label: `${chapitre.code} - ${chapitre.libelle}`,
+        value: chapitre.id,
+        chapitre
+      }));
+      
+      // Fusionner avec les options fréquentes sans doublons
+      setOptions(prev => {
+        const allOptions = [...searchOpts];
+        const existingIds = new Set(allOptions.map(opt => opt.id));
+        
+        // Ajouter les options fréquentes qui ne sont pas déjà présentes
+        frequentOptions.forEach(chapitre => {
+          if (!existingIds.has(chapitre.id)) {
+            allOptions.push({
+              id: chapitre.id,
+              label: `${chapitre.code} - ${chapitre.libelle}`,
+              value: chapitre.id,
+              chapitre
+            });
+          }
+        });
+        
+        // Garder l'option sélectionnée même si pas dans la liste
+        if (selectedOption && !allOptions.some(opt => opt.id === selectedOption.id)) {
+          allOptions.unshift(selectedOption);
+        }
+        
+        return allOptions;
+      });
+    }
+  }, [searchResults, frequentOptions, selectedOption]);
+
+  const handleInputChange = useCallback((event: any, newInputValue: string) => {
+    setInputValue(newInputValue);
+    
+    if (newInputValue.length >= 2) {
+      searchChapitres(newInputValue);
+    } else if (newInputValue.length === 0) {
+      // Réinitialiser aux options fréquentes
+      if (frequentOptions.length > 0) {
+        const frequentOpts = frequentOptions.map(chapitre => ({
+          id: chapitre.id,
+          label: `${chapitre.code} - ${chapitre.libelle}`,
+          value: chapitre.id,
+          chapitre
+        }));
+        setOptions(frequentOpts);
+      }
+    }
+  }, [searchChapitres, frequentOptions]);
+
+  const handleChange = useCallback((event: any, newValue: any) => {
+    setSelectedOption(newValue);
+    field.onChange(newValue ? newValue.value : null);
+  }, [field]);
+
+  const getOptionLabel = useCallback((option: any) => {
+    if (typeof option === 'string') return option;
+    if (option && option.label) return option.label;
+    return '';
+  }, []);
+
+  const renderOption = useCallback((props: any, option: any) => {
+    const { chapitre } = option;
+    return (
+      <li {...props} key={option.id}>
+        <Box>
+          <Typography variant="body1">
+            <strong>{chapitre.code}</strong> - {chapitre.libelle}
+          </Typography>
+          {chapitre.categorie && (
+            <Typography variant="caption" color="text.secondary">
+              Catégorie: {chapitre.categorie.code} - {chapitre.categorie.libelle}
+            </Typography>
+          )}
+        </Box>
+      </li>
+    );
+  }, []);
+
+  // Fonction de filtrage personnalisée
+  const filterOptions = useCallback((options: any[], { inputValue }: any) => {
+    if (!inputValue || inputValue.length < 2) {
+      return options;
+    }
+    
+    const inputLower = inputValue.toLowerCase();
+    return options.filter(option => {
+      const code = option.chapitre?.code?.toLowerCase() || '';
+      const libelle = option.chapitre?.libelle?.toLowerCase() || '';
+      return code.includes(inputLower) || libelle.includes(inputLower);
+    });
+  }, []);
+
+  return (
+    <Autocomplete
+      id={field.name}
+      options={options}
+      value={selectedOption}
+      getOptionLabel={getOptionLabel}
+      isOptionEqualToValue={(option, value) => option?.id === value?.id}
+      onChange={handleChange}
+      onInputChange={handleInputChange}
+      loading={loading || loadingFrequent}
+      disabled={disabled}
+      filterOptions={filterOptions}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label={label}
+          placeholder="Tapez 2 caractères pour rechercher..."
+          error={!!fieldState.error}
+          helperText={fieldState.error?.message || helperText}
+          InputProps={{
+            ...params.InputProps,
+            endAdornment: (
+              <React.Fragment>
+                {loading || loadingFrequent ? (
+                  <CircularProgress color="inherit" size={20} />
+                ) : null}
+                {params.InputProps.endAdornment}
+              </React.Fragment>
+            ),
+          }}
+        />
+      )}
+      renderOption={renderOption}
+      loadingText="Chargement..."
+      noOptionsText={
+        inputValue.length < 2 
+          ? "Tapez au moins 2 caractères pour rechercher"
+          : loading ? "Recherche en cours..." : "Aucun chapitre trouvé"
+      }
+      sx={{ mb: 2 }}
+    />
+  );
+};
 
 const TypeCompteList = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [typesCompte, setTypesCompte] = useState<TypeCompte[]>([]);
   const [filteredTypes, setFilteredTypes] = useState<TypeCompte[]>([]);
-  const [allChapitres, setAllChapitres] = useState<Chapitre[]>([]);
   const [openEditModal, setOpenEditModal] = useState(false);
   const [editingType, setEditingType] = useState<TypeCompte | null>(null);
   const [activeTab, setActiveTab] = useState(0);
-  const { enqueueSnackbar, closeSnackbar } = useSnackbar();
+  const { enqueueSnackbar } = useSnackbar();
   
-  // États pour la confirmation
   const [confirmModal, setConfirmModal] = useState({
     open: false,
     title: '',
@@ -170,19 +484,71 @@ const TypeCompteList = () => {
     confirmColor: 'primary' as 'primary' | 'error' | 'success' | 'warning'
   });
   
-  // États pour la modale de visualisation
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<TypeCompte | null>(null);
   
-  // État pour le suivi du chargement des chapitres
-  const [chapitresLoadingInfo, setChapitresLoadingInfo] = useState({
-    loaded: 0,
-    total: 0,
-    isComplete: false,
-    page: 1
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error'
   });
-  
-  // Schéma de validation
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  const openConfirmModal = (
+    title: string, 
+    message: string, 
+    onConfirm: () => void,
+    confirmText = 'Confirmer',
+    confirmColor: 'primary' | 'error' | 'success' | 'warning' = 'primary'
+  ) => {
+    setConfirmModal({
+      open: true,
+      title,
+      message,
+      onConfirm,
+      confirmText,
+      confirmColor
+    });
+  };
+
+  const closeConfirmModal = () => {
+    setConfirmModal({
+      ...confirmModal,
+      open: false
+    });
+  };
+
+  function a11yProps(index: number) {
+    return {
+      id: `simple-tab-${index}`,
+      'aria-controls': `simple-tabpanel-${index}`,
+    };
+  }
+
+  function TabPanel(props: { children?: React.ReactNode; value: number; index: number }) {
+    const { children, value, index } = props;
+    return (
+      <div
+        role="tabpanel"
+        hidden={value !== index}
+        id={`simple-tabpanel-${index}`}
+        aria-labelledby={`simple-tab-${index}`}
+      >
+        {value === index && (
+          <Box sx={{ pt: 3 }}>
+            {children}
+          </Box>
+        )}
+      </div>
+    );
+  }
+
   const schema = yup.object().shape({
     code: yup.string().required('Le code est requis'),
     libelle: yup.string().required('Le libellé est requis'),
@@ -245,85 +611,19 @@ const TypeCompteList = () => {
     }
   });
   
-  // Surveiller les valeurs spécifiques pour les dépendances
   const fraisOuvertureActif = watch('frais_ouverture_actif');
   const fraisCarnetActif = watch('frais_carnet_actif');
   const commissionRetraitActif = watch('commission_retrait_actif');
   const interetsActifs = watch('interets_actifs');
   const penaliteActif = watch('penalite_actif');
   const fraisClotureActif = watch('frais_cloture_anticipe_actif');
-  
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'success' as 'success' | 'error'
-  });
 
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
-
-  // Fonction pour ouvrir la modale de confirmation
-  const openConfirmModal = (
-    title: string, 
-    message: string, 
-    onConfirm: () => void,
-    confirmText = 'Confirmer',
-    confirmColor: 'primary' | 'error' | 'success' | 'warning' = 'primary'
-  ) => {
-    setConfirmModal({
-      open: true,
-      title,
-      message,
-      onConfirm,
-      confirmText,
-      confirmColor
-    });
-  };
-
-  // Fonction pour fermer la modale de confirmation
-  const closeConfirmModal = () => {
-    setConfirmModal({
-      ...confirmModal,
-      open: false
-    });
-  };
-
-  // Fonction utilitaire pour les onglets
-  function a11yProps(index: number) {
-    return {
-      id: `simple-tab-${index}`,
-      'aria-controls': `simple-tabpanel-${index}`,
-    };
-  }
-
-  // Composant TabPanel personnalisé
-  function TabPanel(props: { children?: React.ReactNode; value: number; index: number }) {
-    const { children, value, index } = props;
-    return (
-      <div
-        role="tabpanel"
-        hidden={value !== index}
-        id={`simple-tabpanel-${index}`}
-        aria-labelledby={`simple-tab-${index}`}
-      >
-        {value === index && (
-          <Box sx={{ pt: 3 }}>
-            {children}
-          </Box>
-        )}
-      </div>
-    );
-  }
-
-  // Récupération des types de compte avec react-query
   const { data: typesData, isLoading: loadingTypes, refetch: refetchTypesCompte } = useQuery<TypeCompte[]>({
     queryKey: ['typesCompte'],
     queryFn: async () => {
-      const response = await ApiClient.get('/types-comptes');
+      const response = await ApiClient.get('/types-comptes', {
+        params: { per_page: 100, page: 1 }
+      });
       
       const extractArrays = (obj: any): any[] => {
         if (Array.isArray(obj)) return obj;
@@ -355,196 +655,16 @@ const TypeCompteList = () => {
       return data.filter((item: any) => item !== null && item !== undefined);
     },
     retry: 1,
-    refetchOnWindowFocus: false
-  });
-
-  // Charger TOUS les chapitres avec PAGINATION AUTOMATIQUE
-  const { data: chapitresData, isLoading: loadingChapitres, refetch: refetchChapitres } = useQuery<Chapitre[]>({
-    queryKey: ['chapitres'],
-    queryFn: async () => {
-      console.log('Début du chargement intelligent des chapitres avec pagination...');
-      setChapitresLoadingInfo({
-        loaded: 0,
-        total: 0,
-        isComplete: false,
-        page: 1
-      });
-      
-      const loadAllChapitres = async (): Promise<Chapitre[]> => {
-        let allChapitres: Chapitre[] = [];
-        let currentPage = 1;
-        const pageSize = 100; // Taille raisonnable par page
-        let totalPages = 1;
-        let lastSuccess = true;
-
-        try {
-          do {
-            console.log(`Chargement page ${currentPage}...`);
-            
-            setChapitresLoadingInfo(prev => ({
-              ...prev,
-              page: currentPage,
-              loaded: allChapitres.length
-            }));
-            
-            const response = await ApiClient.get('/plan-comptable/comptes', {
-              params: { page: currentPage, per_page: pageSize },
-              timeout: 15000 // Timeout de 15 secondes par page
-            });
-
-            const responseData = response.data;
-            let pageChapitres: Chapitre[] = [];
-
-            // Gestion des différents formats de réponse
-            if (Array.isArray(responseData)) {
-              // Format 1: Tableau direct
-              pageChapitres = responseData.map((item: any) => ({
-                id: item.id,
-                code: item.code,
-                libelle: item.libelle,
-                categorie: item.categorie
-              }));
-              lastSuccess = pageChapitres.length > 0;
-              totalPages = pageChapitres.length < pageSize ? currentPage : currentPage + 1;
-            } else if (responseData.data && Array.isArray(responseData.data)) {
-              // Format 2: Laravel standard { data: [], meta: {}, links: {} }
-              pageChapitres = responseData.data.map((item: any) => ({
-                id: item.id,
-                code: item.code,
-                libelle: item.libelle,
-                categorie: item.categorie
-              }));
-              lastSuccess = pageChapitres.length > 0;
-              
-              if (responseData.meta) {
-                totalPages = responseData.meta.last_page || 1;
-                // Mettre à jour le total estimé
-                setChapitresLoadingInfo(prev => ({
-                  ...prev,
-                  total: responseData.meta.total || prev.total
-                }));
-              } else {
-                totalPages = pageChapitres.length < pageSize ? currentPage : currentPage + 1;
-              }
-            } else if (responseData.results && Array.isArray(responseData.results)) {
-              // Format 3: Autre format paginé { results: [] }
-              pageChapitres = responseData.results.map((item: any) => ({
-                id: item.id,
-                code: item.code,
-                libelle: item.libelle,
-                categorie: item.categorie
-              }));
-              lastSuccess = pageChapitres.length > 0;
-              totalPages = pageChapitres.length < pageSize ? currentPage : currentPage + 1;
-            } else {
-              console.warn('Format de réponse inattendu à la page', currentPage, ':', responseData);
-              break;
-            }
-
-            if (pageChapitres.length === 0) {
-              console.log(`Page ${currentPage} vide, arrêt du chargement.`);
-              lastSuccess = false;
-              break;
-            }
-
-            allChapitres = [...allChapitres, ...pageChapitres];
-            console.log(`✓ Page ${currentPage}: ${pageChapitres.length} chapitres (total: ${allChapitres.length})`);
-            
-            // Mettre à jour les informations de chargement
-            setChapitresLoadingInfo(prev => ({
-              ...prev,
-              loaded: allChapitres.length,
-              page: currentPage
-            }));
-            
-            currentPage++;
-            
-            // Limite de sécurité: ne pas dépasser 50 pages (5,000 chapitres)
-            if (currentPage > 50) {
-              console.warn('Limite de sécurité atteinte (50 pages). Arrêt du chargement.');
-              break;
-            }
-
-          } while (lastSuccess && currentPage <= totalPages);
-
-          console.log(`✅ Chargement terminé: ${allChapitres.length} chapitres récupérés`);
-          
-          setChapitresLoadingInfo(prev => ({
-            ...prev,
-            loaded: allChapitres.length,
-            total: allChapitres.length,
-            isComplete: true
-          }));
-          
-          return allChapitres;
-
-        } catch (error: any) {
-          console.error('Erreur lors du chargement paginé:', error.message);
-          
-          // Si on a déjà récupéré des chapitres, les retourner
-          if (allChapitres.length > 0) {
-            console.log(`⚠️ Chargement interrompu. Retour de ${allChapitres.length} chapitres déjà récupérés`);
-            return allChapitres;
-          }
-          
-          // Fallback: essayer une seule requête avec une taille raisonnable
-          try {
-            console.log('Tentative de fallback avec per_page=200...');
-            const fallbackResponse = await ApiClient.get('/plan-comptable/comptes', {
-              params: { per_page: 200 },
-              timeout: 10000
-            });
-            
-            let fallbackChapitres: Chapitre[] = [];
-            
-            if (fallbackResponse.data?.data && Array.isArray(fallbackResponse.data.data)) {
-              fallbackChapitres = fallbackResponse.data.data.map((item: any) => ({
-                id: item.id,
-                code: item.code,
-                libelle: item.libelle,
-                categorie: item.categorie
-              }));
-            } else if (Array.isArray(fallbackResponse.data)) {
-              fallbackChapitres = fallbackResponse.data.map((item: any) => ({
-                id: item.id,
-                code: item.code,
-                libelle: item.libelle,
-                categorie: item.categorie
-              }));
-            }
-            
-            console.log(`✅ Fallback chargé: ${fallbackChapitres.length} chapitres`);
-            return fallbackChapitres;
-          } catch (fallbackError) {
-            console.error('❌ Erreur du fallback:', fallbackError);
-            throw new Error('Impossible de charger les chapitres');
-          }
-        }
-      };
-
-      return loadAllChapitres();
-    },
-    retry: 1,
     refetchOnWindowFocus: false,
-    // Temps de cache plus long pour les chapitres (5 minutes)
-    staleTime: 5 * 60 * 1000,
+    staleTime: 2 * 60 * 1000
   });
 
-  // Mutation pour la mise à jour du type de compte
   const updateTypeCompteMutation = useMutation({
     mutationFn: async (data: Partial<TypeCompte>) => {
-      console.log('Envoi de la requête de mise à jour avec:', data);
-      try {
-        const response = await ApiClient.put(`/types-comptes/${data.id}`, data);
-        console.log('Réponse de l\'API:', response);
-        return response.data;
-      } catch (error) {
-        console.error('Erreur dans la mutation:', error);
-        throw error;
-      }
+      const response = await ApiClient.put(`/types-comptes/${data.id}`, data);
+      return response.data;
     },
     onSuccess: (responseData, variables) => {
-      // Mettre à jour le tableau localement immédiatement
       if (variables.id && typesData) {
         const updatedTypes = typesData.map(type => 
           type.id === variables.id 
@@ -555,59 +675,41 @@ const TypeCompteList = () => {
         setTypesCompte(updatedTypes);
       }
       
-      // Recharger les données depuis le serveur
       refetchTypesCompte();
       
       enqueueSnackbar('✅ Type de compte mis à jour avec succès', { 
         variant: 'success',
-        anchorOrigin: {
-          vertical: 'top',
-          horizontal: 'right',
-        },
+        anchorOrigin: { vertical: 'top', horizontal: 'right' },
         autoHideDuration: 5000,
       });
       
       setOpenEditModal(false);
     },
     onError: (error: any) => {
-      console.error('Erreur dans onError de la mutation:', error);
       const errorMessage = error.response?.data?.message || 'Erreur lors de la mise à jour du type de compte';
       enqueueSnackbar(`❌ ${errorMessage}`, { 
         variant: 'error',
-        anchorOrigin: {
-          vertical: 'top',
-          horizontal: 'right',
-        },
+        anchorOrigin: { vertical: 'top', horizontal: 'right' },
         autoHideDuration: 10000,
       });
     }
   });
   
-  // Gestion du changement d'onglet
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
   
-  // Gestion de la soumission du formulaire avec confirmation
   const handleSubmitWithConfirmation = (data: TypeCompte) => {
-    // Ouvrir la modale de confirmation
     openConfirmModal(
       'Confirmer la modification',
       `Êtes-vous sûr de vouloir modifier le type de compte "${data.libelle}" (${data.code}) ?`,
-      () => {
-        // Fonction exécutée après confirmation
-        executeUpdate(data);
-      },
+      () => executeUpdate(data),
       'Modifier',
       'primary'
     );
   };
 
-  // Fonction qui exécute réellement la mise à jour
   const executeUpdate = (data: TypeCompte) => {
-    console.log('Exécution de la mise à jour avec les données:', data);
-    
-    // Nettoyer les données null et les remplacer par undefined
     const cleanData: Partial<TypeCompte> = {
       id: editingType?.id,
       code: data.code,
@@ -626,7 +728,6 @@ const TypeCompteList = () => {
       capitalisation_interets: data.capitalisation_interets,
     };
     
-    // Ajouter les chapitres seulement s'ils sont définis
     if (data.chapitre_defaut_id !== null && data.chapitre_defaut_id !== undefined) {
       cleanData.chapitre_defaut_id = data.chapitre_defaut_id;
     }
@@ -655,7 +756,6 @@ const TypeCompteList = () => {
       cleanData.chapitre_cloture_anticipe_id = data.chapitre_cloture_anticipe_id;
     }
     
-    // Ajouter les valeurs numériques seulement si elles sont définies et non nulles
     if (data.frais_ouverture !== null && data.frais_ouverture !== undefined) {
       cleanData.frais_ouverture = data.frais_ouverture;
     }
@@ -687,7 +787,6 @@ const TypeCompteList = () => {
     updateTypeCompteMutation.mutate(cleanData);
   };
 
-  // Mettre à jour les états quand les données sont chargées
   useEffect(() => {
     if (typesData) {
       setTypesCompte(typesData);
@@ -695,13 +794,6 @@ const TypeCompteList = () => {
     }
   }, [typesData]);
 
-  useEffect(() => {
-    if (chapitresData) {
-      setAllChapitres(chapitresData);
-    }
-  }, [chapitresData]);
-
-  // Gestion de la recherche
   useEffect(() => {
     const filtered = typesCompte.filter(type => {
       if (!type) return false;
@@ -717,11 +809,7 @@ const TypeCompteList = () => {
     setPage(0);
   }, [searchTerm, typesCompte]);
 
-  // Gestion de l'édition
   const handleEditClick = (type: TypeCompte) => {
-    console.log('Modification du type de compte:', type);
-    
-    // Préparer les valeurs avec des valeurs par défaut pour éviter null
     const preparedType = {
       ...type,
       description: type.description || '',
@@ -740,51 +828,37 @@ const TypeCompteList = () => {
       chapitre_cloture_anticipe_id: type.chapitre_cloture_anticipe_id || null,
     };
     
-    console.log('Valeurs préparées pour le formulaire:', preparedType);
-    
-    // Réinitialiser le formulaire avec les valeurs du type à modifier
     reset(preparedType);
-    
     setEditingType(type);
     setOpenEditModal(true);
     setActiveTab(0);
   };
 
-  // Fonction pour réactiver un type de compte
   const handleReactivate = async (typeId: number, typeName: string) => {
     try {
       await ApiClient.put(`/types-comptes/${typeId}`, { actif: true });
       
-      // Mettre à jour le tableau localement immédiatement
       setTypesCompte(typesCompte.map(t => 
         t.id === typeId ? { ...t, actif: true, updated_at: new Date().toISOString() } : t
       ));
       
       enqueueSnackbar(`✅ Type de compte "${typeName}" réactivé avec succès`, { 
         variant: 'success',
-        anchorOrigin: {
-          vertical: 'top',
-          horizontal: 'right',
-        },
+        anchorOrigin: { vertical: 'top', horizontal: 'right' },
         autoHideDuration: 6000,
       });
       
-      // Recharger les données
       refetchTypesCompte();
     } catch (error) {
       console.error('Erreur lors de la réactivation', error);
       enqueueSnackbar('❌ Erreur lors de la réactivation du type de compte', { 
         variant: 'error',
-        anchorOrigin: {
-          vertical: 'top',
-          horizontal: 'right',
-        },
+        anchorOrigin: { vertical: 'top', horizontal: 'right' },
         autoHideDuration: 6000,
       });
     }
   };
 
-  // Gestion de la désactivation avec confirmation
   const handleDelete = (typeId: number, typeName: string) => {
     openConfirmModal(
       'Confirmer la désactivation',
@@ -793,127 +867,28 @@ const TypeCompteList = () => {
         try {
           await ApiClient.put(`/types-comptes/${typeId}`, { actif: false });
           
-          // Mettre à jour le tableau localement immédiatement
           setTypesCompte(typesCompte.map(type => 
             type.id === typeId ? { ...type, actif: false, updated_at: new Date().toISOString() } : type
           ));
           
           enqueueSnackbar(`✅ Type de compte "${typeName}" désactivé avec succès`, { 
             variant: 'success',
-            anchorOrigin: {
-              vertical: 'top',
-              horizontal: 'right',
-            },
+            anchorOrigin: { vertical: 'top', horizontal: 'right' },
             autoHideDuration: 6000,
           });
           
-          // Recharger les données
           refetchTypesCompte();
         } catch (error) {
           console.error('Erreur lors de la désactivation', error);
           enqueueSnackbar('❌ Erreur lors de la désactivation du type de compte', { 
             variant: 'error',
-            anchorOrigin: {
-              vertical: 'top',
-              horizontal: 'right',
-            },
+            anchorOrigin: { vertical: 'top', horizontal: 'right' },
             autoHideDuration: 6000,
           });
         }
       },
       'Désactiver',
       'error'
-    );
-  };
-
-  // Composant pour le sélecteur de chapitre
-  const ChapitreSelect = ({ name, label, required = false, helperText = "" }: { 
-    name: keyof TypeCompte; 
-    label: string; 
-    required?: boolean;
-    helperText?: string;
-  }) => {
-    const value = watch(name) as number | null;
-    const selectedChapitre = value ? allChapitres.find(ch => ch.id === value) : null;
-
-    return (
-      <Controller
-        name={name}
-        control={control}
-        render={({ field, fieldState }) => (
-          <FormControl fullWidth margin="dense" sx={{ mb: 2 }}>
-            <Autocomplete
-              options={allChapitres}
-              value={selectedChapitre}
-              getOptionLabel={(option) => {
-                if (typeof option === 'string') return option;
-                return `${option.code} - ${option.libelle}`;
-              }}
-              isOptionEqualToValue={(option, value) => option.id === value.id}
-              onChange={(event, newValue) => {
-                field.onChange(newValue ? newValue.id : null);
-              }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label={label + (required ? " *" : "")}
-                  placeholder="Rechercher un chapitre..."
-                  error={!!fieldState.error}
-                  helperText={fieldState.error?.message || helperText}
-                  InputProps={{
-                    ...params.InputProps,
-                    endAdornment: (
-                      <React.Fragment>
-                        {loadingChapitres ? (
-                          <CircularProgress color="inherit" size={20} />
-                        ) : null}
-                        {params.InputProps.endAdornment}
-                      </React.Fragment>
-                    ),
-                  }}
-                />
-              )}
-              renderOption={(props, option) => (
-                <li {...props} key={option.id}>
-                  <Box>
-                    <Typography variant="body1">
-                      <strong>{option.code}</strong> - {option.libelle}
-                    </Typography>
-                    {option.categorie && (
-                      <Typography variant="caption" color="text.secondary">
-                        Catégorie: {option.categorie.code} - {option.categorie.nom}
-                      </Typography>
-                    )}
-                  </Box>
-                </li>
-              )}
-              loading={loadingChapitres}
-              loadingText="Chargement des chapitres..."
-              noOptionsText={
-                loadingChapitres 
-                  ? "Chargement..." 
-                  : allChapitres.length === 0 
-                    ? "Aucun chapitre disponible" 
-                    : "Aucun chapitre trouvé"
-              }
-              filterOptions={(options, state) => {
-                const inputValue = state.inputValue.toLowerCase().trim();
-                if (!inputValue) return options;
-                
-                return options.filter(option => 
-                  option.code.toLowerCase().includes(inputValue) ||
-                  option.libelle.toLowerCase().includes(inputValue) ||
-                  (option.categorie?.nom?.toLowerCase()?.includes(inputValue) || false)
-                );
-              }}
-              groupBy={(option) => option.categorie?.nom || 'Sans catégorie'}
-            />
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-              💡 Tapez pour rechercher par code, libellé ou catégorie
-            </Typography>
-          </FormControl>
-        )}
-      />
     );
   };
 
@@ -970,37 +945,6 @@ const TypeCompteList = () => {
               </Button>
             </Box>
 
-            {/* Indicateur de chargement des chapitres */}
-            {loadingChapitres && (
-              <Box sx={{ mb: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <CircularProgress size={20} />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2">
-                      {chapitresLoadingInfo.isComplete 
-                        ? `Chargement terminé: ${chapitresLoadingInfo.loaded} chapitres`
-                        : `Chargement des chapitres... (page ${chapitresLoadingInfo.page})`}
-                      {chapitresLoadingInfo.loaded > 0 && 
-                        !chapitresLoadingInfo.isComplete &&
-                        ` - ${chapitresLoadingInfo.loaded} chargés`}
-                    </Typography>
-                    {chapitresLoadingInfo.loaded > 0 && !chapitresLoadingInfo.isComplete && (
-                      <Box sx={{ mt: 1 }}>
-                        <LinearProgress 
-                          variant="determinate" 
-                          value={chapitresLoadingInfo.total > 0 
-                            ? Math.min((chapitresLoadingInfo.loaded / chapitresLoadingInfo.total) * 100, 100)
-                            : 0
-                          }
-                          sx={{ height: 6, borderRadius: 3 }}
-                        />
-                      </Box>
-                    )}
-                  </Box>
-                </Box>
-              </Box>
-            )}
-
             {/* Barre de recherche */}
             <TextField
               fullWidth
@@ -1026,15 +970,15 @@ const TypeCompteList = () => {
           <Paper elevation={3} sx={{ width: '100%', overflow: 'hidden', borderRadius: 2 }}>
             <TableContainer sx={{ maxHeight: 'calc(100vh - 250px)' }}>
               <Table stickyHeader size="small">
-                <TableHead style={{ backgroundColor:'#3479efff'}}>
-                  <TableRow style={{ backgroundColor:'#3479efff'}}>
-                    <TableCell  sx={{ color: 'black', fontWeight: 'bold' }}>Code</TableCell>
-                    <TableCell  sx={{ color: 'black', fontWeight: 'bold' }}>Libellé</TableCell>
-                    <TableCell  sx={{ color: 'black', fontWeight: 'bold' }}>Description</TableCell>
-                    <TableCell  align="center" sx={{ color: 'black', fontWeight: 'bold' }}>MATA</TableCell>
-                    <TableCell  align="center" sx={{ color: 'black', fontWeight: 'bold' }}>Durée</TableCell>
-                    <TableCell  align="center" sx={{ color: 'black', fontWeight: 'bold' }}>Islamique</TableCell>
-                    <TableCell  align="center" sx={{ color: 'black', fontWeight: 'bold' }}>Statut</TableCell>
+                <TableHead style={{ backgroundColor:'#2277fa'}}>
+                  <TableRow style={{ backgroundColor:'#2277fa'}}>
+                    <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>Code</TableCell>
+                    <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>Libellé</TableCell>
+                    <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>Description</TableCell>
+                    <TableCell align="center" sx={{ color: 'black', fontWeight: 'bold' }}>MATA</TableCell>
+                    <TableCell align="center" sx={{ color: 'black', fontWeight: 'bold' }}>Durée</TableCell>
+                    <TableCell align="center" sx={{ color: 'black', fontWeight: 'bold' }}>Islamique</TableCell>
+                    <TableCell align="center" sx={{ color: 'black', fontWeight: 'bold' }}>Statut</TableCell>
                     <TableCell align="center" sx={{ color: 'black', fontWeight: 'bold' }}>Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -1299,10 +1243,17 @@ const TypeCompteList = () => {
                   />
                                     
                   {/* Chapitre par défaut */}
-                  <ChapitreSelect 
-                    name="chapitre_defaut_id" 
-                    label="Chapitre par défaut"
-                    helperText="Chapitre à utiliser par défaut pour les opérations"
+                  <Controller
+                    name="chapitre_defaut_id"
+                    control={control}
+                    render={({ field, fieldState }) => (
+                      <ChapitreSelectComponent
+                        field={field}
+                        fieldState={fieldState}
+                        label="Chapitre par défaut"
+                        helperText="Chapitre à utiliser par défaut pour les opérations"
+                      />
+                    )}
                   />
                   
                   <Controller
@@ -1320,7 +1271,8 @@ const TypeCompteList = () => {
                       />
                     )}
                   />
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2, ml: 1 }}>
+                  
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2, ml: 1 }}>
                     <Controller
                       name="est_islamique"
                       control={control}
@@ -1369,7 +1321,6 @@ const TypeCompteList = () => {
                       )}
                     />
                   </Box>
-
                 </TabPanel>
 
                 {/* Onglet Frais & Commissions */}
@@ -1424,10 +1375,17 @@ const TypeCompteList = () => {
                   </Box>
                   
                   {/* Chapitre pour frais d'ouverture */}
-                  <ChapitreSelect 
-                    name="chapitre_frais_ouverture_id" 
-                    label="Chapitre frais d'ouverture"
-                    helperText="Chapitre pour comptabiliser les frais d'ouverture"
+                  <Controller
+                    name="chapitre_frais_ouverture_id"
+                    control={control}
+                    render={({ field, fieldState }) => (
+                      <ChapitreSelectComponent
+                        field={field}
+                        fieldState={fieldState}
+                        label="Chapitre frais d'ouverture"
+                        helperText="Chapitre pour comptabiliser les frais d'ouverture"
+                      />
+                    )}
                   />
 
                   <Divider sx={{ my: 2 }} />
@@ -1482,10 +1440,17 @@ const TypeCompteList = () => {
                   </Box>
                   
                   {/* Chapitre pour frais de carnet */}
-                  <ChapitreSelect 
-                    name="chapitre_frais_carnet_id" 
-                    label="Chapitre frais de carnet"
-                    helperText="Chapitre pour comptabiliser les frais de carnet"
+                  <Controller
+                    name="chapitre_frais_carnet_id"
+                    control={control}
+                    render={({ field, fieldState }) => (
+                      <ChapitreSelectComponent
+                        field={field}
+                        fieldState={fieldState}
+                        label="Chapitre frais de carnet"
+                        helperText="Chapitre pour comptabiliser les frais de carnet"
+                      />
+                    )}
                   />
 
                   <Divider sx={{ my: 2 }} />
@@ -1540,10 +1505,17 @@ const TypeCompteList = () => {
                   </Box>
                   
                   {/* Chapitre pour commission de retrait */}
-                  <ChapitreSelect 
-                    name="chapitre_commission_retrait_id" 
-                    label="Chapitre commission de retrait"
-                    helperText="Chapitre pour comptabiliser les commissions de retrait"
+                  <Controller
+                    name="chapitre_commission_retrait_id"
+                    control={control}
+                    render={({ field, fieldState }) => (
+                      <ChapitreSelectComponent
+                        field={field}
+                        fieldState={fieldState}
+                        label="Chapitre commission de retrait"
+                        helperText="Chapitre pour comptabiliser les commissions de retrait"
+                      />
+                    )}
                   />
                 </TabPanel>
 
@@ -1639,10 +1611,17 @@ const TypeCompteList = () => {
                   />
                   
                   {/* Chapitre pour intérêts créditeurs */}
-                  <ChapitreSelect 
-                    name="chapitre_interet_credit_id" 
-                    label="Chapitre intérêts créditeurs"
-                    helperText="Chapitre pour comptabiliser les intérêts créditeurs"
+                  <Controller
+                    name="chapitre_interet_credit_id"
+                    control={control}
+                    render={({ field, fieldState }) => (
+                      <ChapitreSelectComponent
+                        field={field}
+                        fieldState={fieldState}
+                        label="Chapitre intérêts créditeurs"
+                        helperText="Chapitre pour comptabiliser les intérêts créditeurs"
+                      />
+                    )}
                   />
                 </TabPanel>
 
@@ -1702,10 +1681,17 @@ const TypeCompteList = () => {
                     </Box>
                     
                     {/* Chapitre pour pénalité */}
-                    <ChapitreSelect 
-                      name="chapitre_penalite_id" 
-                      label="Chapitre pénalité de retrait"
-                      helperText="Chapitre pour comptabiliser les pénalités de retrait anticipé"
+                    <Controller
+                      name="chapitre_penalite_id"
+                      control={control}
+                      render={({ field, fieldState }) => (
+                        <ChapitreSelectComponent
+                          field={field}
+                          fieldState={fieldState}
+                          label="Chapitre pénalité de retrait"
+                          helperText="Chapitre pour comptabiliser les pénalités de retrait anticipé"
+                        />
+                      )}
                     />
                   </Box>
                   
@@ -1760,10 +1746,17 @@ const TypeCompteList = () => {
                     </Box>
                     
                     {/* Chapitre pour frais de clôture anticipée */}
-                    <ChapitreSelect 
-                      name="chapitre_cloture_anticipe_id" 
-                      label="Chapitre frais de clôture anticipée"
-                      helperText="Chapitre pour comptabiliser les frais de clôture anticipée"
+                    <Controller
+                      name="chapitre_cloture_anticipe_id"
+                      control={control}
+                      render={({ field, fieldState }) => (
+                        <ChapitreSelectComponent
+                          field={field}
+                          fieldState={fieldState}
+                          label="Chapitre frais de clôture anticipée"
+                          helperText="Chapitre pour comptabiliser les frais de clôture anticipée"
+                        />
+                      )}
                     />
                   </Box>
                 </TabPanel>
@@ -1813,19 +1806,12 @@ const TypeCompteList = () => {
             </form>
           </Dialog>
 
-          {/* Modal de confirmation générique */}
-          <Dialog
-            open={confirmModal.open}
-            onClose={closeConfirmModal}
-            maxWidth="sm"
-            fullWidth
-          >
+          {/* Modal de confirmation */}
+          <Dialog open={confirmModal.open} onClose={closeConfirmModal} maxWidth="sm" fullWidth>
             <DialogTitle>
               <Box display="flex" alignItems="center" gap={1}>
                 <WarningIcon color="warning" />
-                <Typography variant="h6">
-                  {confirmModal.title}
-                </Typography>
+                <Typography variant="h6">{confirmModal.title}</Typography>
               </Box>
             </DialogTitle>
             
@@ -1866,7 +1852,7 @@ const TypeCompteList = () => {
             </DialogActions>
           </Dialog>
 
-          {/* Modal de visualisation des détails */}
+          {/* Modal de visualisation */}
           <Dialog 
             open={viewModalOpen} 
             onClose={() => setViewModalOpen(false)}
@@ -1901,10 +1887,10 @@ const TypeCompteList = () => {
                 <CloseIcon />
               </IconButton>
             </DialogTitle>
+            
             <DialogContent dividers>
               {selectedType && (
                 <Grid container spacing={3}>
-                  {/* Colonne 1: Informations de base */}
                   <Grid item xs={12} md={6}>
                     <Card variant="outlined" sx={{ mb: 3 }}>
                       <CardHeader 
@@ -1937,246 +1923,12 @@ const TypeCompteList = () => {
                             value={selectedType.actif ? 'Actif' : 'Inactif'} 
                             color={selectedType.actif ? 'success' : 'error'}
                           />
-                          <DetailItem 
-                            label="ID Chapitre par défaut" 
-                            value={selectedType.chapitre_defaut_id || 'Non défini'}
-                          />
-                        </List>
-                      </CardContent>
-                    </Card>
-
-                    {/* Frais et commissions */}
-                    <Card variant="outlined" sx={{ mb: 3 }}>
-                      <CardHeader 
-                        title="Frais et commissions" 
-                        titleTypographyProps={{ variant: 'h6' }}
-                        sx={{ bgcolor: 'grey.100' }}
-                      />
-                      <CardContent>
-                        <List dense>
-                          {selectedType.frais_ouverture_actif && (
-                            <>
-                              <DetailItem 
-                                label="Frais d'ouverture" 
-                                value={`${selectedType.frais_ouverture || 0} FCFA`} 
-                              />
-                              <DetailItem 
-                                label="ID Chapitre frais d'ouverture" 
-                                value={selectedType.chapitre_frais_ouverture_id || 'Non défini'}
-                              />
-                            </>
-                          )}
-                          
-                          {selectedType.frais_carnet_actif && (
-                            <>
-                              <DetailItem 
-                                label="Frais de carnet" 
-                                value={`${selectedType.frais_carnet || 0} FCFA`} 
-                              />
-                              <DetailItem 
-                                label="ID Chapitre frais carnet" 
-                                value={selectedType.chapitre_frais_carnet_id || 'Non défini'}
-                              />
-                            </>
-                          )}
-
-                          {selectedType.frais_renouvellement_actif && (
-                            <>
-                              <DetailItem 
-                                label="Frais renouvellement carnet" 
-                                value={`${selectedType.frais_renouvellement_carnet || 0} FCFA`} 
-                              />
-                              <DetailItem 
-                                label="ID Chapitre renouvellement" 
-                                value={selectedType.chapitre_renouvellement_id || 'Non défini'}
-                              />
-                            </>
-                          )}
-
-                          {selectedType.frais_perte_actif && (
-                            <>
-                              <DetailItem 
-                                label="Frais perte carnet" 
-                                value={`${selectedType.frais_perte_carnet || 0} FCFA`} 
-                              />
-                              <DetailItem 
-                                label="ID Chapitre perte" 
-                                value={selectedType.chapitre_perte_id || 'Non défini'}
-                              />
-                            </>
-                          )}
-
-                          {selectedType.commission_retrait_actif && (
-                            <>
-                              <DetailItem 
-                                label="Commission retrait" 
-                                value={`${selectedType.commission_retrait || 0}%`} 
-                              />
-                              <DetailItem 
-                                label="ID Chapitre commission retrait" 
-                                value={selectedType.chapitre_commission_retrait_id || 'Non défini'}
-                              />
-                            </>
-                          )}
-
-                          {selectedType.commission_sms_actif && (
-                            <>
-                              <DetailItem 
-                                label="Commission SMS" 
-                                value={`${selectedType.commission_sms || 0} FCFA`} 
-                              />
-                              <DetailItem 
-                                label="ID Chapitre commission SMS" 
-                                value={selectedType.chapitre_commission_sms_id || 'Non défini'}
-                              />
-                            </>
-                          )}
-
-                          {selectedType.commission_mensuelle_actif && (
-                            <>
-                              <DetailItem 
-                                label="Seuil commission" 
-                                value={`${selectedType.seuil_commission || 0} FCFA`} 
-                              />
-                              <DetailItem 
-                                label="Commission si > seuil" 
-                                value={`${selectedType.commission_si_superieur || 0} FCFA`} 
-                              />
-                              <DetailItem 
-                                label="Commission si < seuil" 
-                                value={`${selectedType.commission_si_inferieur || 0} FCFA`} 
-                              />
-                            </>
-                          )}
                         </List>
                       </CardContent>
                     </Card>
                   </Grid>
-
-                  {/* Colonne 2: Paramètres avancés */}
+                  
                   <Grid item xs={12} md={6}>
-                    {/* Paramètres d'intérêts */}
-                    {selectedType.interets_actifs && (
-                      <Card variant="outlined" sx={{ mb: 3 }}>
-                        <CardHeader 
-                          title="Paramètres d'intérêts" 
-                          titleTypographyProps={{ variant: 'h6' }}
-                          sx={{ bgcolor: 'grey.100' }}
-                        />
-                        <CardContent>
-                          <List dense>
-                            <DetailItem 
-                              label="Taux d'intérêt annuel" 
-                              value={`${selectedType.taux_interet_annuel || 0}%`} 
-                            />
-                            <DetailItem 
-                              label="Fréquence calcul intérêt" 
-                              value={selectedType.frequence_calcul_interet || 'Non défini'} 
-                            />
-                            <DetailItem 
-                              label="Heure calcul intérêt" 
-                              value={selectedType.heure_calcul_interet || 'Non défini'} 
-                            />
-                            <DetailItem 
-                              label="ID Chapitre intérêts créditeurs" 
-                              value={selectedType.chapitre_interet_credit_id || 'Non défini'}
-                            />
-                            <DetailItem 
-                              label="Capitalisation intérêts" 
-                              value={selectedType.capitalisation_interets ? 'Oui' : 'Non'}
-                              color={selectedType.capitalisation_interets ? 'success' : 'default'}
-                            />
-                          </List>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Frais et pénalités */}
-                    <Card variant="outlined" sx={{ mb: 3 }}>
-                      <CardHeader 
-                        title="Frais et pénalités" 
-                        titleTypographyProps={{ variant: 'h6' }}
-                        sx={{ bgcolor: 'grey.100' }}
-                      />
-                      <CardContent>
-                        <List dense>
-                          {selectedType.frais_deblocage_actif && (
-                            <>
-                              <DetailItem 
-                                label="Frais de déblocage" 
-                                value={`${selectedType.frais_deblocage || 0} FCFA`} 
-                              />
-                              <DetailItem 
-                                label="ID Chapitre frais déblocage" 
-                                value={selectedType.chapitre_frais_deblocage_id || 'Non défini'}
-                              />
-                            </>
-                          )}
-
-                          {selectedType.penalite_actif && (
-                            <>
-                              <DetailItem 
-                                label="Pénalité de retrait anticipé" 
-                                value={`${selectedType.penalite_retrait_anticipe || 0}%`} 
-                              />
-                              <DetailItem 
-                                label="ID Chapitre pénalité" 
-                                value={selectedType.chapitre_penalite_id || 'Non défini'}
-                              />
-                            </>
-                          )}
-
-                          {selectedType.frais_cloture_anticipe_actif && (
-                            <>
-                              <DetailItem 
-                                label="Frais de clôture anticipée" 
-                                value={`${selectedType.frais_cloture_anticipe || 0} FCFA`} 
-                              />
-                              <DetailItem 
-                                label="ID Chapitre clôture anticipée" 
-                                value={selectedType.chapitre_cloture_anticipe_id || 'Non défini'}
-                              />
-                            </>
-                          )}
-
-                          {selectedType.minimum_compte_actif && (
-                            <DetailItem 
-                              label="Solde minimum" 
-                              value={`${selectedType.minimum_compte || 0} FCFA`} 
-                            />
-                          )}
-
-                          <DetailItem 
-                            label="ID Compte attente produits" 
-                            value={selectedType.compte_attente_produits_id || 'Non défini'}
-                          />
-
-                          <DetailItem 
-                            label="Retrait anticipé autorisé" 
-                            value={selectedType.retrait_anticipe_autorise ? 'Oui' : 'Non'}
-                            color={selectedType.retrait_anticipe_autorise ? 'success' : 'default'}
-                          />
-
-                          <DetailItem 
-                            label="Validation retrait anticipé" 
-                            value={selectedType.validation_retrait_anticipe ? 'Oui' : 'Non'}
-                            color={selectedType.validation_retrait_anticipe ? 'success' : 'default'}
-                          />
-
-                          <DetailItem 
-                            label="Durée blocage min (jours)" 
-                            value={selectedType.duree_blocage_min || 'Non défini'} 
-                          />
-
-                          <DetailItem 
-                            label="Durée blocage max (jours)" 
-                            value={selectedType.duree_blocage_max || 'Non défini'} 
-                          />
-                        </List>
-                      </CardContent>
-                    </Card>
-
-                    {/* Métadonnées */}
                     <Card variant="outlined">
                       <CardHeader 
                         title="Métadonnées" 
@@ -2186,11 +1938,6 @@ const TypeCompteList = () => {
                       <CardContent>
                         <List dense>
                           <DetailItem 
-                            label="Observations" 
-                            value={selectedType.observations || 'Aucune observation'} 
-                            multiline
-                          />
-                          <DetailItem 
                             label="Date de création" 
                             value={selectedType.created_at ? new Date(selectedType.created_at).toLocaleString() : 'Inconnue'} 
                           />
@@ -2198,13 +1945,6 @@ const TypeCompteList = () => {
                             label="Dernière mise à jour" 
                             value={selectedType.updated_at ? new Date(selectedType.updated_at).toLocaleString() : 'Jamais modifié'} 
                           />
-                          {selectedType.deleted_at && (
-                            <DetailItem 
-                              label="Date de suppression" 
-                              value={new Date(selectedType.deleted_at).toLocaleString()}
-                              color="error"
-                            />
-                          )}
                         </List>
                       </CardContent>
                     </Card>
@@ -2212,7 +1952,8 @@ const TypeCompteList = () => {
                 </Grid>
               )}
             </DialogContent>
-            <DialogActions sx={{ p: 2, borderTop: 1, borderColor: 'divider', position: 'sticky', bottom: 0, bgcolor: 'background.paper' }}>
+            
+            <DialogActions sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
               <Button 
                 onClick={() => setViewModalOpen(false)} 
                 color="primary"
@@ -2224,7 +1965,6 @@ const TypeCompteList = () => {
             </DialogActions>
           </Dialog>
 
-          {/* Snackbar pour les notifications */}
           <Snackbar
             open={snackbar.open}
             autoHideDuration={6000}

@@ -10,6 +10,7 @@ export interface Gestionnaire {
   cni_recto: string | null;
   cni_verso: string | null;
   plan_localisation_domicile: string | null;
+  signature: string | null;
   ville: string | null;
   quartier: string | null;
   agence_id: number;
@@ -22,6 +23,7 @@ export interface Gestionnaire {
   cni_recto_url?: string | null;
   cni_verso_url?: string | null;
   plan_localisation_domicile_url?: string | null;
+  signature_url?: string | null;
   
   // Relations
   agence?: {
@@ -30,6 +32,10 @@ export interface Gestionnaire {
     name: string;
     agency_name?: string;
   };
+  
+  // Attributs calculés
+  nom_complet?: string;
+  adresse_complete?: string;
 }
 
 export interface CreateGestionnaireData {
@@ -44,6 +50,7 @@ export interface CreateGestionnaireData {
   cni_recto?: File | null;
   cni_verso?: File | null;
   plan_localisation_domicile?: File | null;
+  signature?: File | null;
 }
 
 export interface UpdateGestionnaireData {
@@ -58,6 +65,7 @@ export interface UpdateGestionnaireData {
   cni_recto?: File | null;
   cni_verso?: File | null;
   plan_localisation_domicile?: File | null;
+  signature?: File | null;
 }
 
 export interface PaginatedResponse {
@@ -112,6 +120,7 @@ class GestionnaireService {
     if (data.cni_recto) formData.append('cni_recto', data.cni_recto);
     if (data.cni_verso) formData.append('cni_verso', data.cni_verso);
     if (data.plan_localisation_domicile) formData.append('plan_localisation_domicile', data.plan_localisation_domicile);
+    if (data.signature) formData.append('signature', data.signature);
     
     const response = await ApiClient.post('/gestionnaires', formData, {
       headers: {
@@ -126,38 +135,48 @@ class GestionnaireService {
     const formData = new FormData();
     
     // Ajouter les champs texte
-    if (data.gestionnaire_code) formData.append('gestionnaire_code', data.gestionnaire_code);
-    if (data.gestionnaire_nom) formData.append('gestionnaire_nom', data.gestionnaire_nom);
-    if (data.gestionnaire_prenom) formData.append('gestionnaire_prenom', data.gestionnaire_prenom);
+    if (data.gestionnaire_code !== undefined) formData.append('gestionnaire_code', data.gestionnaire_code);
+    if (data.gestionnaire_nom !== undefined) formData.append('gestionnaire_nom', data.gestionnaire_nom);
+    if (data.gestionnaire_prenom !== undefined) formData.append('gestionnaire_prenom', data.gestionnaire_prenom);
     if (data.telephone !== undefined) formData.append('telephone', data.telephone || '');
     if (data.email !== undefined) formData.append('email', data.email || '');
     if (data.ville !== undefined) formData.append('ville', data.ville || '');
     if (data.quartier !== undefined) formData.append('quartier', data.quartier || '');
-    if (data.agence_id) formData.append('agence_id', data.agence_id.toString());
+    if (data.agence_id !== undefined) formData.append('agence_id', data.agence_id.toString());
     
-    // Ajouter les fichiers
-    if (data.cni_recto !== undefined) {
-      if (data.cni_recto) {
-        formData.append('cni_recto', data.cni_recto);
-      } else {
-        formData.append('cni_recto', ''); // Pour supprimer l'image existante
-      }
+    // CORRECTION IMPORTANTE : Gestion des fichiers avec suppression
+    // Pour permettre la suppression des fichiers existants
+    
+    // Pour cni_recto
+    if (data.cni_recto === null) {
+      // Envoyer une chaîne vide pour supprimer l'image
+      formData.append('cni_recto', '');
+    } else if (data.cni_recto instanceof File) {
+      // Envoyer le nouveau fichier
+      formData.append('cni_recto', data.cni_recto);
     }
     
-    if (data.cni_verso !== undefined) {
-      if (data.cni_verso) {
-        formData.append('cni_verso', data.cni_verso);
-      } else {
-        formData.append('cni_verso', '');
-      }
+    // Pour cni_verso
+    if (data.cni_verso === null) {
+      formData.append('cni_verso', '');
+    } else if (data.cni_verso instanceof File) {
+      formData.append('cni_verso', data.cni_verso);
     }
     
-    if (data.plan_localisation_domicile !== undefined) {
-      if (data.plan_localisation_domicile) {
-        formData.append('plan_localisation_domicile', data.plan_localisation_domicile);
-      } else {
-        formData.append('plan_localisation_domicile', '');
-      }
+    // Pour plan_localisation_domicile
+    if (data.plan_localisation_domicile === null) {
+      formData.append('plan_localisation_domicile', '');
+    } else if (data.plan_localisation_domicile instanceof File) {
+      formData.append('plan_localisation_domicile', data.plan_localisation_domicile);
+    }
+    
+    // Pour signature - CORRECTION CRITIQUE
+    if (data.signature === null) {
+      // Envoyer une chaîne vide pour supprimer la signature
+      formData.append('signature', '');
+    } else if (data.signature instanceof File) {
+      // Envoyer le nouveau fichier
+      formData.append('signature', data.signature);
     }
     
     const response = await ApiClient.post(`/gestionnaires/${id}?_method=PUT`, formData, {

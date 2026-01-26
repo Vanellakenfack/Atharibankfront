@@ -20,7 +20,6 @@ export interface RetraitData {
   // Données de frais
   commissions?: number;
   taxes?: number;
-  frais_en_compte?: boolean;
   
   // Contexte de l'opération
   motif?: string;
@@ -90,7 +89,6 @@ class RetraitService {
         // Données de frais
         commissions: data.commissions || 0,
         taxes: data.taxes || 0,
-        frais_en_compte: data.frais_en_compte !== undefined ? data.frais_en_compte : true,
         
         // Données tiers/porteur
         tiers: {

@@ -18,6 +18,7 @@ import {
   CardContent,
   IconButton,
   Snackbar,
+  Divider,
 } from '@mui/material';
 import { indigo, blueGrey, cyan } from '@mui/material/colors';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -59,7 +60,6 @@ export default function AddGestionnaire() {
   const [agencies, setAgencies] = useState<any[]>([]);
   const [loadingAgencies, setLoadingAgencies] = useState(true);
   const [formData, setFormData] = useState({
-    gestionnaire_code: '',
     gestionnaire_nom: '',
     gestionnaire_prenom: '',
     telephone: '',
@@ -72,11 +72,13 @@ export default function AddGestionnaire() {
     cni_recto: null as File | null,
     cni_verso: null as File | null,
     plan_localisation_domicile: null as File | null,
+    signature: null as File | null,
   });
   const [previews, setPreviews] = useState({
     cni_recto: null as string | null,
     cni_verso: null as string | null,
     plan_localisation_domicile: null as string | null,
+    signature: null as string | null,
   });
 
   // États pour les notifications
@@ -89,6 +91,12 @@ export default function AddGestionnaire() {
   // Charger les agences au démarrage
   useEffect(() => {
     fetchAgencies();
+    return () => {
+      // Nettoyer les URLs de prévisualisation
+      Object.values(previews).forEach(url => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    };
   }, []);
 
   const fetchAgencies = async () => {
@@ -135,30 +143,34 @@ export default function AddGestionnaire() {
       if (file.size > 2 * 1024 * 1024) {
         setSnackbar({
           open: true,
-          message: `Le fichier ${field === 'cni_recto' ? 'CNI Recto' : field === 'cni_verso' ? 'CNI Verso' : 'Plan de localisation'} ne doit pas dépasser 2MB.`,
+          message: `Le fichier ${field === 'cni_recto' ? 'CNI Recto' : field === 'cni_verso' ? 'CNI Verso' : field === 'signature' ? 'Signature' : 'Plan de localisation'} ne doit pas dépasser 2MB.`,
           severity: 'error',
         });
         return;
       }
       
       // Vérifier le type (images seulement)
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
       if (!allowedTypes.includes(file.type)) {
         setSnackbar({
           open: true,
-          message: `Le fichier doit être une image (JPG, PNG, GIF). Type détecté: ${file.type}`,
+          message: `Le fichier doit être une image (JPG, PNG). Type détecté: ${file.type}`,
           severity: 'error',
         });
         return;
       }
       
       setFiles(prev => ({ ...prev, [field]: file }));
-      setPreviews(prev => ({ ...prev, [field]: URL.createObjectURL(file) }));
+      setPreviews(prev => {
+        // Libérer l'ancienne URL si elle existe
+        if (prev[field]) URL.revokeObjectURL(prev[field]!);
+        return { ...prev, [field]: URL.createObjectURL(file) };
+      });
       
       // Confirmation de téléchargement
       setSnackbar({
         open: true,
-        message: `Fichier ${field === 'cni_recto' ? 'CNI Recto' : field === 'cni_verso' ? 'CNI Verso' : 'Plan de localisation'} téléchargé avec succès.`,
+        message: `Fichier ${field === 'cni_recto' ? 'CNI Recto' : field === 'cni_verso' ? 'CNI Verso' : field === 'signature' ? 'Signature' : 'Plan de localisation'} téléchargé avec succès.`,
         severity: 'success',
       });
     }
@@ -173,7 +185,7 @@ export default function AddGestionnaire() {
     
     setSnackbar({
       open: true,
-      message: `Fichier ${field === 'cni_recto' ? 'CNI Recto' : field === 'cni_verso' ? 'CNI Verso' : 'Plan de localisation'} supprimé.`,
+      message: `Fichier ${field === 'cni_recto' ? 'CNI Recto' : field === 'cni_verso' ? 'CNI Verso' : field === 'signature' ? 'Signature' : 'Plan de localisation'} supprimé.`,
       severity: 'info',
     });
   };
@@ -182,9 +194,6 @@ export default function AddGestionnaire() {
     const errors: string[] = [];
 
     // Validation des champs obligatoires
-    if (!formData.gestionnaire_code.trim()) {
-      errors.push('Le code gestionnaire est obligatoire');
-    }
     if (!formData.gestionnaire_nom.trim()) {
       errors.push('Le nom est obligatoire');
     }
@@ -201,6 +210,9 @@ export default function AddGestionnaire() {
     }
     if (!files.cni_verso) {
       errors.push('La CNI verso est obligatoire');
+    }
+    if (!files.signature) {
+      errors.push('La signature est obligatoire');
     }
 
     // Validation format email
@@ -245,6 +257,7 @@ export default function AddGestionnaire() {
         cni_recto: files.cni_recto,
         cni_verso: files.cni_verso,
         plan_localisation_domicile: files.plan_localisation_domicile,
+        signature: files.signature,
       });
 
       if (result.success) {
@@ -256,7 +269,6 @@ export default function AddGestionnaire() {
 
         // Réinitialiser le formulaire
         setFormData({
-          gestionnaire_code: '',
           gestionnaire_nom: '',
           gestionnaire_prenom: '',
           telephone: '',
@@ -269,14 +281,16 @@ export default function AddGestionnaire() {
           cni_recto: null,
           cni_verso: null,
           plan_localisation_domicile: null,
+          signature: null,
         });
         setPreviews({
           cni_recto: null,
           cni_verso: null,
           plan_localisation_domicile: null,
+          signature: null,
         });
 
-        // Redirection après 3 secondes
+        // Redirection après 5 secondes
         setTimeout(() => {
           navigate('/AddGestionnaire');
         }, 5000);
@@ -381,6 +395,7 @@ export default function AddGestionnaire() {
                 <Typography variant="body2">
                   Tous les champs marqués d'un astérisque (*) sont obligatoires. 
                   Les fichiers image doivent être au format JPG ou PNG et ne pas dépasser 2MB.
+                  Le code gestionnaire sera généré automatiquement (format: G001, G002, etc.)
                 </Typography>
               </Alert>
             </Box>
@@ -392,53 +407,6 @@ export default function AddGestionnaire() {
                   <Typography variant="h6" sx={{ color: indigo[700], mb: 2 }}>
                     Informations de base
                   </Typography>
-                </Grid>
-
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Code Gestionnaire *"
-                    name="gestionnaire_code"
-                    value={formData.gestionnaire_code}
-                    onChange={handleInputChange}
-                    size="small"
-                    required
-                    helperText="Identifiant unique du gestionnaire"
-                  />
-                </Grid>
-
-                <Grid item xs={12} md={6}>
-                  <FormControl fullWidth size="small" required>
-                    <InputLabel>Agence *</InputLabel>
-                    <Select
-                      name="agence_id"
-                      value={formData.agence_id}
-                      label="Agence *"
-                      onChange={handleSelectChange}
-                      disabled={loadingAgencies || agencies.length === 0}
-                    >
-                      {loadingAgencies ? (
-                        <MenuItem value="">
-                          <em>Chargement des agences...</em>
-                        </MenuItem>
-                      ) : agencies.length === 0 ? (
-                        <MenuItem value="">
-                          <em>Aucune agence disponible</em>
-                        </MenuItem>
-                      ) : (
-                        agencies.map((agence) => (
-                          <MenuItem key={agence.id} value={agence.id}>
-                            {agence.code} - {agence.name}
-                          </MenuItem>
-                        ))
-                      )}
-                    </Select>
-                    {!loadingAgencies && agencies.length === 0 && (
-                      <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
-                        Veuillez créer une agence d'abord
-                      </Typography>
-                    )}
-                  </FormControl>
                 </Grid>
 
                 <Grid item xs={12} md={6}>
@@ -465,6 +433,42 @@ export default function AddGestionnaire() {
                   />
                 </Grid>
 
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth size="small" required>
+                    <InputLabel>Agence *</InputLabel>
+                    <Select
+                      name="agence_id"
+                      value={formData.agence_id}
+                      label="Agence *"
+                      onChange={handleSelectChange}
+                      disabled={loadingAgencies || agencies.length === 0}
+                      required
+                      sx={{minWidth: 200}}
+                    >
+                      {loadingAgencies ? (
+                        <MenuItem value="">
+                          <em>Chargement des agences...</em>
+                        </MenuItem>
+                      ) : agencies.length === 0 ? (
+                        <MenuItem value="">
+                          <em>Aucune agence disponible</em>
+                        </MenuItem>
+                      ) : (
+                        agencies.map((agence) => (
+                          <MenuItem key={agence.id} value={agence.id}>
+                            {agence.code} - {agence.name}
+                          </MenuItem>
+                        ))
+                      )}
+                    </Select>
+                    {!loadingAgencies && agencies.length === 0 && (
+                      <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
+                        Veuillez créer une agence d'abord
+                      </Typography>
+                    )}
+                  </FormControl>
+                </Grid>
+
                 {/* Contact */}
                 <Grid item xs={12}>
                   <Typography variant="h6" sx={{ color: indigo[700], mb: 2, mt: 2 }}>
@@ -475,13 +479,14 @@ export default function AddGestionnaire() {
                 <Grid item xs={12} md={6}>
                   <TextField
                     fullWidth
-                    label="Téléphone"
+                    label="Téléphone *"
                     name="telephone"
                     value={formData.telephone}
                     onChange={handleInputChange}
                     size="small"
-                    placeholder="Ex: +243 81 234 5678"
+                    placeholder="Ex: +237 6 81 23 45 78"
                     helperText="Format : 8 à 20 chiffres"
+                    required
                   />
                 </Grid>
 
@@ -534,7 +539,7 @@ export default function AddGestionnaire() {
                     Documents
                   </Typography>
                   <Alert severity="warning" sx={{ mb: 2 }}>
-                    Les fichiers CNI (recto et verso) sont obligatoires. Format accepté : JPG, PNG (max 2MB)
+                    Les fichiers CNI (recto et verso) et la signature sont obligatoires. Format accepté : JPG, PNG (max 2MB)
                   </Alert>
                 </Grid>
 
@@ -661,7 +666,7 @@ export default function AddGestionnaire() {
                 </Grid>
 
                 {/* Plan de localisation */}
-                <Grid item xs={12}>
+                <Grid item xs={12} md={6}>
                   <Card variant="outlined">
                     <CardContent>
                       <Typography variant="subtitle2" sx={{ mb: 2, color: indigo[600] }}>
@@ -679,7 +684,7 @@ export default function AddGestionnaire() {
                             alt="Plan localisation"
                             style={{
                               width: '100%',
-                              maxHeight: '200px',
+                              height: '150px',
                               objectFit: 'contain',
                               borderRadius: '8px',
                               marginBottom: '10px',
@@ -720,20 +725,87 @@ export default function AddGestionnaire() {
                   </Card>
                 </Grid>
 
+                {/* Signature */}
+                <Grid item xs={12} md={6}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="subtitle2" sx={{ mb: 2, color: indigo[600] }}>
+                        Signature *
+                        {previews.signature && (
+                          <Typography variant="caption" color="success" sx={{ ml: 1 }}>
+                            ✓ Téléchargé
+                          </Typography>
+                        )}
+                      </Typography>
+                      {previews.signature ? (
+                        <Box sx={{ position: 'relative' }}>
+                          <img
+                            src={previews.signature}
+                            alt="Signature"
+                            style={{
+                              width: '100%',
+                              height: '150px',
+                              objectFit: 'contain',
+                              borderRadius: '8px',
+                              marginBottom: '10px',
+                              border: '2px solid #4caf50',
+                              backgroundColor: 'white',
+                            }}
+                          />
+                          <IconButton
+                            size="small"
+                            onClick={() => removeFile('signature')}
+                            sx={{
+                              position: 'absolute',
+                              top: 5,
+                              right: 5,
+                              backgroundColor: 'white',
+                              '&:hover': { backgroundColor: '#f5f5f5' },
+                            }}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Box>
+                      ) : (
+                        <Button
+                          component="label"
+                          variant="outlined"
+                          fullWidth
+                          startIcon={<CloudUploadIcon />}
+                          sx={{ py: 2 }}
+                        >
+                          Télécharger la signature
+                          <input
+                            type="file"
+                            hidden
+                            accept="image/*"
+                            onChange={(e) => handleFileChange('signature', e)}
+                          />
+                        </Button>
+                      )}
+                      <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
+                        Format accepté : JPG, PNG (max 2MB)
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
                 {/* Boutons */}
                 <Grid item xs={12}>
+                  <Divider sx={{ my: 3 }} />
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
                     <Button
                       variant="outlined"
                       onClick={() => navigate('/gestionnaire')}
                       disabled={loading}
+                      sx={{  mr: 5  }}
                     >
                       Annuler
                     </Button>
                     <Button
                       type="submit"
                       variant="contained"
-                      disabled={loading || loadingAgencies || agencies.length === 0}
+                      disabled={loading || loadingAgencies || agencies.length === 0 || !files.cni_recto || !files.cni_verso || !files.signature}
                       startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
                       sx={{
                         background: `linear-gradient(135deg, ${indigo[600]} 0%, ${cyan[700]} 100%)`,

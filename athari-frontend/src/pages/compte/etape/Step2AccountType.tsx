@@ -74,6 +74,8 @@ interface FormOptions {
   gestionnaire_nom?: string;
   gestionnaire_prenom?: string;
   gestionnaire_code?: string;
+  // AJOUT: Inclure gestionnaire_id
+  gestionnaire_id?: number | null;
 }
 
 interface Step2AccountTypeProps {
@@ -434,20 +436,48 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
     // Trouver le gestionnaire sélectionné
     const gestionnaire = gestionnaires.find(g => g.id === gestionnaireId);
     if (gestionnaire) {
-      // Remplir automatiquement les champs gestionnaire
-      onChange('options', {
+      // Remplir automatiquement les champs gestionnaire dans les options
+      const newOptions = {
         ...options,
+        gestionnaire_id: gestionnaire.id, // AJOUT: Inclure l'ID
         gestionnaire_nom: gestionnaire.gestionnaire_nom,
         gestionnaire_prenom: gestionnaire.gestionnaire_prenom,
         gestionnaire_code: gestionnaire.gestionnaire_code
+      };
+      
+      onChange('options', newOptions);
+
+      // Also set top-level gestionnaire so prepareFormData can include gestionnaire_id
+      onChange('gestionnaire', {
+        id: gestionnaire.id,
+        nom: gestionnaire.gestionnaire_nom,
+        prenom: gestionnaire.gestionnaire_prenom,
+        code: gestionnaire.gestionnaire_code
+      });
+      
+      console.log('Gestionnaire sélectionné:', {
+        id: gestionnaire.id,
+        nom: gestionnaire.gestionnaire_nom,
+        prenom: gestionnaire.gestionnaire_prenom,
+        code: gestionnaire.gestionnaire_code
       });
     } else {
       // Si aucun gestionnaire sélectionné, vider les champs
-      onChange('options', {
+      const newOptions = {
         ...options,
+        gestionnaire_id: null, // AJOUT: Réinitialiser l'ID
         gestionnaire_nom: '',
         gestionnaire_prenom: '',
         gestionnaire_code: ''
+      };
+      
+      onChange('options', newOptions);
+
+      // Clear top-level gestionnaire as well
+      onChange('gestionnaire', {
+        nom: '',
+        prenom: '',
+        code: ''
       });
     }
   };
@@ -600,6 +630,11 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
       setValidating(true);
       setError(null);
       
+      // AJOUT: Validation que le gestionnaire est bien sélectionné
+      if (!selectedGestionnaireId && !options.gestionnaire_id) {
+        throw new Error('Veuillez sélectionner un gestionnaire');
+      }
+      
       const etape2Data = {
         account_type: selectedTypeDetails?.id || accountType,
         account_sub_type: selectedType || accountSubType,
@@ -609,13 +644,20 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
         plan_comptable_id: selectedChapitre.plan_comptable_id || selectedChapitre.id,
         chapitre_comptable_id: selectedChapitre.id,
         categorie_id: selectedChapitre.categorie_id || '',
+        // AJOUT: Inclure explicitement le gestionnaire_id depuis selectedGestionnaireId ou options.gestionnaire_id
+        gestionnaire_id: selectedGestionnaireId || options.gestionnaire_id || null,
         gestionnaire_nom: options.gestionnaire_nom || '',
         gestionnaire_prenom: options.gestionnaire_prenom || '',
         gestionnaire_code: options.gestionnaire_code || '',
         type_compte_libelle: selectedTypeDetails?.libelle || ''
       };
 
-      console.log('Données envoyées à l\'étape 2:', etape2Data);
+      console.log('=== DONNÉES ÉTAPE 2 ENVOYÉES ===');
+      console.log('etape2Data:', etape2Data);
+      console.log('gestionnaire_id:', etape2Data.gestionnaire_id);
+      console.log('selectedGestionnaireId:', selectedGestionnaireId);
+      console.log('options.gestionnaire_id:', options.gestionnaire_id);
+      console.log('=== FIN DONNÉES ÉTAPE 2 ===');
       
       await onNext(etape2Data);
       
@@ -737,7 +779,7 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
           <FormControl sx={{  minWidth: 200 }} variant="outlined" margin="normal">
             <InputLabel id="gestionnaire-select-label">Sélectionner un gestionnaire existant</InputLabel>
             <Select
-             sx={{  minWidth: 250 }}
+              sx={{  minWidth: 250 }}
               labelId="gestionnaire-select-label"
               id="gestionnaire-select"
               value={selectedGestionnaireId}
@@ -824,6 +866,15 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
           </Grid>
         </Grid>
         
+        {/* Affichage du gestionnaire_id sélectionné pour débogage */}
+        {selectedGestionnaireId && (
+          <Alert severity="info" sx={{ mt: 2 }}>
+            <Typography variant="body2">
+              Gestionnaire sélectionné: <strong>ID: {selectedGestionnaireId}</strong>
+            </Typography>
+          </Alert>
+        )}
+        
         {/* Bouton pour effacer la sélection */}
         {selectedGestionnaireId && (
           <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
@@ -832,11 +883,19 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
               size="small"
               onClick={() => {
                 setSelectedGestionnaireId('');
-                onChange('options', {
+                const newOptions = {
                   ...options,
+                  gestionnaire_id: null,
                   gestionnaire_nom: '',
                   gestionnaire_prenom: '',
                   gestionnaire_code: ''
+                };
+                
+                onChange('options', newOptions);
+                onChange('gestionnaire', {
+                  nom: '',
+                  prenom: '',
+                  code: ''
                 });
               }}
             >
@@ -1176,12 +1235,28 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
               )}
             </Grid>
 
+            {/* Validation du gestionnaire pour débogage */}
+            <Alert 
+              severity={selectedGestionnaireId ? "success" : "warning"} 
+              sx={{ mt: 2, mb: 2 }}
+            >
+              {selectedGestionnaireId ? (
+                <Typography variant="body2">
+                  ✅ Gestionnaire sélectionné: ID {selectedGestionnaireId}
+                </Typography>
+              ) : (
+                <Typography variant="body2">
+                  ⚠️ Veuillez sélectionner un gestionnaire avant de valider
+                </Typography>
+              )}
+            </Alert>
+
             {/* Bouton de validation */}
             <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
               <Button
                 variant="contained"
                 onClick={handleValidateStep2}
-                disabled={validating || !selectedType || !selectedChapitre}
+                disabled={validating || !selectedType || !selectedChapitre || !selectedGestionnaireId}
                 sx={{
                   background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
                   color: 'white',
@@ -1214,6 +1289,7 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
                 <li>Type de compte sélectionné</li>
                 <li>solde initial renseigné</li>
                 <li>Chapitre comptable sélectionné</li>
+                <li>Gestionnaire sélectionné</li>
                 {selectedTypeDetails.necessite_duree && (
                   <li>Durée de blocage définie</li>
                 )}

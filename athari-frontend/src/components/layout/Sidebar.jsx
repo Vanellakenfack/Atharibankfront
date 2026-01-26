@@ -27,7 +27,10 @@ import {
   Coins,
   DollarSign,
   FileCheck,
-  FileSpreadsheet
+  FileSpreadsheet,
+  UserPlus,
+  UserCog,
+  UserCheck
 } from 'lucide-react';
 import { useAuth } from "../../context/AuthContext";
 
@@ -44,6 +47,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showReporting, setShowReporting] = useState(false);
   const [showVersementMenu, setShowVersementMenu] = useState(false);
+  const [showGestionnaireMenu, setShowGestionnaireMenu] = useState(false);
 
   // Définition des chemins pour chaque menu (chemins d'origine)
   const menuPaths = {
@@ -59,8 +63,9 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     datTypes: '/dat/types',
     compte: '/compte',
     listeComptes: '/liste-des-comptes',
+    validationComptes: '/ValidationComptes',
     journalComptable: '/Journal-Comptable',
-    journalCaisse: '/Journal-Caisse', // Ajout du Journal de caisse
+    journalCaisse: '/Journal-Caisse',
     reporting2: '/reporting-2',
     agenceForm: '/agence/form',
     guichetForm: '/guichet/form',
@@ -80,15 +85,18 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     agence: '/agence',
     listeTypeCompte: '/Liste-type-de-compte',
     fraisApplications: '/frais/applications',
-    validerTransaction: '/validation-transaction'
+    validerTransaction: '/validation-transaction',
+    addGestionnaire: '/AddGestionnaire',
+    listGestionnaire: '/ListGestionnaire'
   };
 
   // Groupes de chemins pour les menus déroulants
   const pathGroups = {
     DAT: [menuPaths.datContracts, menuPaths.datTypes],
     PlanComptable: [menuPaths.planComptable, menuPaths.planComptableCategories],
-    Account: [menuPaths.compte, menuPaths.listeComptes],
-    Reporting: [menuPaths.journalComptable, menuPaths.journalCaisse, menuPaths.reporting2], // Ajout du journalCaisse
+    Account: [menuPaths.compte, menuPaths.listeComptes, menuPaths.validationComptes],
+    Gestionnaire: [menuPaths.addGestionnaire, menuPaths.listGestionnaire],
+    Reporting: [menuPaths.journalComptable, menuPaths.journalCaisse, menuPaths.reporting2],
     TransactionsAdmin: [menuPaths.agenceForm, menuPaths.guichetForm, menuPaths.caisseForm, menuPaths.validerTransaction],
     FrontOffice: [
       menuPaths.dashboardCaissieres,
@@ -180,6 +188,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     if (isGroupActive('DAT')) setShowDATMenu(true);
     if (isGroupActive('PlanComptable')) setShowPlanComptable(true);
     if (isGroupActive('Account')) setShowAccountMenu(true);
+    if (isGroupActive('Gestionnaire')) setShowGestionnaireMenu(true);
     if (isGroupActive('Reporting')) setShowReporting(true);
     if (isGroupActive('TransactionsAdmin') && !isActivePath(menuPaths.agence)) setShowTransactions(true);
     if (isGroupActive('FrontOffice')) setShowFrontOffice(true);
@@ -499,7 +508,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               
               <Link
                 to={menuPaths.listeComptes}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
                   isActivePath(menuPaths.listeComptes) 
                     ? 'text-white fw-bold' 
                     : 'text-secondary hover-bg-light'
@@ -512,6 +521,92 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               >
                 <List size={16} strokeWidth={isActivePath(menuPaths.listeComptes) ? 3 : 2} />
                 Liste des comptes
+              </Link>
+
+              <Link
+                to={menuPaths.validationComptes}
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                  isActivePath(menuPaths.validationComptes) 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: isActivePath(menuPaths.validationComptes) ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <UserCheck size={16} strokeWidth={isActivePath(menuPaths.validationComptes) ? 3 : 2} />
+                Validation des comptes
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* MENU Gestionnaire */}
+        <div className="mb-2">
+          <div 
+            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+              isGroupActive('Gestionnaire') ? 'text-white' : 'text-secondary hover-bg-light'
+            }`}
+            style={{ 
+              background: isGroupActive('Gestionnaire') ? activeGradient : 'transparent',
+              cursor: 'pointer',
+              justifyContent: sidebarOpen ? 'space-between' : 'center'
+            }}
+            onClick={() => {
+              if (sidebarOpen) setShowGestionnaireMenu(!showGestionnaireMenu);
+            }}
+            title={!sidebarOpen ? 'Gestionnaire' : ''}
+          >
+            <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
+              <UserCog size={20} strokeWidth={isGroupActive('Gestionnaire') ? 3 : 2} />
+              {sidebarOpen && <span className="small fw-bold">Gestionnaire</span>}
+            </div>
+            {sidebarOpen && showGestionnaireMenu && (
+              <ChevronDown 
+                size={16} 
+                className={`transition-all ${showGestionnaireMenu ? 'rotate-180' : ''}`}
+                style={{ transition: 'transform 0.2s ease' }}
+              />
+            )}
+          </div>
+          
+          {/* Sous-menu Gestionnaire */}
+          {showGestionnaireMenu && sidebarOpen && (
+            <div className="ms-4 mt-1">
+              <Link
+                to={menuPaths.addGestionnaire}
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  isActivePath(menuPaths.addGestionnaire) 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: isActivePath(menuPaths.addGestionnaire) ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <UserPlus size={16} strokeWidth={isActivePath(menuPaths.addGestionnaire) ? 3 : 2} />
+                Ajouter un gestionnaire
+              </Link>
+              
+              <Link
+                to={menuPaths.listGestionnaire}
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                  isActivePath(menuPaths.listGestionnaire) 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: isActivePath(menuPaths.listGestionnaire) ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <List size={16} strokeWidth={isActivePath(menuPaths.listGestionnaire) ? 3 : 2} />
+                Liste des gestionnaires
               </Link>
             </div>
           )}
