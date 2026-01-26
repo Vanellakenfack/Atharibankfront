@@ -84,7 +84,6 @@ const defaultFormData: CompteData = {
     chapitre_id: '',
   },
   gestionnaire: {
-    id: null,
     nom: '',
     prenom: '',
     code: ''
@@ -307,7 +306,6 @@ const AccountForm: React.FC<AccountFormProps> = ({
 
       // Mettre à jour l'objet gestionnaire
       updateFormData('gestionnaire', {
-        id: etape2Data.gestionnaire_id || null,
         nom: etape2Data.gestionnaire_nom || '',
         prenom: etape2Data.gestionnaire_prenom || '',
         code: etape2Data.gestionnaire_code || ''

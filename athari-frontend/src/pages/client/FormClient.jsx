@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   ThemeProvider, createTheme, CssBaseline, Container, Box, Grid, TextField,
-  Button, Stepper, Step, StepLabel, Select, MenuItem, InputLabel, 
+  Button, Stepper, Step, StepLabel, Select, MenuItem, InputLabel,
   FormControl, Typography, Divider, Paper, FormHelperText, Snackbar, Alert,
   IconButton
 } from "@mui/material";
@@ -10,9 +10,12 @@ import { useForm, Controller } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as Yup from "yup";
 import { useNavigate } from "react-router-dom";
-import ApiClient from "../../services/api/ApiClient"; 
+import ApiClient from "../../services/api/ApiClient";
 import Layout from "../../components/layout/Layout";
-import { Upload as UploadIcon, Close } from "@mui/icons-material";
+import {
+  Upload as UploadIcon,
+  Close
+} from "@mui/icons-material";
 
 const muiTheme = createTheme({
   palette: {
@@ -24,7 +27,13 @@ const muiTheme = createTheme({
   shape: { borderRadius: 12 },
 });
 
-const STEPS = ["Identité & Agence", "Localisation & Contact", "Documents & Profession", "Famille & Biens", "Documents CNI & NUI"];
+const ETAPES = [
+  "Identité & Agence",
+  "Localisation & Contact",
+  "Documents & Profession",
+  "Famille & Biens",
+  "Documents CNI & NUI"
+];
 
 const schemas = [
   Yup.object({
@@ -37,7 +46,6 @@ const schemas = [
     adresse_ville: Yup.string().required("La ville est obligatoire"),
     adresse_quartier: Yup.string().required("Le quartier est obligatoire"),
     telephone: Yup.string().required("Le téléphone est obligatoire"),
-    // Champs required pour l'étape 1
     photo_localisation_domicile: Yup.mixed().required("La photo de localisation du domicile est obligatoire"),
     ville_activite: Yup.string().required("La ville d'activité est obligatoire"),
     quartier_activite: Yup.string().required("Le quartier d'activité est obligatoire"),
@@ -47,21 +55,19 @@ const schemas = [
   Yup.object({
     cni_numero: Yup.string().required("Le numéro de CNI est obligatoire"),
     profession: Yup.string().required("La profession est requise"),
-    // Champs required pour l'étape 2
     nui: Yup.string().required("Le NUI est obligatoire"),
     photo: Yup.mixed().required("La photo du client est obligatoire"),
     signature: Yup.mixed().required("La signature du client est obligatoire"),
   }),
   Yup.object({}),
   Yup.object({
-    // Champs required pour l'étape 4
     cni_recto: Yup.mixed().required("Le recto de la CNI est obligatoire"),
     cni_verso: Yup.mixed().required("Le verso de la CNI est obligatoire"),
-    niu_image: Yup.mixed().required("La photocopie NUI est obligatoire"), // NOUVEAU
+    niu_image: Yup.mixed().required("La photocopie NUI est obligatoire"),
   }),
 ];
 
-const CITY_DATA = {
+const DONNEES_VILLES = {
   Douala: ["Akwa", "Bonapriso", "Deïdo", "Bali", "Makepe", "Bonanjo", "Logbessou", "Kotto", "Logpom", "Lendi", "Nyalla", "Ndogpassi", "Bepanda", "Bonamoussadi", "Ange Raphaël", "Ndoti", "New Bell", "Bassa", "Nylon", "Cité des Palmiers", "Bonabéri", "Sodiko", "Boanda", "Mabanda", "Yassa", "Japoma"],
   Yaoundé: ["Bastos", "Essos", "Mokolo", "Biyem-Assi", "Mvog-Ada", "Nkolbisson", "Ekounou", "Ngousso", "Santa Barbara", "Etoudi", "Mballa II", "Emana", "Messassi", "Olembe", "Nlongkak", "Etoa-Meki", "Mvog-Mbi", "Obili", "Ngoa-Ekelle", "Damase", "Mendong", "Simbock", "Efoulan", "Nsam", "Ahala", "Kondengui"],
   Bafoussam: ["Tamdja", "Banengo", "Djeleng", "Nkong-Zem", "Koptchou", "Famla", "Houkaha", "Kouékong", "Ndiangdam", "Kamkop", "Toungang", "Tocket", "Diadam", "Baleng"],
@@ -78,8 +84,7 @@ const CITY_DATA = {
   Dschang: ["Foréké", "Foto", "Keleng", "Tsinfing", "Apouh", "Mingmeto"]
 };
 
-export default function FormClient() {
-  const fileInputRef = useRef(null);
+export default function FormulaireClient() {
   const domicilePhotoRef = useRef(null);
   const activitePhotoRef = useRef(null);
   const cniRectoRef = useRef(null);
@@ -88,185 +93,195 @@ export default function FormClient() {
   const navigate = useNavigate();
 
   const [snackbar, setSnackbar] = useState({
-    open: false,
+    ouvert: false,
     message: "",
-    severity: "success"
+    severite: "success"
   });
 
-  const [activeStep, setActiveStep] = useState(0);
-  const [agencies, setAgencies] = useState([]);
-  const [generatedNumClient, setGeneratedNumClient] = useState("EN ATTENTE...");
-  const [cniRectoPreview, setCniRectoPreview] = useState(null);
-  const [cniVersoPreview, setCniVersoPreview] = useState(null);
-  const [niuImagePreview, setNiuImagePreview] = useState(null); // NOUVEAU
+  const [etapeActive, setEtapeActive] = useState(0);
+  const [agences, setAgences] = useState([]);
+  const [numeroClientGenere, setNumeroClientGenere] = useState("EN ATTENTE...");
+  const [apercuCniRecto, setApercuCniRecto] = useState(null);
+  const [apercuCniVerso, setApercuCniVerso] = useState(null);
+  const [apercuNiuImage, setApercuNiuImage] = useState(null);
 
-  const { control, handleSubmit, trigger, watch, setValue, formState: { errors } } = useForm({
+  // CORRECTION : Utilisation correcte de formState
+  const { 
+    control, 
+    handleSubmit, 
+    trigger, 
+    watch, 
+    setValue, 
+    formState 
+  } = useForm({
     defaultValues: {
       // Infos agence et type
-      agency_id: "", 
+      agency_id: "",
       type_client: "physique",
-      
+
       // Identité
-      nom_prenoms: "", 
+      nom_prenoms: "",
       sexe: "",
-      date_naissance: "", 
-      lieu_naissance: "", 
+      date_naissance: "",
+      lieu_naissance: "",
       nationalite: "Camerounaise",
-      
+
       // Localisation principale
-      adresse_ville: "", 
-      adresse_quartier: "", 
+      adresse_ville: "",
+      adresse_quartier: "",
       lieu_dit_domicile: "",
       photo_localisation_domicile: null,
-      
+
       // Localisation activité
       lieu_dit_activite: "",
       ville_activite: "",
       quartier_activite: "",
       photo_localisation_activite: null,
-      
+
       // Contact
-      bp: "", 
-      email: "", 
+      bp: "",
+      email: "",
       telephone: "",
       pays_residence: "Cameroun",
-      
+
       // Documents
-      cni_numero: "", 
-      cni_delivrance: "", 
+      cni_numero: "",
+      cni_delivrance: "",
       cni_expiration: "",
       nui: "",
       cni_recto: null,
       cni_verso: null,
-      niu_image: null, // NOUVEAU
-      
+      niu_image: null,
+
       // Parents
-      nom_mere: "", 
+      nom_mere: "",
       nom_pere: "",
       nationalite_mere: "",
       nationalite_pere: "",
-      
+
       // Profession
-      profession: "", 
+      profession: "",
       employeur: "",
-      
+
       // Situation familiale
       situation_familiale: "",
-      nom_conjoint: "", 
-      date_naissance_conjoint: "", 
+      nom_conjoint: "",
+      date_naissance_conjoint: "",
       cni_conjoint: "",
-      profession_conjoint: "", 
+      profession_conjoint: "",
       salaire: "",
       tel_conjoint: "",
-      
+
       // Biens
       solde_initial: "0",
       immobiliere: "",
       autres_biens: "",
-      
+
       // Photos
       photo: null,
       signature: null,
     },
-    resolver: yupResolver(schemas[activeStep]),
+    resolver: yupResolver(schemas[etapeActive]),
     mode: "onTouched",
     shouldUnregister: false,
   });
 
-  const selectedAgency = watch("agency_id");
-  const selectedVille = watch("adresse_ville");
+  // CORRECTION : Déstructuration correcte après avoir obtenu formState
+  const { errors: erreurs } = formState;
+
+  const agenceSelectionnee = watch("agency_id");
+  const villeSelectionnee = watch("adresse_ville");
 
   // 1. Charger les agences
   useEffect(() => {
     ApiClient.get("/agencies")
       .then((res) => {
-        const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
-        setAgencies(list);
+        const liste = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        setAgences(liste);
       })
       .catch((err) => {
-        console.error("Erreur chargement agences:", err);
-        showSnackbar("Erreur lors du chargement des agences", "error");
+        console.error("Erreur lors du chargement des agences:", err);
+        afficherSnackbar("Erreur lors du chargement des agences", "error");
       });
   }, []);
 
   // 2. Générer le numéro client quand une agence est sélectionnée
   useEffect(() => {
-    if (selectedAgency) {
-      ApiClient.get(`/agencies/${selectedAgency}/next-number`)
+    if (agenceSelectionnee) {
+      ApiClient.get(`/agencies/${agenceSelectionnee}/next-number`)
         .then((res) => {
-          setGeneratedNumClient(res.data.next_number);
+          setNumeroClientGenere(res.data.next_number);
           console.log("Numéro client généré:", res.data.next_number);
         })
         .catch((err) => {
-          console.error("Erreur génération numéro:", err);
-          setGeneratedNumClient("ERREUR");
-          showSnackbar("Erreur de génération du numéro client", "error");
+          console.error("Erreur de génération du numéro:", err);
+          setNumeroClientGenere("ERREUR");
+          afficherSnackbar("Erreur de génération du numéro client", "error");
         });
     } else {
-      setGeneratedNumClient("Sélectionnez une agence");
+      setNumeroClientGenere("Sélectionnez une agence");
     }
-  }, [selectedAgency]);
+  }, [agenceSelectionnee]);
 
-  const quartiersOptions = useMemo(() => 
-    (selectedVille ? CITY_DATA[selectedVille] || [] : []), 
-    [selectedVille]
+  const optionsQuartiers = useMemo(() =>
+    (villeSelectionnee ? DONNEES_VILLES[villeSelectionnee] || [] : []),
+    [villeSelectionnee]
   );
 
-  const showSnackbar = (message, severity = "success") => {
+  const afficherSnackbar = (message, severite = "success") => {
     setSnackbar({
-      open: true,
+      ouvert: true,
       message,
-      severity
+      severite
     });
   };
 
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
+  const fermerSnackbar = () => {
+    setSnackbar({ ...snackbar, ouvert: false });
   };
 
-  const handleCniRectoChange = (e, onChange) => {
-    const file = e.target.files[0];
-    if (file) {
-      onChange(file);
-      setCniRectoPreview(URL.createObjectURL(file));
+  const gererChangementCniRecto = (e, onChange) => {
+    const fichier = e.target.files[0];
+    if (fichier) {
+      onChange(fichier);
+      setApercuCniRecto(URL.createObjectURL(fichier));
     }
   };
 
-  const handleCniVersoChange = (e, onChange) => {
-    const file = e.target.files[0];
-    if (file) {
-      onChange(file);
-      setCniVersoPreview(URL.createObjectURL(file));
+  const gererChangementCniVerso = (e, onChange) => {
+    const fichier = e.target.files[0];
+    if (fichier) {
+      onChange(fichier);
+      setApercuCniVerso(URL.createObjectURL(fichier));
     }
   };
 
-  const handleNiuImageChange = (e, onChange) => {
-    const file = e.target.files[0];
-    if (file) {
-      onChange(file);
-      setNiuImagePreview(URL.createObjectURL(file));
+  const gererChangementNiuImage = (e, onChange) => {
+    const fichier = e.target.files[0];
+    if (fichier) {
+      onChange(fichier);
+      setApercuNiuImage(URL.createObjectURL(fichier));
     }
   };
 
-  const removeFile = (field, setPreview = null) => {
-    setValue(field, null, { shouldValidate: true });
-    if (setPreview) {
-      setPreview(null);
+  const supprimerFichier = (champ, setApercu = null) => {
+    setValue(champ, null, { shouldValidate: true });
+    if (setApercu) {
+      setApercu(null);
     }
   };
 
-  const formatErrorMessage = (errorData) => {
-    if (!errorData) return "Une erreur est survenue";
-    
-    if (typeof errorData === 'string') {
-      return errorData;
+  const formaterMessageErreur = (donneesErreur) => {
+    if (!donneesErreur) return "Une erreur est survenue";
+
+    if (typeof donneesErreur === 'string') {
+      return donneesErreur;
     }
-    
-    if (errorData.errors) {
-      const errorMessages = Object.values(errorData.errors).flat();
-      if (errorMessages.length > 0) {
-        // Traduire les messages d'erreur
-        const translatedErrors = errorMessages.map(msg => {
+
+    if (donneesErreur.errors) {
+      const messagesErreur = Object.values(donneesErreur.errors).flat();
+      if (messagesErreur.length > 0) {
+        const erreursTraduites = messagesErreur.map(msg => {
           if (msg.includes('already been taken')) {
             if (msg.includes('cni_numero')) return "Ce numéro de CNI existe déjà";
             if (msg.includes('nom_prenoms')) return "Un client avec ce nom existe déjà";
@@ -293,124 +308,124 @@ export default function FormClient() {
           }
           return msg;
         });
-        return translatedErrors.join(', ');
+        return erreursTraduites.join(', ');
       }
     }
-    
-    if (errorData.message) {
-      if (errorData.message.includes('already exists')) {
+
+    if (donneesErreur.message) {
+      if (donneesErreur.message.includes('already exists')) {
         return "Ce client existe déjà dans la base de données";
       }
-      return errorData.message;
+      return donneesErreur.message;
     }
-    
+
     return "Une erreur est survenue lors de l'enregistrement";
   };
 
-  const onSubmit = async (data) => {
-    console.log("Données du formulaire physique:", data);
-    
+  const soumettreFormulaire = async (donnees) => {
+    console.log("Données du formulaire physique:", donnees);
+
     try {
       const formData = new FormData();
 
       // 1. INFOS DE BASE DU CLIENT
-      formData.append("agency_id", data.agency_id);
+      formData.append("agency_id", donnees.agency_id);
       formData.append("type_client", "physique");
-      formData.append("telephone", data.telephone || "");
-      formData.append("email", data.email || "");
-      formData.append("adresse_ville", data.adresse_ville || "");
-      formData.append("adresse_quartier", data.adresse_quartier || "");
-      formData.append("lieu_dit_domicile", data.lieu_dit_domicile || "");
-      formData.append("lieu_dit_activite", data.lieu_dit_activite || "");
-      formData.append("ville_activite", data.ville_activite || "");
-      formData.append("quartier_activite", data.quartier_activite || "");
-      formData.append("bp", data.bp || "");
-      formData.append("pays_residence", data.pays_residence || "Cameroun");
-      formData.append("nui", data.nui || "");
-      formData.append("solde_initial", data.solde_initial || "0");
-      formData.append("immobiliere", data.immobiliere || "");
-      formData.append("autres_biens", data.autres_biens || "");
+      formData.append("telephone", donnees.telephone || "");
+      formData.append("email", donnees.email || "");
+      formData.append("adresse_ville", donnees.adresse_ville || "");
+      formData.append("adresse_quartier", donnees.adresse_quartier || "");
+      formData.append("lieu_dit_domicile", donnees.lieu_dit_domicile || "");
+      formData.append("lieu_dit_activite", donnees.lieu_dit_activite || "");
+      formData.append("ville_activite", donnees.ville_activite || "");
+      formData.append("quartier_activite", donnees.quartier_activite || "");
+      formData.append("bp", donnees.bp || "");
+      formData.append("pays_residence", donnees.pays_residence || "Cameroun");
+      formData.append("nui", donnees.nui || "");
+      formData.append("solde_initial", donnees.solde_initial || "0");
+      formData.append("immobiliere", donnees.immobiliere || "");
+      formData.append("autres_biens", donnees.autres_biens || "");
 
       // 2. GESTION DES FICHIERS DE LOCALISATION
-      if (data.photo_localisation_domicile) {
-        formData.append("photo_localisation_domicile", data.photo_localisation_domicile);
+      if (donnees.photo_localisation_domicile) {
+        formData.append("photo_localisation_domicile", donnees.photo_localisation_domicile);
       }
 
-      if (data.photo_localisation_activite) {
-        formData.append("photo_localisation_activite", data.photo_localisation_activite);
+      if (donnees.photo_localisation_activite) {
+        formData.append("photo_localisation_activite", donnees.photo_localisation_activite);
       }
 
       // 3. INFOS PHYSIQUES
-      formData.append("nom_prenoms", data.nom_prenoms);
-      formData.append("sexe", data.sexe);
-      formData.append("date_naissance", data.date_naissance);
-      formData.append("lieu_naissance", data.lieu_naissance || "");
-      formData.append("nationalite", data.nationalite || "Camerounaise");
-      formData.append("cni_numero", data.cni_numero);
-      formData.append("cni_delivrance", data.cni_delivrance || "");
-      formData.append("cni_expiration", data.cni_expiration || "");
-      formData.append("nom_pere", data.nom_pere || "");
-      formData.append("nom_mere", data.nom_mere || "");
-      formData.append("nationalite_pere", data.nationalite_pere || "");
-      formData.append("nationalite_mere", data.nationalite_mere || "");
-      formData.append("profession", data.profession || "");
-      formData.append("employeur", data.employeur || "");
-      formData.append("situation_familiale", data.situation_familiale || "");
-      formData.append("regime_matrimonial", data.regime_matrimonial || "");
-      formData.append("nom_conjoint", data.nom_conjoint || "");
-      formData.append("date_naissance_conjoint", data.date_naissance_conjoint || "");
-      formData.append("cni_conjoint", data.cni_conjoint || "");
-      formData.append("profession_conjoint", data.profession_conjoint || "");
-      formData.append("salaire", data.salaire || "");
-      formData.append("tel_conjoint", data.tel_conjoint || "");
+      formData.append("nom_prenoms", donnees.nom_prenoms);
+      formData.append("sexe", donnees.sexe);
+      formData.append("date_naissance", donnees.date_naissance);
+      formData.append("lieu_naissance", donnees.lieu_naissance || "");
+      formData.append("nationalite", donnees.nationalite || "Camerounaise");
+      formData.append("cni_numero", donnees.cni_numero);
+      formData.append("cni_delivrance", donnees.cni_delivrance || "");
+      formData.append("cni_expiration", donnees.cni_expiration || "");
+      formData.append("nom_pere", donnees.nom_pere || "");
+      formData.append("nom_mere", donnees.nom_mere || "");
+      formData.append("nationalite_pere", donnees.nationalite_pere || "");
+      formData.append("nationalite_mere", donnees.nationalite_mere || "");
+      formData.append("profession", donnees.profession || "");
+      formData.append("employeur", donnees.employeur || "");
+      formData.append("situation_familiale", donnees.situation_familiale || "");
+      formData.append("regime_matrimonial", donnees.regime_matrimonial || "");
+      formData.append("nom_conjoint", donnees.nom_conjoint || "");
+      formData.append("date_naissance_conjoint", donnees.date_naissance_conjoint || "");
+      formData.append("cni_conjoint", donnees.cni_conjoint || "");
+      formData.append("profession_conjoint", donnees.profession_conjoint || "");
+      formData.append("salaire", donnees.salaire || "");
+      formData.append("tel_conjoint", donnees.tel_conjoint || "");
 
       // 4. GESTION DES FICHIERS PERSO
-      if (data.photo) {
-        formData.append("photo", data.photo);
+      if (donnees.photo) {
+        formData.append("photo", donnees.photo);
       }
 
-      if (data.signature) {
-        formData.append("signature", data.signature);
+      if (donnees.signature) {
+        formData.append("signature", donnees.signature);
       }
 
       // 5. FICHIERS CNI
-      if (data.cni_recto) {
-        formData.append("cni_recto", data.cni_recto);
+      if (donnees.cni_recto) {
+        formData.append("cni_recto", donnees.cni_recto);
       }
 
-      if (data.cni_verso) {
-        formData.append("cni_verso", data.cni_verso);
+      if (donnees.cni_verso) {
+        formData.append("cni_verso", donnees.cni_verso);
       }
 
-      // 6. FICHIER NUI (NOUVEAU)
-      if (data.niu_image) {
-        formData.append("niu_image", data.niu_image);
+      // 6. FICHIER NUI
+      if (donnees.niu_image) {
+        formData.append("niu_image", donnees.niu_image);
       }
 
       console.log("Envoi FormData...");
-      const response = await ApiClient.post("/clients/physique", formData, {
-        headers: { 
+      const reponse = await ApiClient.post("/clients/physique", formData, {
+        headers: {
           "Content-Type": "multipart/form-data",
           "Accept": "application/json"
         }
       });
 
-      console.log("Réponse API:", response.data);
+      console.log("Réponse API:", reponse.data);
 
-      if (response.data.success) {
-        showSnackbar(`Client créé avec succès! Numéro: ${response.data.num_client}`, "success");
+      if (reponse.data.success) {
+        afficherSnackbar(`Client créé avec succès! Numéro: ${reponse.data.num_client}`, "success");
         setTimeout(() => {
           navigate("/client");
         }, 2000);
       } else {
-        const errorMessage = formatErrorMessage(response.data);
-        showSnackbar(errorMessage, "error");
+        const messageErreur = formaterMessageErreur(reponse.data);
+        afficherSnackbar(messageErreur, "error");
       }
-    } catch (error) {
-      console.error("Erreur API détail:", error.response?.data || error.message);
-      
-      const errorMessage = formatErrorMessage(error.response?.data);
-      showSnackbar(errorMessage, "error");
+    } catch (erreur) {
+      console.error("Erreur API détail:", erreur.response?.data || erreur.message);
+
+      const messageErreur = formaterMessageErreur(erreur.response?.data);
+      afficherSnackbar(messageErreur, "error");
     }
   };
 
@@ -424,103 +439,104 @@ export default function FormClient() {
               <Typography variant="h4" align="center" sx={{ fontWeight: 700, mb: 4, color: indigo[900] }}>
                 Nouveau Client Physique
               </Typography>
-              
-              <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 5 }}>
-                {STEPS.map((label) => (<Step key={label}><StepLabel>{label}</StepLabel></Step>))}
+
+              <Stepper activeStep={etapeActive} alternativeLabel sx={{ mb: 5 }}>
+                {ETAPES.map((label) => (<Step key={label}><StepLabel>{label}</StepLabel></Step>))}
               </Stepper>
 
-              <form onSubmit={handleSubmit(onSubmit)}>
+              <form onSubmit={handleSubmit(soumettreFormulaire)}>
                 <Box sx={{ minHeight: "450px" }}>
-                  
+
                   {/* ÉTAPE 0 : ADMINISTRATIF & IDENTITÉ */}
-                  {activeStep === 0 && (
+                  {etapeActive === 0 && (
                     <Grid container spacing={2}>
                       <Grid item xs={12}>
                         <Typography variant="subtitle1" fontWeight="bold" color="primary">
                           Infos Agence
                         </Typography>
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="agency_id" control={control} render={({ field }) => (
-                          <FormControl fullWidth size="small" error={!!errors.agency_id} required sx={{ minWidth: 200 }}>
+                          <FormControl fullWidth size="small" error={!!erreurs?.agency_id} required sx={{ minWidth: 200 }}>
                             <InputLabel>Agence *</InputLabel>
                             <Select label="Agence *" {...field} value={field.value || ""}>
-                              {agencies.map((a) => (
+                              {agences.map((a) => (
                                 <MenuItem key={a.id} value={a.id}>{a.code} - {a.agency_name || a.nom}</MenuItem>
                               ))}
                             </Select>
-                            {errors.agency_id && <FormHelperText>{errors.agency_id.message}</FormHelperText>}
+                            {erreurs?.agency_id && <FormHelperText>{erreurs.agency_id.message}</FormHelperText>}
                           </FormControl>
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
-                        <TextField 
-                          fullWidth 
-                          size="small" 
-                          label="ID Client" 
-                          value={generatedNumClient} 
-                          disabled 
-                          variant="filled" 
-                          InputProps={{ readOnly: true, style: { fontWeight: 'bold' } }} 
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="ID Client"
+                          value={numeroClientGenere}
+                          disabled
+                          variant="filled"
+                          InputProps={{ readOnly: true, style: { fontWeight: 'bold' } }}
                         />
                       </Grid>
-                      
+
                       <Grid item xs={12}>
                         <Typography variant="subtitle1" fontWeight="bold" color="primary" sx={{ mt: 2 }}>
                           Identité
                         </Typography>
                       </Grid>
-                      
+
                       <Grid item xs={12} md={8}>
                         <Controller name="nom_prenoms" control={control} render={({ field }) => (
-                          <TextField 
-                            {...field} 
-                            fullWidth 
-                            size="small" 
-                            label="Nom & Prénoms *" 
-                            required 
-                            error={!!errors.nom_prenoms} 
-                            helperText={errors.nom_prenoms?.message} 
+                          <TextField
+                            {...field}
+                            fullWidth
+                            size="small"
+                            label="Nom & Prénoms *"
+                            required
+                            error={!!erreurs?.nom_prenoms}
+                            helperText={erreurs?.nom_prenoms?.message}
                           />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="sexe" control={control} render={({ field }) => (
-                          <FormControl fullWidth size="small" error={!!errors.sexe} required sx={{ minWidth: 200 }}>
+                          <FormControl fullWidth size="small" error={!!erreurs?.sexe} required sx={{ minWidth: 200 }}>
                             <InputLabel>Sexe *</InputLabel>
                             <Select label="Sexe *" {...field} value={field.value || ""}>
                               <MenuItem value="M">Masculin</MenuItem>
                               <MenuItem value="F">Féminin</MenuItem>
                             </Select>
+                            {erreurs?.sexe && <FormHelperText>{erreurs.sexe.message}</FormHelperText>}
                           </FormControl>
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="date_naissance" control={control} render={({ field }) => (
-                          <TextField 
-                            {...field} 
-                            fullWidth 
-                            size="small" 
-                            type="date" 
-                            label="Date Naissance *" 
-                            required 
-                            InputLabelProps={{ shrink: true }} 
-                            error={!!errors.date_naissance} 
-                            helperText={errors.date_naissance?.message} 
+                          <TextField
+                            {...field}
+                            fullWidth
+                            size="small"
+                            type="date"
+                            label="Date Naissance *"
+                            required
+                            InputLabelProps={{ shrink: true }}
+                            error={!!erreurs?.date_naissance}
+                            helperText={erreurs?.date_naissance?.message}
                           />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="lieu_naissance" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Lieu Naissance" />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="nationalite" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Nationalité" />
@@ -530,48 +546,50 @@ export default function FormClient() {
                   )}
 
                   {/* ÉTAPE 1 : LOCALISATION & CONTACT */}
-                  {activeStep === 1 && (
+                  {etapeActive === 1 && (
                     <Grid container spacing={2}>
                       <Grid item xs={12}>
                         <Typography variant="subtitle1" fontWeight="bold" color="primary">
                           Localisation Domicile
                         </Typography>
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="adresse_ville" control={control} render={({ field }) => (
-                          <FormControl fullWidth size="small" error={!!errors.adresse_ville} required sx={{ minWidth: 200 }}>
+                          <FormControl fullWidth size="small" error={!!erreurs?.adresse_ville} required sx={{ minWidth: 200 }}>
                             <InputLabel>Ville *</InputLabel>
                             <Select label="Ville *" {...field} value={field.value || ""}>
-                              {Object.keys(CITY_DATA).map(v => (
+                              {Object.keys(DONNEES_VILLES).map(v => (
                                 <MenuItem key={v} value={v}>{v}</MenuItem>
                               ))}
                             </Select>
+                            {erreurs?.adresse_ville && <FormHelperText>{erreurs.adresse_ville.message}</FormHelperText>}
                           </FormControl>
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="adresse_quartier" control={control} render={({ field }) => (
-                          <FormControl fullWidth size="small" error={!!errors.adresse_quartier} required sx={{ minWidth: 200 }}>
+                          <FormControl fullWidth size="small" error={!!erreurs?.adresse_quartier} required sx={{ minWidth: 200 }}>
                             <InputLabel>Quartier *</InputLabel>
                             <Select label="Quartier *" {...field} value={field.value || ""}>
-                              {quartiersOptions.map(q => (
+                              {optionsQuartiers.map(q => (
                                 <MenuItem key={q} value={q}>{q}</MenuItem>
                               ))}
                             </Select>
+                            {erreurs?.adresse_quartier && <FormHelperText>{erreurs.adresse_quartier.message}</FormHelperText>}
                           </FormControl>
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="lieu_dit_domicile" control={control} render={({ field }) => (
-                          <TextField {...field} fullWidth size="small" label="Lieu-dit Domicile *" 
-                            error={!!errors.lieu_dit_domicile}
-                            helperText={errors.lieu_dit_domicile?.message} />
+                          <TextField {...field} fullWidth size="small" label="Lieu-dit Domicile"
+                            error={!!erreurs?.lieu_dit_domicile}
+                            helperText={erreurs?.lieu_dit_domicile?.message} />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={6}>
                         <Box sx={{ p: 2, border: '1px dashed #ccc', borderRadius: 2, bgcolor: '#fafafa' }}>
                           <Typography variant="subtitle2" sx={{ mb: 1, color: indigo[700] }}>
@@ -585,62 +603,62 @@ export default function FormClient() {
                                 onChange={(e) => field.onChange(e.target.files[0])}
                                 ref={domicilePhotoRef}
                               />
-                              {errors.photo_localisation_domicile && (
-                                <FormHelperText error>{errors.photo_localisation_domicile.message}</FormHelperText>
+                              {erreurs?.photo_localisation_domicile && (
+                                <FormHelperText error>{erreurs.photo_localisation_domicile.message}</FormHelperText>
                               )}
                             </div>
                           )} />
                         </Box>
                       </Grid>
-                      
+
                       <Grid item xs={12}>
                         <Typography variant="subtitle1" fontWeight="bold" color="primary" sx={{ mt: 2 }}>
                           Localisation Activité *
                         </Typography>
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="ville_activite" control={control} render={({ field }) => (
-                          <TextField 
-                            {...field} 
-                            fullWidth 
-                            size="small" 
-                            label="Ville Activité *" 
-                            required 
-                            error={!!errors.ville_activite}
-                            helperText={errors.ville_activite?.message}
+                          <TextField
+                            {...field}
+                            fullWidth
+                            size="small"
+                            label="Ville Activité *"
+                            required
+                            error={!!erreurs?.ville_activite}
+                            helperText={erreurs?.ville_activite?.message}
                           />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="quartier_activite" control={control} render={({ field }) => (
-                          <TextField 
-                            {...field} 
-                            fullWidth 
-                            size="small" 
-                            label="Quartier Activité *" 
-                            required 
-                            error={!!errors.quartier_activite}
-                            helperText={errors.quartier_activite?.message}
+                          <TextField
+                            {...field}
+                            fullWidth
+                            size="small"
+                            label="Quartier Activité *"
+                            required
+                            error={!!erreurs?.quartier_activite}
+                            helperText={erreurs?.quartier_activite?.message}
                           />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="lieu_dit_activite" control={control} render={({ field }) => (
-                          <TextField 
-                            {...field} 
-                            fullWidth 
-                            size="small" 
-                            label="Lieu-dit Activité *" 
-                            required 
-                            error={!!errors.lieu_dit_activite}
-                            helperText={errors.lieu_dit_activite?.message}
+                          <TextField
+                            {...field}
+                            fullWidth
+                            size="small"
+                            label="Lieu-dit Activité *"
+                            required
+                            error={!!erreurs?.lieu_dit_activite}
+                            helperText={erreurs?.lieu_dit_activite?.message}
                           />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={6}>
                         <Box sx={{ p: 2, border: '1px dashed #ccc', borderRadius: 2, bgcolor: '#fafafa' }}>
                           <Typography variant="subtitle2" sx={{ mb: 1, color: indigo[700] }}>
@@ -654,46 +672,46 @@ export default function FormClient() {
                                 onChange={(e) => field.onChange(e.target.files[0])}
                                 ref={activitePhotoRef}
                               />
-                              {errors.photo_localisation_activite && (
-                                <FormHelperText error>{errors.photo_localisation_activite.message}</FormHelperText>
+                              {erreurs?.photo_localisation_activite && (
+                                <FormHelperText error>{erreurs.photo_localisation_activite.message}</FormHelperText>
                               )}
                             </div>
                           )} />
                         </Box>
                       </Grid>
-                      
+
                       <Grid item xs={12}>
                         <Typography variant="subtitle1" fontWeight="bold" color="primary" sx={{ mt: 2 }}>
                           Contact
                         </Typography>
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="telephone" control={control} render={({ field }) => (
-                          <TextField 
-                            {...field} 
-                            fullWidth 
-                            size="small" 
-                            label="Téléphone Principal *" 
-                            required 
-                            error={!!errors.telephone}
-                            helperText={errors.telephone?.message}
+                          <TextField
+                            {...field}
+                            fullWidth
+                            size="small"
+                            label="Téléphone Principal *"
+                            required
+                            error={!!erreurs?.telephone}
+                            helperText={erreurs?.telephone?.message}
                           />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="email" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Email" type="email" />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="bp" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Boite Postale" />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="pays_residence" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Pays de Résidence" value="Cameroun" disabled />
@@ -703,101 +721,101 @@ export default function FormClient() {
                   )}
 
                   {/* ÉTAPE 2 : DOCUMENTS & PROFESSION */}
-                  {activeStep === 2 && (
+                  {etapeActive === 2 && (
                     <Grid container spacing={2}>
                       <Grid item xs={12}>
                         <Typography variant="subtitle1" fontWeight="bold" color="primary">
                           Documents d'Identité
                         </Typography>
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="cni_numero" control={control} render={({ field }) => (
-                          <TextField 
-                            {...field} 
-                            fullWidth 
-                            size="small" 
-                            label="N° CNI *" 
-                            required 
-                            error={!!errors.cni_numero} 
-                            helperText={errors.cni_numero?.message} 
+                          <TextField
+                            {...field}
+                            fullWidth
+                            size="small"
+                            label="N° CNI *"
+                            required
+                            error={!!erreurs?.cni_numero}
+                            helperText={erreurs?.cni_numero?.message}
                           />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="cni_delivrance" control={control} render={({ field }) => (
-                          <TextField 
-                            {...field} 
-                            fullWidth 
-                            size="small" 
-                            type="date" 
-                            label="Délivré le" 
-                            InputLabelProps={{ shrink: true }} 
+                          <TextField
+                            {...field}
+                            fullWidth
+                            size="small"
+                            type="date"
+                            label="Délivré le"
+                            InputLabelProps={{ shrink: true }}
                           />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="cni_expiration" control={control} render={({ field }) => (
-                          <TextField 
-                            {...field} 
-                            fullWidth 
-                            size="small" 
-                            type="date" 
-                            label="Expire le" 
-                            InputLabelProps={{ shrink: true }} 
+                          <TextField
+                            {...field}
+                            fullWidth
+                            size="small"
+                            type="date"
+                            label="Expire le"
+                            InputLabelProps={{ shrink: true }}
                           />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={6}>
                         <Controller name="nui" control={control} render={({ field }) => (
-                          <TextField 
-                            {...field} 
-                            fullWidth 
-                            size="small" 
-                            label="N° NUI *" 
-                            required 
-                            error={!!errors.nui}
-                            helperText={errors.nui?.message}
+                          <TextField
+                            {...field}
+                            fullWidth
+                            size="small"
+                            label="N° NUI *"
+                            required
+                            error={!!erreurs?.nui}
+                            helperText={erreurs?.nui?.message}
                             placeholder="Ex: M1234567890"
                           />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12}>
                         <Typography variant="subtitle1" fontWeight="bold" color="primary" sx={{ mt: 2 }}>
                           Profession
                         </Typography>
                       </Grid>
-                      
+
                       <Grid item xs={12} md={6}>
                         <Controller name="profession" control={control} render={({ field }) => (
-                          <TextField 
-                            {...field} 
-                            fullWidth 
-                            size="small" 
-                            label="Profession *" 
-                            required 
-                            error={!!errors.profession} 
-                            helperText={errors.profession?.message} 
+                          <TextField
+                            {...field}
+                            fullWidth
+                            size="small"
+                            label="Profession *"
+                            required
+                            error={!!erreurs?.profession}
+                            helperText={erreurs?.profession?.message}
                           />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={6}>
                         <Controller name="employeur" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Employeur" />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12}>
                         <Typography variant="subtitle1" fontWeight="bold" color="primary" sx={{ mt: 2 }}>
                           Documents Personnels *
                         </Typography>
                       </Grid>
-                      
+
                       <Grid item xs={12} md={6}>
                         <Box sx={{ p: 2, border: '1px dashed #ccc', borderRadius: 2, bgcolor: '#fafafa' }}>
                           <Typography variant="subtitle2" sx={{ mb: 1, color: indigo[700] }}>
@@ -810,14 +828,14 @@ export default function FormClient() {
                                 accept="image/*"
                                 onChange={(e) => field.onChange(e.target.files[0])}
                               />
-                              {errors.photo && (
-                                <FormHelperText error>{errors.photo.message}</FormHelperText>
+                              {erreurs?.photo && (
+                                <FormHelperText error>{erreurs.photo.message}</FormHelperText>
                               )}
                             </div>
                           )} />
                         </Box>
                       </Grid>
-                      
+
                       <Grid item xs={12} md={6}>
                         <Box sx={{ p: 2, border: '1px dashed #ccc', borderRadius: 2, bgcolor: '#fafafa' }}>
                           <Typography variant="subtitle2" sx={{ mb: 1, color: indigo[700] }}>
@@ -830,8 +848,8 @@ export default function FormClient() {
                                 accept="image/*"
                                 onChange={(e) => field.onChange(e.target.files[0])}
                               />
-                              {errors.signature && (
-                                <FormHelperText error>{errors.signature.message}</FormHelperText>
+                              {erreurs?.signature && (
+                                <FormHelperText error>{erreurs.signature.message}</FormHelperText>
                               )}
                             </div>
                           )} />
@@ -841,111 +859,111 @@ export default function FormClient() {
                   )}
 
                   {/* ÉTAPE 3 : FAMILLE & BIENS */}
-                  {activeStep === 3 && (
+                  {etapeActive === 3 && (
                     <Grid container spacing={2}>
                       <Grid item xs={12}>
                         <Typography variant="subtitle1" fontWeight="bold" color="primary">
                           Parents
                         </Typography>
                       </Grid>
-                      
+
                       <Grid item xs={12} md={6}>
                         <Controller name="nom_pere" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Nom du Père" />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={6}>
                         <Controller name="nationalite_pere" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Nationalité Père" />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={6}>
                         <Controller name="nom_mere" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Nom de la Mère" />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={6}>
                         <Controller name="nationalite_mere" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Nationalité Mère" />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12}>
                         <Typography variant="subtitle1" fontWeight="bold" color="primary" sx={{ mt: 2 }}>
                           Situation Familiale
                         </Typography>
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="situation_familiale" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Situation Familiale" />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={8}>
                         <Controller name="nom_conjoint" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Nom du Conjoint" />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="date_naissance_conjoint" control={control} render={({ field }) => (
-                          <TextField 
-                            {...field} 
-                            fullWidth 
-                            size="small" 
-                            type="date" 
-                            label="Date Naissance Conjoint" 
-                            InputLabelProps={{ shrink: true }} 
+                          <TextField
+                            {...field}
+                            fullWidth
+                            size="small"
+                            type="date"
+                            label="Date Naissance Conjoint"
+                            InputLabelProps={{ shrink: true }}
                           />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="cni_conjoint" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="CNI Conjoint" />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="profession_conjoint" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Profession Conjoint" />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="salaire" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Salaire" type="number" />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="tel_conjoint" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Téléphone Conjoint" />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12}>
                         <Typography variant="subtitle1" fontWeight="bold" color="primary" sx={{ mt: 2 }}>
                           Biens et Patrimoine
                         </Typography>
                       </Grid>
-                      
+
                       <Grid item xs={12} md={4}>
                         <Controller name="solde_initial" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="CAPITAL" type="number" />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={8}>
                         <Controller name="immobiliere" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Immobilière" multiline rows={2} />
                         )} />
                       </Grid>
-                      
+
                       <Grid item xs={12} md={12}>
                         <Controller name="autres_biens" control={control} render={({ field }) => (
                           <TextField {...field} fullWidth size="small" label="Autres Biens" multiline rows={3} />
@@ -955,36 +973,36 @@ export default function FormClient() {
                   )}
 
                   {/* ÉTAPE 4 : DOCUMENTS CNI & NUI */}
-                  {activeStep === 4 && (
+                  {etapeActive === 4 && (
                     <Grid container spacing={2}>
                       <Grid item xs={12}>
                         <Typography variant="subtitle1" fontWeight="bold" color="primary">
                           Documents CNI (Recto et Verso) *
                         </Typography>
                       </Grid>
-                      
+
                       <Grid item xs={12} md={6}>
                         <Box sx={{ p: 2, border: '1px dashed #ccc', borderRadius: 2, bgcolor: '#fafafa', textAlign: 'center' }}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                             <Typography variant="subtitle2" sx={{ color: indigo[700] }}>
                               Recto de la CNI *
                             </Typography>
-                            {cniRectoPreview && (
-                              <IconButton size="small" onClick={() => removeFile('cni_recto', setCniRectoPreview)}>
+                            {apercuCniRecto && (
+                              <IconButton size="small" onClick={() => supprimerFichier('cni_recto', setApercuCniRecto)}>
                                 <Close fontSize="small" />
                               </IconButton>
                             )}
                           </Box>
-                          {cniRectoPreview && (
-                            <img 
-                              src={cniRectoPreview} 
-                              alt="Recto CNI" 
-                              style={{ 
-                                maxWidth: '100%', 
-                                maxHeight: '200px', 
+                          {apercuCniRecto && (
+                            <img
+                              src={apercuCniRecto}
+                              alt="Recto CNI"
+                              style={{
+                                maxWidth: '100%',
+                                maxHeight: '200px',
                                 borderRadius: '8px',
                                 marginBottom: '10px'
-                              }} 
+                              }}
                             />
                           )}
                           <Controller name="cni_recto" control={control} render={({ field }) => (
@@ -995,45 +1013,45 @@ export default function FormClient() {
                                 startIcon={<UploadIcon />}
                                 sx={{ mt: 1 }}
                               >
-                                {cniRectoPreview ? 'Changer le recto' : 'Télécharger le recto'}
+                                {apercuCniRecto ? 'Changer le recto' : 'Télécharger le recto'}
                                 <input
                                   type="file"
                                   hidden
                                   accept="image/*"
-                                  onChange={(e) => handleCniRectoChange(e, field.onChange)}
+                                  onChange={(e) => gererChangementCniRecto(e, field.onChange)}
                                   ref={cniRectoRef}
                                 />
                               </Button>
-                              {errors.cni_recto && (
-                                <FormHelperText error sx={{ mt: 1 }}>{errors.cni_recto.message}</FormHelperText>
+                              {erreurs?.cni_recto && (
+                                <FormHelperText error sx={{ mt: 1 }}>{erreurs.cni_recto.message}</FormHelperText>
                               )}
                             </div>
                           )} />
                         </Box>
                       </Grid>
-                      
+
                       <Grid item xs={12} md={6}>
                         <Box sx={{ p: 2, border: '1px dashed #ccc', borderRadius: 2, bgcolor: '#fafafa', textAlign: 'center' }}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                             <Typography variant="subtitle2" sx={{ color: indigo[700] }}>
                               Verso de la CNI *
                             </Typography>
-                            {cniVersoPreview && (
-                              <IconButton size="small" onClick={() => removeFile('cni_verso', setCniVersoPreview)}>
+                            {apercuCniVerso && (
+                              <IconButton size="small" onClick={() => supprimerFichier('cni_verso', setApercuCniVerso)}>
                                 <Close fontSize="small" />
                               </IconButton>
                             )}
                           </Box>
-                          {cniVersoPreview && (
-                            <img 
-                              src={cniVersoPreview} 
-                              alt="Verso CNI" 
-                              style={{ 
-                                maxWidth: '100%', 
-                                maxHeight: '200px', 
+                          {apercuCniVerso && (
+                            <img
+                              src={apercuCniVerso}
+                              alt="Verso CNI"
+                              style={{
+                                maxWidth: '100%',
+                                maxHeight: '200px',
                                 borderRadius: '8px',
                                 marginBottom: '10px'
-                              }} 
+                              }}
                             />
                           )}
                           <Controller name="cni_verso" control={control} render={({ field }) => (
@@ -1044,51 +1062,51 @@ export default function FormClient() {
                                 startIcon={<UploadIcon />}
                                 sx={{ mt: 1 }}
                               >
-                                {cniVersoPreview ? 'Changer le verso' : 'Télécharger le verso'}
+                                {apercuCniVerso ? 'Changer le verso' : 'Télécharger le verso'}
                                 <input
                                   type="file"
                                   hidden
                                   accept="image/*"
-                                  onChange={(e) => handleCniVersoChange(e, field.onChange)}
+                                  onChange={(e) => gererChangementCniVerso(e, field.onChange)}
                                   ref={cniVersoRef}
                                 />
                               </Button>
-                              {errors.cni_verso && (
-                                <FormHelperText error sx={{ mt: 1 }}>{errors.cni_verso.message}</FormHelperText>
+                              {erreurs?.cni_verso && (
+                                <FormHelperText error sx={{ mt: 1 }}>{erreurs.cni_verso.message}</FormHelperText>
                               )}
                             </div>
                           )} />
                         </Box>
                       </Grid>
-                      
+
                       <Grid item xs={12}>
                         <Typography variant="subtitle1" fontWeight="bold" color="primary" sx={{ mt: 4 }}>
                           Photocopie NUI *
                         </Typography>
                       </Grid>
-                      
+
                       <Grid item xs={12} md={6}>
                         <Box sx={{ p: 2, border: '1px dashed #ccc', borderRadius: 2, bgcolor: '#fafafa', textAlign: 'center' }}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                             <Typography variant="subtitle2" sx={{ color: indigo[700] }}>
                               Photocopie NUI *
                             </Typography>
-                            {niuImagePreview && (
-                              <IconButton size="small" onClick={() => removeFile('niu_image', setNiuImagePreview)}>
+                            {apercuNiuImage && (
+                              <IconButton size="small" onClick={() => supprimerFichier('niu_image', setApercuNiuImage)}>
                                 <Close fontSize="small" />
                               </IconButton>
                             )}
                           </Box>
-                          {niuImagePreview && (
-                            <img 
-                              src={niuImagePreview} 
-                              alt="Photocopie NUI" 
-                              style={{ 
-                                maxWidth: '100%', 
-                                maxHeight: '200px', 
+                          {apercuNiuImage && (
+                            <img
+                              src={apercuNiuImage}
+                              alt="Photocopie NUI"
+                              style={{
+                                maxWidth: '100%',
+                                maxHeight: '200px',
                                 borderRadius: '8px',
                                 marginBottom: '10px'
-                              }} 
+                              }}
                             />
                           )}
                           <Controller name="niu_image" control={control} render={({ field }) => (
@@ -1099,17 +1117,17 @@ export default function FormClient() {
                                 startIcon={<UploadIcon />}
                                 sx={{ mt: 1 }}
                               >
-                                {niuImagePreview ? 'Changer la photocopie NUI' : 'Télécharger la photocopie NUI'}
+                                {apercuNiuImage ? 'Changer la photocopie NUI' : 'Télécharger la photocopie NUI'}
                                 <input
                                   type="file"
                                   hidden
                                   accept="image/*"
-                                  onChange={(e) => handleNiuImageChange(e, field.onChange)}
+                                  onChange={(e) => gererChangementNiuImage(e, field.onChange)}
                                   ref={niuImageRef}
                                 />
                               </Button>
-                              {errors.niu_image && (
-                                <FormHelperText error sx={{ mt: 1 }}>{errors.niu_image.message}</FormHelperText>
+                              {erreurs?.niu_image && (
+                                <FormHelperText error sx={{ mt: 1 }}>{erreurs.niu_image.message}</FormHelperText>
                               )}
                             </div>
                           )} />
@@ -1118,10 +1136,10 @@ export default function FormClient() {
                           </Typography>
                         </Box>
                       </Grid>
-                      
+
                       <Grid item xs={12}>
                         <Alert severity="info" sx={{ mt: 2 }}>
-                          Veuillez télécharger les deux côtés de la CNI (recto et verso) ainsi que la photocopie du NUI. 
+                          Veuillez télécharger les deux côtés de la CNI (recto et verso) ainsi que la photocopie du NUI.
                           Format accepté : JPG, PNG (max 2MB par fichier)
                         </Alert>
                       </Grid>
@@ -1131,35 +1149,35 @@ export default function FormClient() {
                 </Box>
 
                 <Divider sx={{ my: 3 }} />
-                
+
                 <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                  <Button 
-                    variant="outlined" 
-                    type="button" 
-                    disabled={activeStep === 0} 
-                    onClick={() => setActiveStep(s => s - 1)}
+                  <Button
+                    variant="outlined"
+                    type="button"
+                    disabled={etapeActive === 0}
+                    onClick={() => setEtapeActive(s => s - 1)}
                   >
                     Précédent
                   </Button>
 
-                  {activeStep === STEPS.length - 1 ? (
-                    <Button 
-                      variant="contained" 
-                      color="secondary" 
-                      type="submit" 
+                  {etapeActive === ETAPES.length - 1 ? (
+                    <Button
+                      variant="contained"
+                      color="secondary"
+                      type="submit"
                       sx={{ px: 4 }}
                     >
                       Enregistrer le client
                     </Button>
                   ) : (
-                    <Button 
-                      variant="contained" 
+                    <Button
+                      variant="contained"
                       type="button"
                       onClick={async (e) => {
                         e.preventDefault();
-                        const isValid = await trigger();
-                        if (isValid) {
-                          setActiveStep((s) => s + 1);
+                        const valide = await trigger();
+                        if (valide) {
+                          setEtapeActive((s) => s + 1);
                         }
                       }}
                     >
@@ -1174,14 +1192,14 @@ export default function FormClient() {
 
         {/* Snackbar pour les notifications */}
         <Snackbar
-          open={snackbar.open}
+          open={snackbar.ouvert}
           autoHideDuration={6000}
-          onClose={handleCloseSnackbar}
+          onClose={fermerSnackbar}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         >
-          <Alert 
-            onClose={handleCloseSnackbar} 
-            severity={snackbar.severity} 
+          <Alert
+            onClose={fermerSnackbar}
+            severity={snackbar.severite}
             sx={{ width: '100%' }}
           >
             {snackbar.message}

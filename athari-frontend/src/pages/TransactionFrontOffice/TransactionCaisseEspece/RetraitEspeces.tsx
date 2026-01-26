@@ -59,6 +59,9 @@ import {
   AccountBalanceWallet,
   Print,
   Download,
+  CloudUpload,
+  CloudDownload,
+  Badge,
 } from '@mui/icons-material';
 
 import logo from '../../../assets/img/logo.png';
@@ -207,6 +210,17 @@ interface ReceiptData {
   billetage?: BilletageItem[];
 }
 
+// Interface pour le retrait à distance
+interface RetraitDistanceData {
+  numeroCompte: string;
+  montant: string;
+  procurationFile: File | null;
+  demandeRetraitFile: File | null;
+  nomGestionnaire: string;
+  prenomGestionnaire: string;
+  codeGestionnaire: string;
+}
+
 // Fonction utilitaire pour obtenir le nom complet du mandataire
 const getMandataireNomComplet = (mandataire: Mandataire): string => {
   return `${mandataire.prenom || ''} ${mandataire.nom || ''}`.trim();
@@ -254,7 +268,7 @@ interface RetraitFormData {
   guichet: string;
   caisse: string;
   typeRetrait: string;
-  agenceCompte: string;
+  //agenceCompte: string;
   compte: string;
   compte_id: number | null;
   chapitre: string;
@@ -391,6 +405,21 @@ const SignatureContainer = styled(Box)({
   justifyContent: 'center',
   alignItems: 'center',
   minHeight: 100,
+});
+
+// Composant pour l'upload de fichiers
+const FileUploadBox = styled(Box)({
+  border: '2px dashed #1976D2',
+  borderRadius: 8,
+  padding: 24,
+  textAlign: 'center',
+  backgroundColor: '#f8f9fa',
+  cursor: 'pointer',
+  transition: 'all 0.3s ease',
+  '&:hover': {
+    backgroundColor: '#e3f2fd',
+    borderColor: '#0D47A1',
+  },
 });
 
 // Constante pour l'URL de l'API
@@ -594,6 +623,21 @@ const RetraitEspeces: React.FC = () => {
   // Référence pour le reçu caché
   const receiptRef = useRef<HTMLDivElement>(null);
 
+  // État pour le retrait à distance
+  const [retraitDistanceData, setRetraitDistanceData] = useState<RetraitDistanceData>({
+    numeroCompte: '',
+    montant: '',
+    procurationFile: null,
+    demandeRetraitFile: null,
+    nomGestionnaire: '',
+    prenomGestionnaire: '',
+    codeGestionnaire: '',
+  });
+
+  // États pour la validation du CNI
+  const [clientRealCni, setClientRealCni] = useState<string>('');
+  const [cniValidationError, setCniValidationError] = useState<string>('');
+
   // Initialisation avec RetraitFormData
   const [formData, setFormData] = useState<RetraitFormData>({
     // Onglet Retrait Espèces
@@ -602,7 +646,7 @@ const RetraitEspeces: React.FC = () => {
     guichet: '',
     caisse: '',
     typeRetrait: '01',
-    agenceCompte: '',
+   // agenceCompte: '',
     compte: '',
     compte_id: null,
     chapitre: '',
@@ -639,277 +683,301 @@ const RetraitEspeces: React.FC = () => {
     netADebiter: '0',
   });
 
-  // Fonction pour générer et télécharger le reçu PDF amélioré
-  const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
-    try {
-      setDownloading(true);
-      
-      // Créer un élément temporaire pour le reçu
-      const receiptElement = document.createElement('div');
-      receiptElement.style.position = 'absolute';
-      receiptElement.style.left = '-9999px';
-      receiptElement.style.top = '0';
-      receiptElement.style.width = '210mm'; // A4 width
-      receiptElement.style.minHeight = '297mm'; // A4 height
-      receiptElement.style.backgroundColor = 'white';
-      receiptElement.style.padding = '15mm';
-      receiptElement.style.fontFamily = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
-      receiptElement.style.color = '#333';
-      receiptElement.style.fontSize = '12px';
-      receiptElement.style.lineHeight = '1.4';
-      
-      // Convertir le montant en lettres
-      const montantNumerique = parseFloat(receiptData.montant.replace(/\s/g, '')) || 0;
-      const montantEnLettres = numberToFrenchWords(montantNumerique).toUpperCase();
-      
-      // Filtrer le billetage pour n'afficher que les coupures utilisées
-      const billetageFiltre = receiptData.billetage?.filter(item => item.quantite > 0) || [];
-      
-      // Contenu HTML du reçu amélioré
-      receiptElement.innerHTML = `
-        <div style="text-align: center; margin-bottom: 25px;">
-          <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 15px;">
-            <div style="width: 80px; height: 80px; margin-right: 15px;">
-              <img src="${logo}" alt="Logo Athari Financial" style="width: 100%; height: 100%; object-fit: contain;" />
-            </div>
-            <div>
-              <h1 style="margin: 0; font-size: 22px; color: #1976d2; font-weight: bold; letter-spacing: 0.5px;">
-                ATHARI FINANCIAL COOP-CA
-              </h1>
-              <p style="margin: 4px 0; font-size: 13px; color: #666;">
-                Coopérative d'Épargne et de Crédit
-              </p>
-              <p style="margin: 4px 0; font-size: 12px; color: #777;">
-                Agrément N°: MF-2023-001 | RCCM: CI-ABJ-2023-B-00001
-              </p>
-            </div>
-          </div>
-          <div style="border-top: 3px solid #1976d2; margin: 0 auto; width: 100%;"></div>
-        </div>
-        
-        <div style="text-align: center; margin-bottom: 25px;">
-          <h2 style="margin: 0; font-size: 18px; color: #333; font-weight: 600; text-transform: uppercase;">
-            REÇU DE RETRAIT D'ESPÈCES
-          </h2>
-          <p style="margin: 5px 0; font-size: 13px; color: #666;">
-            Référence: <strong>${receiptData.reference}</strong>
-          </p>
-          <p style="margin: 0; font-size: 12px; color: #777;">
-            Date et heure: ${receiptData.date}
-          </p>
-        </div>
-        
-        <div style="margin-bottom: 25px;">
-          <div style="background-color: #1976d2; color: white; padding: 8px 12px; font-weight: 600; font-size: 13px; border-radius: 4px 4px 0 0;">
-            INFORMATIONS SUR L'OPÉRATION
-          </div>
-          <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-top: none;">
-            <tr>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; width: 40%; font-weight: 500; background-color: #f9f9f9;">Référence transaction:</td>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 600;">${receiptData.reference}</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 500; background-color: #f9f9f9;">Date et heure:</td>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee;">${receiptData.date}</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 500; background-color: #f9f9f9;">Type d'opération:</td>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; color: #d32f2f; font-weight: 600;">RETRAIT D'ESPÈCES</td>
-            </tr>
-            ${receiptData.agence ? `
-            <tr>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 500; background-color: #f9f9f9;">Agence:</td>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee;">${receiptData.agence}</td>
-            </tr>
-            ` : ''}
-            ${receiptData.guichet ? `
-            <tr>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 500; background-color: #f9f9f9;">Guichet:</td>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee;">${receiptData.guichet}</td>
-            </tr>
-            ` : ''}
-            ${receiptData.motif ? `
-            <tr>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 500; background-color: #f9f9f9;">Motif:</td>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee;">${receiptData.motif}</td>
-            </tr>
-            ` : ''}
-          </table>
-        </div>
-        
-        <div style="margin-bottom: 25px;">
-          <div style="background-color: #1976d2; color: white; padding: 8px 12px; font-weight: 600; font-size: 13px; border-radius: 4px 4px 0 0;">
-            INFORMATIONS COMPTE
-          </div>
-          <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-top: none;">
-            <tr>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; width: 40%; font-weight: 500; background-color: #f9f9f9;">Numéro de compte:</td>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 600;">${receiptData.compte}</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 500; background-color: #f9f9f9;">Titulaire du compte:</td>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee;">${receiptData.titulaire}</td>
-            </tr>
-          </table>
-        </div>
-        
-        <div style="margin-bottom: 25px;">
-          <div style="background-color: #1976d2; color: white; padding: 8px 12px; font-weight: 600; font-size: 13px; border-radius: 4px 4px 0 0;">
-            INFORMATIONS PORTEUR
-          </div>
-          <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-top: none;">
-            <tr>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; width: 40%; font-weight: 500; background-color: #f9f9f9;">Nom du porteur:</td>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee;">${receiptData.porteur}</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 500; background-color: #f9f9f9;">Pièce d'identité:</td>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee;">${receiptData.pieceId}</td>
-            </tr>
-          </table>
-        </div>
-        
-        <div style="margin-bottom: 25px;">
-          <div style="background-color: #1976d2; color: white; padding: 8px 12px; font-weight: 600; font-size: 13px; border-radius: 4px 4px 0 0;">
-            DÉTAILS DU MONTANT
-          </div>
-          <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-top: none;">
-            <tr>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; width: 40%; font-weight: 500; background-color: #f9f9f9;">Montant retiré:</td>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; text-align: right; font-weight: 700; font-size: 16px; color: #d32f2f;">
-                ${formatCurrency(receiptData.montant)} FCFA
-              </td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-weight: 500; background-color: #f9f9f9;">Montant en toutes lettres:</td>
-              <td style="padding: 10px 12px; border-bottom: 1px solid #eee; font-style: italic;">
-                ${montantEnLettres} FRANCS CFA
-              </td>
-            </tr>
-          </table>
-        </div>
-        
-        ${billetageFiltre.length > 0 ? `
-        <div style="margin-bottom: 25px;">
-          <div style="background-color: #1976d2; color: white; padding: 8px 12px; font-weight: 600; font-size: 13px; border-radius: 4px 4px 0 0;">
-            BILLETAGE - COMPOSITION
-          </div>
-          <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-top: none;">
-            <thead>
-              <tr style="background-color: #f5f5f5;">
-                <th style="padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid #ddd;">Coupure (FCFA)</th>
-                <th style="padding: 10px 12px; text-align: center; font-weight: 600; border-bottom: 1px solid #ddd;">Quantité</th>
-                <th style="padding: 10px 12px; text-align: right; font-weight: 600; border-bottom: 1px solid #ddd;">Sous-total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${billetageFiltre.map(item => `
-                <tr>
-                  <td style="padding: 10px 12px; border-bottom: 1px solid #eee;">${item.valeur.toLocaleString()} FCFA</td>
-                  <td style="padding: 10px 12px; text-align: center; border-bottom: 1px solid #eee;">${item.quantite}</td>
-                  <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #eee; font-weight: 500;">${(item.valeur * item.quantite).toLocaleString()} FCFA</td>
-                </tr>
-              `).join('')}
-              <tr style="background-color: #f9f9f9;">
-                <td style="padding: 10px 12px; font-weight: 600; border-top: 2px solid #ddd;" colspan="2">TOTAL BILLETAGE:</td>
-                <td style="padding: 10px 12px; text-align: right; font-weight: 700; font-size: 14px; color: #1976d2; border-top: 2px solid #ddd;">
-                  ${billetageFiltre.reduce((sum, item) => sum + (item.valeur * item.quantite), 0).toLocaleString()} FCFA
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        ` : ''}
-        
-        <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #1976d2;">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 40px;">
-            <div style="text-align: center; flex: 1;">
-              <div style="height: 60px; border-bottom: 1px solid #999; margin-bottom: 10px; position: relative;">
-                <div style="position: absolute; bottom: 5px; left: 0; right: 0; height: 1px; background-color: #999;"></div>
-              </div>
-              <div style="font-weight: 600; font-size: 13px; color: #333;">Signature du porteur</div>
-            </div>
-            <div style="text-align: center; flex: 1;">
-              <div style="height: 60px; border-bottom: 1px solid #999; margin-bottom: 10px; position: relative;">
-                <div style="position: absolute; bottom: 5px; left: 0; right: 0; height: 1px; background-color: #999;"></div>
-              </div>
-              <div style="font-weight: 600; font-size: 13px; color: #333;">Signature et cachet de la caisse</div>
-            </div>
-          </div>
-          
-          <div style="text-align: center; margin-top: 20px; color: #666; font-size: 11px;">
-            <div style="font-weight: 600; margin-bottom: 5px; color: #333;">
-              Caissier ID: ${receiptData.caissierId}
-            </div>
-            <div style="margin-bottom: 5px;">
-              Ce document fait foi de transaction effectuée.
-            </div>
-            <div style="color: #999; margin-top: 10px;">
-              Reçu électronique généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-            </div>
-            <div style="color: #1976d2; font-weight: 500; margin-top: 5px;">
-              Athari Financial Coop-CA - Votre partenaire financier de confiance
-            </div>
-          </div>
-        </div>
-        
-        <div style="margin-top: 30px; padding: 10px; background-color: #f5f5f5; border-radius: 4px; border-left: 4px solid #1976d2; font-size: 10px; color: #666;">
-          <strong>NOTE IMPORTANTE:</strong> Ce reçu est un justificatif de transaction. Conservez-le précieusement. 
-          En cas de litige, présentez ce document avec votre pièce d'identité.
-        </div>
-      `;
-      
-      // Ajouter l'élément au DOM
-      document.body.appendChild(receiptElement);
-      
-      // Générer le PDF
-      const canvas = await html2canvas(receiptElement, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#FFFFFF',
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
-      
-      const imgWidth = 210; // A4 width in mm
-      const pageHeight = 297; // A4 height in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
-      // Calculer la position pour centrer verticalement si nécessaire
-      let position = 0;
-      
-      // Vérifier si le contenu dépasse une page
-      if (imgHeight <= pageHeight) {
-        // Contenu sur une seule page
-        position = (pageHeight - imgHeight) / 2;
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      } else {
-        // Contenu sur plusieurs pages (au cas où)
-        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-      }
-      
-      // Télécharger le PDF
-      const fileName = `Retrait-${receiptData.reference}.pdf`;
-      pdf.save(fileName);
-      
-      // Nettoyer
-      document.body.removeChild(receiptElement);
-      
-      showSnackbar('Reçu PDF généré avec succès', 'success');
-      
-    } catch (error) {
-      console.error('Erreur lors de la génération du reçu:', error);
-      showSnackbar('Erreur lors de la génération du reçu', 'error');
-    } finally {
-      setDownloading(false);
+  // Gestion des changements pour le retrait à distance
+  const handleRetraitDistanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, files } = e.target;
+    
+    if (name === 'procurationFile' || name === 'demandeRetraitFile') {
+      setRetraitDistanceData(prev => ({
+        ...prev,
+        [name]: files ? files[0] : null,
+      }));
+    } else {
+      setRetraitDistanceData(prev => ({
+        ...prev,
+        [name]: value,
+      }));
     }
   };
+
+  // Gestion du téléchargement de fichier
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, fileType: 'procurationFile' | 'demandeRetraitFile') => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setRetraitDistanceData(prev => ({
+        ...prev,
+        [fileType]: file,
+      }));
+    }
+  };
+
+  // Validation du retrait à distance
+  const validateRetraitDistance = async () => {
+    // Validation des champs obligatoires
+    if (!retraitDistanceData.numeroCompte) {
+      showSnackbar('Veuillez saisir le numéro de compte', 'error');
+      return;
+    }
+
+    if (!retraitDistanceData.montant || parseFloat(retraitDistanceData.montant) <= 0) {
+      showSnackbar('Veuillez saisir un montant valide', 'error');
+      return;
+    }
+
+    if (!retraitDistanceData.procurationFile) {
+      showSnackbar('Veuillez télécharger la procuration', 'error');
+      return;
+    }
+
+    if (!retraitDistanceData.demandeRetraitFile) {
+      showSnackbar('Veuillez télécharger la demande de retrait', 'error');
+      return;
+    }
+
+    if (!retraitDistanceData.nomGestionnaire) {
+      showSnackbar('Veuillez saisir le nom du gestionnaire', 'error');
+      return;
+    }
+
+    if (!retraitDistanceData.prenomGestionnaire) {
+      showSnackbar('Veuillez saisir le prénom du gestionnaire', 'error');
+      return;
+    }
+
+    if (!retraitDistanceData.codeGestionnaire) {
+      showSnackbar('Veuillez saisir le code du gestionnaire', 'error');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Ici, vous ajouterez l'appel API pour valider le retrait à distance
+      // Pour l'instant, on simule un succès
+      
+      // Simuler un délai de traitement
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      showSnackbar('Retrait à distance validé avec succès par le CA', 'success');
+      
+      // Réinitialiser le formulaire
+      setRetraitDistanceData({
+        numeroCompte: '',
+        montant: '',
+        procurationFile: null,
+        demandeRetraitFile: null,
+        nomGestionnaire: '',
+        prenomGestionnaire: '',
+        codeGestionnaire: '',
+      });
+      
+    } catch (error) {
+      console.error('Erreur lors de la validation du retrait à distance:', error);
+      showSnackbar('Erreur lors de la validation du retrait à distance', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+// Fonction pour générer et télécharger le reçu PDF simplifié
+const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
+  try {
+    setDownloading(true);
+    
+    // Créer un élément temporaire pour le reçu
+    const receiptElement = document.createElement('div');
+    receiptElement.style.position = 'absolute';
+    receiptElement.style.left = '-9999px';
+    receiptElement.style.top = '0';
+    receiptElement.style.width = '210mm'; // A4 width
+    receiptElement.style.minHeight = '150mm'; // Hauteur réduite
+    receiptElement.style.backgroundColor = 'white';
+    receiptElement.style.padding = '10mm';
+    receiptElement.style.fontFamily = "'Arial', sans-serif";
+    receiptElement.style.color = '#000';
+    receiptElement.style.fontSize = '12px';
+    receiptElement.style.lineHeight = '1.3';
+    
+    // Convertir le montant en lettres
+    const montantNumerique = parseFloat(receiptData.montant.replace(/\s/g, '')) || 0;
+    const montantEnLettres = numberToFrenchWords(montantNumerique).toUpperCase();
+    
+    // Contenu HTML du reçu simplifié
+    receiptElement.innerHTML = `
+      <div style="text-align: center; margin-bottom: 15px; border-bottom: 2px solid #1976d2; padding-bottom: 10px;">
+        <div style="display: inline-block; width: 60px; height: 60px; margin-right: 10px; vertical-align: middle;">
+          <img src="${logo}" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;" />
+        </div>
+        <div style="display: inline-block; vertical-align: middle; text-align: left;">
+          <div style="font-size: 16px; font-weight: bold; color: #1976d2; margin-bottom: 2px;">
+            ATHARI FINANCIAL COOP-CA
+          </div>
+          <div style="font-size: 11px; color: #666;">
+            Coopérative d'Épargne et de Crédit
+          </div>
+        </div>
+      </div>
+      
+      <div style="text-align: center; margin-bottom: 20px;">
+        <div style="font-size: 14px; font-weight: bold; color: #d32f2f; margin-bottom: 5px;">
+          REÇU DE RETRAIT D'ESPÈCES
+        </div>
+        <div style="font-size: 11px; color: #666;">
+          Référence: <strong>${receiptData.reference}</strong>
+        </div>
+        <div style="font-size: 11px; color: #666;">
+          Date: ${receiptData.date}
+        </div>
+      </div>
+      
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px;">
+        <tr>
+          <td style="width: 35%; padding: 5px 0; font-weight: bold;">Compte:</td>
+          <td style="padding: 5px 0;">${receiptData.compte}</td>
+        </tr>
+        <tr>
+          <td style="width: 35%; padding: 5px 0; font-weight: bold;">Titulaire:</td>
+          <td style="padding: 5px 0;">${receiptData.titulaire}</td>
+        </tr>
+        <tr>
+          <td style="width: 35%; padding: 5px 0; font-weight: bold;">Porteur:</td>
+          <td style="padding: 5px 0;">${receiptData.porteur}</td>
+        </tr>
+        <tr>
+          <td style="width: 35%; padding: 5px 0; font-weight: bold;">Pièce d'identité:</td>
+          <td style="padding: 5px 0;">${receiptData.pieceId}</td>
+        </tr>
+        ${receiptData.agence ? `
+        <tr>
+          <td style="width: 35%; padding: 5px 0; font-weight: bold;">Agence:</td>
+          <td style="padding: 5px 0;">${receiptData.agence}</td>
+        </tr>
+        ` : ''}
+      </table>
+      
+      <div style="border: 2px solid #1976d2; border-radius: 4px; padding: 10px; margin-bottom: 15px; background-color: #f8f9fa;">
+        <div style="text-align: center; font-weight: bold; color: #1976d2; margin-bottom: 10px; font-size: 12px;">
+          DÉTAILS DU MONTANT
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 18px; font-weight: bold; color: #d32f2f; margin-bottom: 5px;">
+            ${formatCurrency(receiptData.montant)} FCFA
+          </div>
+          <div style="font-size: 11px; font-style: italic; color: #666; margin-bottom: 10px;">
+            ${montantEnLettres} FRANCS CFA
+          </div>
+        </div>
+      </div>
+      
+      <!-- Tableau billetage compact -->
+      ${receiptData.billetage && receiptData.billetage.some(item => item.quantite > 0) ? `
+      <div style="margin-bottom: 15px;">
+        <div style="font-weight: bold; color: #1976d2; margin-bottom: 5px; font-size: 11px; text-align: center;">
+          COMPOSITION DU BILLETAGE
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 10px; border: 1px solid #ddd;">
+          <thead>
+            <tr style="background-color: #f5f5f5;">
+              <th style="padding: 4px; text-align: left; border-bottom: 1px solid #ddd;">Coupure</th>
+              <th style="padding: 4px; text-align: center; border-bottom: 1px solid #ddd;">Qté</th>
+              <th style="padding: 4px; text-align: right; border-bottom: 1px solid #ddd;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${receiptData.billetage
+              .filter(item => item.quantite > 0)
+              .map(item => `
+                <tr>
+                  <td style="padding: 4px; border-bottom: 1px solid #eee;">${item.valeur.toLocaleString()} FCFA</td>
+                  <td style="padding: 4px; text-align: center; border-bottom: 1px solid #eee;">${item.quantite}</td>
+                  <td style="padding: 4px; text-align: right; border-bottom: 1px solid #eee; font-weight: 500;">${(item.valeur * item.quantite).toLocaleString()} FCFA</td>
+                </tr>
+              `).join('')}
+            <tr style="background-color: #f9f9f9; font-weight: bold;">
+              <td style="padding: 4px; border-top: 2px solid #ddd;" colspan="2">TOTAL:</td>
+              <td style="padding: 4px; text-align: right; border-top: 2px solid #ddd; color: #1976d2;">
+                ${receiptData.billetage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0).toLocaleString()} FCFA
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      ` : ''}
+      
+      <!-- Signatures -->
+      <div style="margin-top: 25px; padding-top: 10px; border-top: 1px solid #ddd;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+          <div style="text-align: center; flex: 1;">
+            <div style="height: 40px; margin-bottom: 5px; border-bottom: 1px solid #999; position: relative;">
+              <div style="position: absolute; bottom: 5px; left: 0; right: 0; height: 1px; background-color: #999;"></div>
+            </div>
+            <div style="font-size: 10px; font-weight: bold; color: #333;">Signature du porteur</div>
+          </div>
+          <div style="width: 30px;"></div>
+          <div style="text-align: center; flex: 1;">
+            <div style="height: 40px; margin-bottom: 5px; border-bottom: 1px solid #999; position: relative;">
+              <div style="position: absolute; bottom: 5px; left: 0; right: 0; height: 1px; background-color: #999;"></div>
+            </div>
+            <div style="font-size: 10px; font-weight: bold; color: #333;">Signature & cachet</div>
+          </div>
+        </div>
+        
+        <div style="text-align: center; font-size: 10px; color: #666; margin-top: 10px;">
+          <div>Caissier: ${receiptData.caissierId}</div>
+          <div style="margin-top: 5px; font-size: 9px;">
+            Document généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+        </div>
+      </div>
+      
+      <!-- Note -->
+      <div style="margin-top: 15px; padding: 8px; background-color: #f5f5f5; border-radius: 3px; border-left: 3px solid #1976d2; font-size: 9px; color: #666;">
+        <strong>NOTE:</strong> Ce reçu fait foi de transaction. Conservez-le précieusement.
+      </div>
+    `;
+    
+    // Ajouter l'élément au DOM
+    document.body.appendChild(receiptElement);
+    
+    // Générer le PDF
+    const canvas = await html2canvas(receiptElement, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#FFFFFF',
+    });
+    
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+    
+    const imgWidth = 190; // Largeur réduite pour marges
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    
+    // Positionner l'image au centre de la page
+    const xPos = (210 - imgWidth) / 2; // Centrer horizontalement
+    const yPos = 10; // Marge supérieure réduite
+    
+    pdf.addImage(imgData, 'PNG', xPos, yPos, imgWidth, imgHeight);
+    
+    // Télécharger le PDF
+    const fileName = `Retrait-${receiptData.reference}.pdf`;
+    pdf.save(fileName);
+    
+    // Nettoyer
+    document.body.removeChild(receiptElement);
+    
+    showSnackbar('Reçu PDF généré avec succès', 'success');
+    
+  } catch (error) {
+    console.error('Erreur lors de la génération du reçu:', error);
+    showSnackbar('Erreur lors de la génération du reçu', 'error');
+  } finally {
+    setDownloading(false);
+  }
+};
 
   // Fonction pour télécharger le reçu
   const downloadReceipt = async (receiptData: ReceiptData) => {
@@ -927,6 +995,7 @@ const RetraitEspeces: React.FC = () => {
     let signature = '';
     let typeId = 'CNI';
     let numeroId = '';
+    let realCni = '';
     let delivreLe = '';
     let delivreA = '';
     
@@ -937,6 +1006,7 @@ const RetraitEspeces: React.FC = () => {
       photo = physique.photo_url || '';
       typeId = 'CNI';
       numeroId = physique.cni_numero || '';
+      realCni = physique.cni_numero || '';
       delivreLe = physique.cni_delivrance || '';
       delivreA = physique.lieu_naissance || '';
     } else if (client.type_client === 'morale' && client.morale) {
@@ -949,6 +1019,9 @@ const RetraitEspeces: React.FC = () => {
       }
     }
     
+    // Stocker le vrai CNI dans l'état
+    setClientRealCni(realCni);
+    
     // Mise à jour des informations du porteur si c'est le client
     if (formData.typePorteur === 'client') {
       setFormData(prev => ({
@@ -956,7 +1029,7 @@ const RetraitEspeces: React.FC = () => {
         nomPorteur: nomClient,
         adresse: adresse,
         typeId: typeId || 'CNI',
-        numeroId: numeroId,
+        numeroId: '',
         delivreLe: delivreLe,
         delivreA: delivreA,
       }));
@@ -994,12 +1067,15 @@ const RetraitEspeces: React.FC = () => {
     console.log('Type pièce:', typePiece);
     console.log('Numéro pièce:', numeroPiece);
     
+    // Stocker le vrai numéro de pièce
+    setClientRealCni(numeroPiece);
+    
     setFormData(prev => ({
       ...prev,
       nomPorteur: nomComplet,
       adresse: mandataire.adresse || '',
       typeId: typePiece,
-      numeroId: numeroPiece,
+      numeroId: '',
       delivreLe: mandataire.date_delivrance_piece || '',
       delivreA: mandataire.lieu_delivrance_piece || mandataire.lieu_naissance || '',
     }));
@@ -1029,6 +1105,42 @@ const RetraitEspeces: React.FC = () => {
     }
   };
 
+  // Fonction pour valider le CNI saisi
+  const validateCni = (): boolean => {
+    // Réinitialiser l'erreur
+    setCniValidationError('');
+    
+    // Si on n'a pas de vrai CNI stocké, on ne peut pas valider
+    if (!clientRealCni || clientRealCni.trim() === '') {
+      console.log('Aucun CNI stocké pour validation');
+      return true; // Pas de validation nécessaire
+    }
+    
+    // Si l'utilisateur n'a rien saisi
+    if (!formData.numeroId || formData.numeroId.trim() === '') {
+      setCniValidationError('Veuillez saisir le numéro de pièce');
+      return false;
+    }
+    
+    // Comparer les deux valeurs (sans tenir compte de la casse et des espaces)
+    const enteredCni = formData.numeroId.trim();
+    const storedCni = clientRealCni.trim();
+    
+    console.log('CNI saisi:', enteredCni);
+    console.log('CNI stocké:', storedCni);
+    
+    if (enteredCni !== storedCni) {
+      const errorMessage = formData.typePorteur === 'client' 
+        ? `Le numéro CNI pour ce client n'est pas correct. Veuillez entrer le bon numéro.`
+        : `Le numéro de pièce pour ce mandataire n'est pas correct. Veuillez entrer le bon numéro.`;
+      
+      setCniValidationError(errorMessage);
+      return false;
+    }
+    
+    return true;
+  };
+
   // Effet pour charger les informations quand le type de porteur change
   useEffect(() => {
     console.log('Type porteur changé:', formData.typePorteur);
@@ -1036,6 +1148,10 @@ const RetraitEspeces: React.FC = () => {
     console.log('Mandataires disponibles:', compteDetails?.mandataires);
     
     if (!compteDetails) return;
+    
+    // Réinitialiser la validation du CNI
+    setCniValidationError('');
+    setClientRealCni('');
     
     if (formData.typePorteur === 'client') {
       // Réinitialiser les infos manuelles et charger les infos du client
@@ -1319,6 +1435,8 @@ const RetraitEspeces: React.FC = () => {
       }));
       setPhotoUrl('');
       setSignatureUrl('');
+      setClientRealCni('');
+      setCniValidationError('');
       return;
     }
     
@@ -1349,7 +1467,11 @@ const RetraitEspeces: React.FC = () => {
         soldeComptable: compte.solde || '0',
         typePorteur: 'client', // Par défaut le client est le porteur
         selectedMandataireId: '',
+        numeroId: '', // Réinitialiser le champ de saisie du CNI
       }));
+      
+      // Réinitialiser la validation
+      setCniValidationError('');
       
       // Charger les infos du client
       loadClientInfo(compte);
@@ -1365,6 +1487,10 @@ const RetraitEspeces: React.FC = () => {
   const handleTypePorteurChange = (type: 'client' | 'mandataire' | 'autre') => {
     console.log('Changement type porteur vers:', type);
     
+    // Réinitialiser la validation
+    setCniValidationError('');
+    setClientRealCni('');
+    
     let selectedMandataireId = '';
     if (type === 'mandataire' && compteDetails?.mandataires?.length) {
       selectedMandataireId = compteDetails.mandataires[0].id.toString();
@@ -1375,6 +1501,7 @@ const RetraitEspeces: React.FC = () => {
       ...prev,
       typePorteur: type,
       selectedMandataireId: selectedMandataireId,
+      numeroId: '', // Réinitialiser le champ de saisie du CNI
     }));
   };
 
@@ -1518,6 +1645,15 @@ const RetraitEspeces: React.FC = () => {
         return;
       }
       
+      // Validation du CNI (uniquement pour client ou mandataire)
+      if (formData.typePorteur === 'client' || formData.typePorteur === 'mandataire') {
+        if (!validateCni()) {
+          // Le message d'erreur est déjà affiché dans le champ
+          showSnackbar('Numéro de pièce incorrect. Veuillez vérifier.', 'error');
+          return;
+        }
+      }
+      
       // Vérifier le billetage
       const billetageValide = billetage.filter(item => item.quantite > 0);
       if (billetageValide.length === 0) {
@@ -1589,7 +1725,6 @@ const RetraitEspeces: React.FC = () => {
         // Données de frais
         commissions: commissions,
         taxes: taxes,
-        frais_en_compte: formData.fraisEnCompte,
         
         // Contexte de l'opération
         motif: formData.motif?.trim() || 'Retrait espèces',
@@ -1675,7 +1810,7 @@ const RetraitEspeces: React.FC = () => {
       guichet: '',
       caisse: '',
       typeRetrait: '01',
-      agenceCompte: '',
+      //agenceCompte: '',
       compte: '',
       compte_id: null,
       chapitre: '',
@@ -1717,6 +1852,8 @@ const RetraitEspeces: React.FC = () => {
     setPendingDemandeId(null);
     setPhotoUrl('');
     setSignatureUrl('');
+    setClientRealCni('');
+    setCniValidationError('');
   };
 
   const handleConfirmValidation = () => {
@@ -1744,12 +1881,12 @@ const RetraitEspeces: React.FC = () => {
     
     if (formData.typePorteur === 'client') {
       // Pour le client, certains champs sont modifiables
-      return !['adresse', 'delivreLe', 'delivreA', 'typeId'].includes(fieldName);
+      return !['adresse', 'delivreLe', 'delivreA', 'typeId', 'numeroId'].includes(fieldName);
     }
     
     if (formData.typePorteur === 'mandataire') {
       // Pour le mandataire, certains champs peuvent être modifiés
-      return !['adresse', 'delivreLe', 'delivreA', 'typeId'].includes(fieldName);
+      return !['adresse', 'delivreLe', 'delivreA', 'typeId', 'numeroId'].includes(fieldName);
     }
     
     return true;
@@ -1833,6 +1970,11 @@ const RetraitEspeces: React.FC = () => {
                   icon={<Photo fontSize="small" />} 
                   iconPosition="start"
                 />
+                <Tab 
+                  label="Retrait à distance" 
+                  icon={<CloudDownload fontSize="small" />} 
+                  iconPosition="start"
+                />
               </StyledTabs>
             </Box>
 
@@ -1859,11 +2001,12 @@ const RetraitEspeces: React.FC = () => {
                               variant="outlined"
                               disabled
                               helperText="Récupéré automatiquement"
+                              sx={{ minWidth: 250 }}
                             />
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small">
+                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Agence *</InputLabel>
                               <Select
                                 name="selectedAgence"
@@ -1884,7 +2027,7 @@ const RetraitEspeces: React.FC = () => {
                           </Grid>
 
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small">
+                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Guichet *</InputLabel>
                               <Select
                                 name="guichet"
@@ -1907,7 +2050,7 @@ const RetraitEspeces: React.FC = () => {
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small">
+                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Caisse *</InputLabel>
                               <Select
                                 name="caisse"
@@ -1930,7 +2073,7 @@ const RetraitEspeces: React.FC = () => {
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small">
+                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Type retrait *</InputLabel>
                               <Select
                                 name="typeRetrait"
@@ -1943,7 +2086,7 @@ const RetraitEspeces: React.FC = () => {
                             </FormControl>
                           </Grid>
                           
-                          <Grid item xs={6}>
+                          {/*<Grid item xs={6}>
                             <TextField
                               fullWidth
                               size="small"
@@ -1952,8 +2095,9 @@ const RetraitEspeces: React.FC = () => {
                               value={formData.agenceCompte}
                               onChange={handleChange}
                               placeholder="Code agence du compte"
+                              sx={{ minWidth: 250 }}
                             />
-                          </Grid>
+                          </Grid>*/}
                         </Grid>
                       </CardContent>
                     </StyledCard>
@@ -2010,10 +2154,11 @@ const RetraitEspeces: React.FC = () => {
                                   value={formData.numero_bordereau}
                                   onChange={handleChange}
                                   placeholder="Ex: BDR-2023-001"
+                                  sx={{ minWidth: 250 }}
                                 />
                               </Grid>
                               <Grid item xs={6}>
-                                <FormControl fullWidth size="small">
+                                <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                                   <InputLabel>Type bordereau</InputLabel>
                                   <Select
                                     name="type_bordereau"
@@ -2044,7 +2189,7 @@ const RetraitEspeces: React.FC = () => {
                                   variant="outlined"
                                   size="small"
                                   required
-                                  sx={{minWidth: 200}}
+                                  sx={{ minWidth: 250 }}
                                   InputProps={{
                                     ...params.InputProps,
                                     endAdornment: (
@@ -2107,6 +2252,7 @@ const RetraitEspeces: React.FC = () => {
                               placeholder="Objet du retrait"
                               multiline
                               rows={2}
+                              sx={{ minWidth: 250 }}
                             />
                           </Grid>
                           
@@ -2124,6 +2270,7 @@ const RetraitEspeces: React.FC = () => {
                                   onChange={handleChange}
                                   InputLabelProps={{ shrink: true }}
                                   disabled
+                                  sx={{ minWidth: 250 }}
                                 />
                               </Grid>
                               <Grid item xs={6}>
@@ -2137,6 +2284,7 @@ const RetraitEspeces: React.FC = () => {
                                   onChange={handleChange}
                                   InputLabelProps={{ shrink: true }}
                                   disabled
+                                  sx={{ minWidth: 250 }}
                                 />
                               </Grid>
                             </Grid>
@@ -2172,11 +2320,11 @@ const RetraitEspeces: React.FC = () => {
                                   value={formData.telephone}
                                   onChange={handleChange}
                                   placeholder="Numéro SMS"
-                                  sx={{ flexGrow: 1 }}
+                                  sx={{ flexGrow: 1, minWidth: 250 }}
                                 />
                               )}
                             </Box>
-                            <FormControlLabel
+                            {/*<FormControlLabel
                               control={
                                 <Checkbox
                                   size="small"
@@ -2186,7 +2334,7 @@ const RetraitEspeces: React.FC = () => {
                                 />
                               }
                               label="Frais en compte"
-                            />
+                            />*/}
                           </Grid>
                           
                           <Grid item xs={12} md={8}>
@@ -2207,6 +2355,7 @@ const RetraitEspeces: React.FC = () => {
                                   placeholder="0"
                                   type="number"
                                   required
+                                  sx={{ minWidth: 250 }}
                                   InputProps={{
                                     startAdornment: <InputAdornment position="start">FCFA</InputAdornment>,
                                   }}
@@ -2221,6 +2370,7 @@ const RetraitEspeces: React.FC = () => {
                                   value={formData.commissions}
                                   onChange={handleChange}
                                   type="number"
+                                  sx={{ minWidth: 250 }}
                                 />
                               </Grid>
                               <Grid item xs={4}>
@@ -2232,6 +2382,7 @@ const RetraitEspeces: React.FC = () => {
                                   value={formData.taxes}
                                   onChange={handleChange}
                                   type="number"
+                                  sx={{ minWidth: 250 }}
                                 />
                               </Grid>
                               <Grid item xs={12}>
@@ -2242,6 +2393,7 @@ const RetraitEspeces: React.FC = () => {
                                   name="refLettrage"
                                   value={formData.refLettrage}
                                   onChange={handleChange}
+                                  sx={{ minWidth: 250 }}
                                 />
                               </Grid>
                             </Grid>
@@ -2259,7 +2411,7 @@ const RetraitEspeces: React.FC = () => {
                           Billetage - Saisie des coupures *
                         </Typography>
                         
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                           <TextField
                             size="small"
                             label="Montant à diviser"
@@ -2269,13 +2421,14 @@ const RetraitEspeces: React.FC = () => {
                               calculateBilletageFromAmount(e.target.value);
                             }}
                             type="number"
-                            sx={{ width: 200 }}
+                            sx={{ minWidth: 250 }}
                           />
                           <Button
                             variant="outlined"
                             startIcon={calculating ? <CircularProgress size={20} /> : <CalculateIcon />}
                             onClick={() => calculateBilletageFromAmount(formData.montant)}
                             disabled={calculating || !formData.montant || parseFloat(formData.montant) <= 0}
+                            sx={{ minWidth: 250 }}
                           >
                             Calculer billetage
                           </Button>
@@ -2383,7 +2536,7 @@ const RetraitEspeces: React.FC = () => {
                               }}
                               placeholder="Ex: A1B2C3"
                               size="medium"
-                              sx={{ width: 300 }}
+                              sx={{ minWidth: 250 }}
                               inputProps={{ maxLength: 6 }}
                               error={!!codeValidationError}
                               helperText={codeValidationError || "Code à 6 caractères fourni par l'assistant"}
@@ -2401,6 +2554,7 @@ const RetraitEspeces: React.FC = () => {
                               onClick={handleVerifyCode}
                               disabled={validationCode.length !== 6}
                               startIcon={<CheckCircle />}
+                              sx={{ minWidth: 250 }}
                             >
                               Vérifier le code
                             </Button>
@@ -2420,6 +2574,7 @@ const RetraitEspeces: React.FC = () => {
                                 setIsCodeValid(false);
                                 setCodeValidationError('');
                               }}
+                              sx={{ minWidth: 250 }}
                             >
                               Annuler
                             </Button>
@@ -2531,7 +2686,7 @@ const RetraitEspeces: React.FC = () => {
                         {/* Sélection du mandataire */}
                         {formData.typePorteur === 'mandataire' && compteDetails?.mandataires && compteDetails.mandataires.length > 0 && (
                           <Box sx={{ mb: 3 }}>
-                            <FormControl fullWidth size="small">
+                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Mandataire *</InputLabel>
                               <Select
                                 name="selectedMandataireId"
@@ -2584,6 +2739,7 @@ const RetraitEspeces: React.FC = () => {
                                 formData.typePorteur === 'mandataire' ? `Mandataire: ${getSelectedMandataireName()}` :
                                 ''
                               }
+                              sx={{ minWidth: 250 }}
                             />
                           </Grid>
                           <Grid item xs={12}>
@@ -2599,10 +2755,11 @@ const RetraitEspeces: React.FC = () => {
                               rows={2}
                               disabled={shouldDisableField('adresse')}
                               helperText={formData.typePorteur === 'autre' ? '' : 'Modifiable si nécessaire'}
+                              sx={{ minWidth: 250 }}
                             />
                           </Grid>
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small">
+                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Type pièce *</InputLabel>
                               <Select
                                 name="typeId"
@@ -2622,18 +2779,29 @@ const RetraitEspeces: React.FC = () => {
                             <TextField
                               fullWidth
                               size="small"
-                              label="N° Pièce *"
+                              label={
+                                formData.typePorteur === 'client' ? 'N° CNI * (à vérifier)' :
+                                formData.typePorteur === 'mandataire' ? 'N° Pièce * (à vérifier)' :
+                                'N° Pièce *'
+                              }
                               name="numeroId"
                               value={formData.numeroId}
                               onChange={handleChange}
-                              placeholder="Numéro de pièce"
-                              required
-                              disabled={shouldDisableField('numeroId')}
-                              helperText={
-                                formData.typePorteur === 'client' ? 'Numéro CNI du client' :
-                                formData.typePorteur === 'mandataire' ? `Numéro CNI: ${getSelectedMandataireNumeroCni()}` :
-                                ''
+                              placeholder={
+                                formData.typePorteur === 'client' ? 'Saisissez le N° CNI du client' :
+                                formData.typePorteur === 'mandataire' ? 'Saisissez le N° pièce du mandataire' :
+                                'Numéro de pièce'
                               }
+                              required
+                              error={!!cniValidationError}
+                              helperText={
+                                cniValidationError || (
+                                  formData.typePorteur === 'client' ? 'Le système a déjà le N° CNI du client. Saisissez-le pour vérification.' :
+                                  formData.typePorteur === 'mandataire' ? 'Le système a déjà le N° pièce du mandataire. Saisissez-le pour vérification.' :
+                                  ''
+                                )
+                              }
+                              sx={{ minWidth: 250 }}
                             />
                           </Grid>
                           <Grid item xs={6}>
@@ -2648,6 +2816,7 @@ const RetraitEspeces: React.FC = () => {
                               InputLabelProps={{ shrink: true }}
                               disabled={shouldDisableField('delivreLe')}
                               helperText={formData.typePorteur === 'client' || formData.typePorteur === 'mandataire' ? 'Modifiable si nécessaire' : ''}
+                              sx={{ minWidth: 250 }}
                             />
                           </Grid>
                           <Grid item xs={6}>
@@ -2661,6 +2830,7 @@ const RetraitEspeces: React.FC = () => {
                               placeholder="Lieu de délivrance"
                               disabled={shouldDisableField('delivreA')}
                               helperText={formData.typePorteur === 'client' || formData.typePorteur === 'mandataire' ? 'Modifiable si nécessaire' : ''}
+                              sx={{ minWidth: 250 }}
                             />
                           </Grid>
                         </Grid>
@@ -2902,31 +3072,287 @@ const RetraitEspeces: React.FC = () => {
                 </Grid>
               </TabPanel>
 
+              {/* Onglet Retrait à distance */}
+              <TabPanel value={tabValue} index={4}>
+                <Grid container spacing={3}>
+                  {/* Informations du compte */}
+                  <Grid item xs={12}>
+                    <StyledCard>
+                      <CardContent>
+                        <Typography variant="subtitle2" sx={{ mb: 3, color: '#1976D2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <AccountBalanceWallet />
+                          Informations du compte client
+                        </Typography>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} md={6}>
+                            <TextField
+                              fullWidth
+                              label="Numéro de compte *"
+                              name="numeroCompte"
+                              value={retraitDistanceData.numeroCompte}
+                              onChange={handleRetraitDistanceChange}
+                              placeholder="Ex: 1234567890"
+                              sx={{ minWidth: 250 }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={6}>
+                            <TextField
+                              fullWidth
+                              label="Montant du retrait *"
+                              name="montant"
+                              value={retraitDistanceData.montant}
+                              onChange={handleRetraitDistanceChange}
+                              placeholder="Montant en FCFA"
+                              type="number"
+                              InputProps={{
+                                startAdornment: <InputAdornment position="start">FCFA</InputAdornment>,
+                              }}
+                              sx={{ minWidth: 250 }}
+                            />
+                          </Grid>
+                        </Grid>
+                      </CardContent>
+                    </StyledCard>
+                  </Grid>
+
+                  {/* Upload de la procuration */}
+                  <Grid item xs={12} md={6}>
+                    <StyledCard sx={{ height: '100%' }}>
+                      <CardContent>
+                        <Typography variant="subtitle2" sx={{ mb: 3, color: '#1976D2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <CloudUpload />
+                          Procuration (Image requise) *
+                        </Typography>
+                        
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleFileUpload(e, 'procurationFile')}
+                          style={{ display: 'none' }}
+                          id="procuration-file-input"
+                        />
+                        
+                        <label htmlFor="procuration-file-input">
+                          <FileUploadBox>
+                            {retraitDistanceData.procurationFile ? (
+                              <Box>
+                                <CheckCircle sx={{ fontSize: 48, color: '#4CAF50', mb: 2 }} />
+                                <Typography variant="body1" fontWeight={500} gutterBottom>
+                                  Procuration téléchargée
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {retraitDistanceData.procurationFile.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                                  Taille: {(retraitDistanceData.procurationFile.size / 1024).toFixed(2)} KB
+                                </Typography>
+                                <Button 
+                                  variant="outlined" 
+                                  sx={{ mt: 2 }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRetraitDistanceData(prev => ({ ...prev, procurationFile: null }));
+                                  }}
+                                >
+                                  Supprimer
+                                </Button>
+                              </Box>
+                            ) : (
+                              <Box>
+                                <CloudUpload sx={{ fontSize: 48, color: '#1976D2', mb: 2 }} />
+                                <Typography variant="body1" fontWeight={500} gutterBottom>
+                                  Cliquez pour télécharger la procuration
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  Formats acceptés: JPG, PNG, GIF
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                                  Taille maximale: 5 MB
+                                </Typography>
+                              </Box>
+                            )}
+                          </FileUploadBox>
+                        </label>
+                        
+                        <Alert severity="info" sx={{ mt: 2 }}>
+                          La procuration doit être signée et inclure les informations d'identification complètes
+                        </Alert>
+                      </CardContent>
+                    </StyledCard>
+                  </Grid>
+
+                  {/* Upload de la demande de retrait */}
+                  <Grid item xs={12} md={6}>
+                    <StyledCard sx={{ height: '100%' }}>
+                      <CardContent>
+                        <Typography variant="subtitle2" sx={{ mb: 3, color: '#1976D2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <CloudUpload />
+                          Demande de retrait (Image requise) *
+                        </Typography>
+                        
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleFileUpload(e, 'demandeRetraitFile')}
+                          style={{ display: 'none' }}
+                          id="demande-retrait-file-input"
+                        />
+                        
+                        <label htmlFor="demande-retrait-file-input">
+                          <FileUploadBox>
+                            {retraitDistanceData.demandeRetraitFile ? (
+                              <Box>
+                                <CheckCircle sx={{ fontSize: 48, color: '#4CAF50', mb: 2 }} />
+                                <Typography variant="body1" fontWeight={500} gutterBottom>
+                                  Demande de retrait téléchargée
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {retraitDistanceData.demandeRetraitFile.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                                  Taille: {(retraitDistanceData.demandeRetraitFile.size / 1024).toFixed(2)} KB
+                                </Typography>
+                                <Button 
+                                  variant="outlined" 
+                                  sx={{ mt: 2 }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRetraitDistanceData(prev => ({ ...prev, demandeRetraitFile: null }));
+                                  }}
+                                >
+                                  Supprimer
+                                </Button>
+                              </Box>
+                            ) : (
+                              <Box>
+                                <CloudUpload sx={{ fontSize: 48, color: '#1976D2', mb: 2 }} />
+                                <Typography variant="body1" fontWeight={500} gutterBottom>
+                                  Cliquez pour télécharger la demande de retrait
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  Formats acceptés: JPG, PNG, GIF
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                                  Taille maximale: 5 MB
+                                </Typography>
+                              </Box>
+                            )}
+                          </FileUploadBox>
+                        </label>
+                        
+                        <Alert severity="info" sx={{ mt: 2 }}>
+                          La demande doit être datée et signée par le client
+                        </Alert>
+                      </CardContent>
+                    </StyledCard>
+                  </Grid>
+
+                  {/* Informations du gestionnaire */}
+                  <Grid item xs={12}>
+                    <StyledCard>
+                      <CardContent>
+                        <Typography variant="subtitle2" sx={{ mb: 3, color: '#1976D2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Badge />
+                          Informations du gestionnaire CA
+                        </Typography>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} md={4}>
+                            <TextField
+                              fullWidth
+                              label="Nom du gestionnaire *"
+                              name="nomGestionnaire"
+                              value={retraitDistanceData.nomGestionnaire}
+                              onChange={handleRetraitDistanceChange}
+                              placeholder="Nom"
+                              sx={{ minWidth: 250 }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={4}>
+                            <TextField
+                              fullWidth
+                              label="Prénom du gestionnaire *"
+                              name="prenomGestionnaire"
+                              value={retraitDistanceData.prenomGestionnaire}
+                              onChange={handleRetraitDistanceChange}
+                              placeholder="Prénom"
+                              sx={{ minWidth: 250 }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={4}>
+                            <TextField
+                              fullWidth
+                              label="Code du gestionnaire *"
+                              name="codeGestionnaire"
+                              value={retraitDistanceData.codeGestionnaire}
+                              onChange={handleRetraitDistanceChange}
+                              placeholder="Code d'identification"
+                              sx={{ minWidth: 250 }}
+                            />
+                          </Grid>
+                        </Grid>
+                        
+                        <Alert severity="warning" sx={{ mt: 3 }}>
+                          Le retrait à distance ne sera validé qu'après vérification et approbation par le CA
+                        </Alert>
+                      </CardContent>
+                    </StyledCard>
+                  </Grid>
+
+                  {/* Bouton de validation */}
+                  <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                      <GradientButton
+                        variant="contained"
+                        onClick={validateRetraitDistance}
+                        startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <CheckCircle />}
+                        disabled={
+                          !retraitDistanceData.numeroCompte ||
+                          !retraitDistanceData.montant ||
+                          parseFloat(retraitDistanceData.montant) <= 0 ||
+                          !retraitDistanceData.procurationFile ||
+                          !retraitDistanceData.demandeRetraitFile ||
+                          !retraitDistanceData.nomGestionnaire ||
+                          !retraitDistanceData.prenomGestionnaire ||
+                          !retraitDistanceData.codeGestionnaire ||
+                          loading
+                        }
+                        sx={{ minWidth: 250, py: 1.5, px: 4 }}
+                      >
+                        {loading ? 'Validation en cours...' : 'Valider le retrait à distance'}
+                      </GradientButton>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </TabPanel>
+
               {/* Boutons d'action */}
-              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                <SecondaryButton onClick={() => window.history.back()}>
-                  Annuler
-                </SecondaryButton>
-                <GradientButton
-                  variant="contained"
-                  onClick={processRetrait}
-                  startIcon={<CheckCircle />}
-                  disabled={
-                    !formData.compte_id || 
-                    !formData.montant || 
-                    parseFloat(formData.montant) <= 0 ||
-                    !formData.nomPorteur ||
-                    !formData.numeroId ||
-                    billetage.every(item => item.quantite === 0) ||
-                    !formData.selectedAgence ||
-                    !formData.guichet ||
-                    !formData.caisse ||
-                    (showValidationInput && !isCodeValid) // Si validation requise, doit avoir un code valide
-                  }
-                >
-                  {showValidationInput ? 'Valider le retrait avec code' : 'Valider le retrait'}
-                </GradientButton>
-              </Box>
+              {tabValue !== 4 && (
+                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                  <SecondaryButton onClick={() => window.history.back()}>
+                    Annuler
+                  </SecondaryButton>
+                  <GradientButton
+                    variant="contained"
+                    onClick={processRetrait}
+                    startIcon={<CheckCircle />}
+                    disabled={
+                      !formData.compte_id || 
+                      !formData.montant || 
+                      parseFloat(formData.montant) <= 0 ||
+                      !formData.nomPorteur ||
+                      !formData.numeroId ||
+                      billetage.every(item => item.quantite === 0) ||
+                      !formData.selectedAgence ||
+                      !formData.guichet ||
+                      !formData.caisse ||
+                      (showValidationInput && !isCodeValid) // Si validation requise, doit avoir un code valide
+                    }
+                    sx={{ minWidth: 250 }}
+                  >
+                    {showValidationInput ? 'Valider le retrait avec code' : 'Valider le retrait'}
+                  </GradientButton>
+                </Box>
+              )}
             </Box>
           </Paper>
         </Box>
@@ -3146,7 +3572,7 @@ const RetraitEspeces: React.FC = () => {
               startIcon={downloading ? <CircularProgress size={20} color="inherit" /> : <Download />}
               onClick={() => successModal.transactionData && downloadReceipt(successModal.transactionData)}
               disabled={downloading || !successModal.transactionData}
-              sx={{ px: 4, py: 1.5 }}
+              sx={{ px: 4, py: 1.5, minWidth: 250 }}
             >
               {downloading ? 'Téléchargement en cours...' : 'Télécharger le reçu PDF'}
             </Button>
@@ -3158,6 +3584,7 @@ const RetraitEspeces: React.FC = () => {
               startIcon={<Print />}
               onClick={() => successModal.transactionData && downloadReceipt(successModal.transactionData)}
               disabled={downloading || !successModal.transactionData}
+              sx={{ minWidth: 250 }}
             >
               Imprimer le reçu
             </Button>

@@ -130,6 +130,10 @@ const AppRoutes = () => {
       <Route path='/Retrait-Especes' element={<RetraitEspeces />} />
       <Route path='/validation-transaction' element={<ValidationTransaction />} />
 
+
+    
+
+
       <Route path='/AddGestionnaire' element={<AddGestionnaire />} />
       <Route path='/ListGestionnaire' element={<ListGestionnaire />} />
       <Route path='/ValidationComptes' element={<ValidationComptes />} />

@@ -30,6 +30,11 @@ export default function ModifierClient() {
     const activitePhotoRef = useRef(null);
     const cniRectoRef = useRef(null);
     const cniVersoRef = useRef(null);
+    const nuiImageRef = useRef(null);
+    const attestationConformitePdfRef = useRef(null);
+    const demandeOuverturePdfRef = useRef(null);
+    const formulaireOuverturePdfRef = useRef(null);
+    const listeMembresPdfRef = useRef(null);
     
     // Références pour client moral
     const gerantPhotoRefs = [useRef(null), useRef(null)];
@@ -37,7 +42,7 @@ export default function ModifierClient() {
     const signatureSignataireRefs = [useRef(null), useRef(null), useRef(null)];
     const extraitRccmRef = useRef(null);
     const titrePatenteRef = useRef(null);
-    const niuImageRef = useRef(null);
+    const niuImageMoraleRef = useRef(null);
     const statutsRef = useRef(null);
     const pvAgcRef = useRef(null);
     const attestationRef = useRef(null);
@@ -53,6 +58,13 @@ export default function ModifierClient() {
     const factureEauSignataireRefs = [useRef(null), useRef(null), useRef(null)];
     const factureElecSignataireRefs = [useRef(null), useRef(null), useRef(null)];
     
+    // Références pour fichiers signataires
+    const cniRectoSignataireRefs = [useRef(null), useRef(null), useRef(null)];
+    const cniVersoSignataireRefs = [useRef(null), useRef(null), useRef(null)];
+    const nuiImageSignataireRefs = [useRef(null), useRef(null), useRef(null)];
+    const lieuDitDomicilePhotoRefs = [useRef(null), useRef(null), useRef(null)];
+    const photoLocalisationDomicileRefs = [useRef(null), useRef(null), useRef(null)];
+    
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
@@ -66,14 +78,24 @@ export default function ModifierClient() {
     const [activitePreview, setActivitePreview] = useState(null);
     const [cniRectoPreview, setCniRectoPreview] = useState(null);
     const [cniVersoPreview, setCniVersoPreview] = useState(null);
+    const [nuiImagePreview, setNuiImagePreview] = useState(null);
+    const [demandeOuverturePdfName, setDemandeOuverturePdfName] = useState('');
+    const [formulaireOuverturePdfName, setFormulaireOuverturePdfName] = useState('');
+    const [listeMembresPdfName, setListeMembresPdfName] = useState('');
+    const [attestationConformitePdfName, setAttestationConformitePdfName] = useState('');
     
     // Prévisualisations client moral
     const [gerantPreviews, setGerantPreviews] = useState([null, null]);
     const [signatairePreviews, setSignatairePreviews] = useState([null, null, null]);
     const [signatureSignatairePreviews, setSignatureSignatairePreviews] = useState([null, null, null]);
+    const [cniRectoSignatairePreviews, setCniRectoSignatairePreviews] = useState([null, null, null]);
+    const [cniVersoSignatairePreviews, setCniVersoSignatairePreviews] = useState([null, null, null]);
+    const [nuiImageSignatairePreviews, setNuiImageSignatairePreviews] = useState([null, null, null]);
+    const [lieuDitDomicilePhotoPreviews, setLieuDitDomicilePhotoPreviews] = useState([null, null, null]);
+    const [photoLocalisationDomicilePreviews, setPhotoLocalisationDomicilePreviews] = useState([null, null, null]);
     const [extraitRccmPreview, setExtraitRccmPreview] = useState(null);
     const [titrePatentePreview, setTitrePatentePreview] = useState(null);
-    const [niuImagePreview, setNiuImagePreview] = useState(null);
+    const [niuImageMoralePreview, setNiuImageMoralePreview] = useState(null);
     const [statutsPreview, setStatutsPreview] = useState(null);
     const [pvAgcPreview, setPvAgcPreview] = useState(null);
     const [attestationPreview, setAttestationPreview] = useState(null);
@@ -112,6 +134,9 @@ export default function ModifierClient() {
         photo_localisation_activite: null,
         cni_recto: null,
         cni_verso: null,
+        niu_image: null,
+        liste_membres_pdf: null,
+        attestation_conformite_pdf: null,
         
         // Client physique
         physique: {
@@ -152,26 +177,57 @@ export default function ModifierClient() {
             telephone_gerant: '',
             nom_gerant2: '',
             telephone_gerant2: '',
-            nom_signataire: '',
-            telephone_signataire: '',
-            nom_signataire2: '',
-            telephone_signataire2: '',
-            nom_signataire3: '',
-            telephone_signataire3: '',
         },
+        
+        // Signataires (champs dynamiques)
+        signataires: [
+            {
+                numero_signataire: 1,
+                nom: '',
+                sexe: '',
+                ville: '',
+                quartier: '',
+                lieu_domicile: '',
+                lieu_dit_domicile: '',
+                telephone: '',
+                email: '',
+                cni: '',
+                nui: '',
+            },
+            {
+                numero_signataire: 2,
+                nom: '',
+                sexe: '',
+                ville: '',
+                quartier: '',
+                lieu_domicile: '',
+                lieu_dit_domicile: '',
+                telephone: '',
+                email: '',
+                cni: '',
+                nui: '',
+            },
+            {
+                numero_signataire: 3,
+                nom: '',
+                sexe: '',
+                ville: '',
+                quartier: '',
+                lieu_domicile: '',
+                lieu_dit_domicile: '',
+                telephone: '',
+                email: '',
+                cni: '',
+                nui: '',
+            }
+        ],
         
         // Fichiers client moral
         photo_gerant: null,
         photo_gerant2: null,
-        photo_signataire: null,
-        photo_signataire2: null,
-        photo_signataire3: null,
-        signature_signataire: null,
-        signature_signataire2: null,
-        signature_signataire3: null,
         extrait_rccm_image: null,
         titre_patente_image: null,
-        niu_image: null,
+        niu_image_morale: null,
         statuts_image: null,
         pv_agc_image: null,
         attestation_non_redevance_image: null,
@@ -205,6 +261,69 @@ export default function ModifierClient() {
                     const date = new Date(dateString);
                     return date.toISOString().split('T')[0];
                 };
+
+                const getFullUrl = (path) => {
+                    if (!path) return null;
+                    if (path.startsWith('http')) return path;
+                    if (path.startsWith('/storage/')) return `http://localhost:8000${path}`;
+                    return `http://localhost:8000/storage/${path}`;
+                };
+
+                // Préparer les données des signataires
+                const signatairesData = [
+                    {
+                        numero_signataire: 1,
+                        nom: '',
+                        sexe: '',
+                        ville: '',
+                        quartier: '',
+                        lieu_domicile: '',
+                        lieu_dit_domicile: '',
+                        telephone: '',
+                        email: '',
+                        cni: '',
+                        nui: '',
+                    },
+                    {
+                        numero_signataire: 2,
+                        nom: '',
+                        sexe: '',
+                        ville: '',
+                        quartier: '',
+                        lieu_domicile: '',
+                        lieu_dit_domicile: '',
+                        telephone: '',
+                        email: '',
+                        cni: '',
+                        nui: '',
+                    },
+                    {
+                        numero_signataire: 3,
+                        nom: '',
+                        sexe: '',
+                        ville: '',
+                        quartier: '',
+                        lieu_domicile: '',
+                        lieu_dit_domicile: '',
+                        telephone: '',
+                        email: '',
+                        cni: '',
+                        nui: '',
+                    }
+                ];
+
+                // Charger les données des signataires si disponibles
+                if (data.type_client === 'morale' && data.morale && data.morale.signataires) {
+                    data.morale.signataires.forEach(signataire => {
+                        const index = signataire.numero_signataire - 1;
+                        if (index >= 0 && index < 3) {
+                            signatairesData[index] = {
+                                ...signatairesData[index],
+                                ...signataire
+                            };
+                        }
+                    });
+                }
 
                 const initialData = {
                     ...data,
@@ -250,31 +369,21 @@ export default function ModifierClient() {
                         telephone_gerant: '',
                         nom_gerant2: '',
                         telephone_gerant2: '',
-                        nom_signataire: '',
-                        telephone_signataire: '',
-                        nom_signataire2: '',
-                        telephone_signataire2: '',
-                        nom_signataire3: '',
-                        telephone_signataire3: '',
                         ...data.morale
-                    }
+                    },
+                    signataires: signatairesData
                 };
                 
                 setFormDataState(initialData);
                 
                 // Définir les prévisualisations d'images
-                const getFullUrl = (path) => {
-                    if (!path) return null;
-                    if (path.startsWith('http')) return path;
-                    if (path.startsWith('/storage/')) return `http://localhost:8000${path}`;
-                    return `http://localhost:8000/storage/${path}`;
-                };
-                
                 if (data.type_client === 'physique' && data.physique) {
                     if (data.physique.photo_url) setPhotoPreview(getFullUrl(data.physique.photo_url));
                     if (data.physique.signature_url) setSignaturePreview(getFullUrl(data.physique.signature_url));
                     if (data.physique.cni_recto_url) setCniRectoPreview(getFullUrl(data.physique.cni_recto_url));
                     if (data.physique.cni_verso_url) setCniVersoPreview(getFullUrl(data.physique.cni_verso_url));
+                    if (data.physique.niu_image_url) setNuiImagePreview(getFullUrl(data.physique.niu_image_url));
+                    if (data.physique.attestation_conformite_pdf_url) setAttestationConformitePdfName('Attestation conformité.pdf');
                 }
                 
                 if (data.type_client === 'morale' && data.morale) {
@@ -284,22 +393,37 @@ export default function ModifierClient() {
                     
                     // Photos signataires
                     const signatairePreviewsTemp = [null, null, null];
-                    if (data.morale.photo_signataire_url) signatairePreviewsTemp[0] = getFullUrl(data.morale.photo_signataire_url);
-                    if (data.morale.photo_signataire2_url) signatairePreviewsTemp[1] = getFullUrl(data.morale.photo_signataire2_url);
-                    if (data.morale.photo_signataire3_url) signatairePreviewsTemp[2] = getFullUrl(data.morale.photo_signataire3_url);
-                    setSignatairePreviews(signatairePreviewsTemp);
-                    
-                    // Signatures signataires
                     const signaturePreviewsTemp = [null, null, null];
-                    if (data.morale.signature_signataire_url) signaturePreviewsTemp[0] = getFullUrl(data.morale.signature_signataire_url);
-                    if (data.morale.signature_signataire2_url) signaturePreviewsTemp[1] = getFullUrl(data.morale.signature_signataire2_url);
-                    if (data.morale.signature_signataire3_url) signaturePreviewsTemp[2] = getFullUrl(data.morale.signature_signataire3_url);
+                    const cniRectoSignatairePreviewsTemp = [null, null, null];
+                    const cniVersoSignatairePreviewsTemp = [null, null, null];
+                    const nuiImageSignatairePreviewsTemp = [null, null, null];
+                    const lieuDitDomicilePhotoPreviewsTemp = [null, null, null];
+                    const photoLocalisationDomicilePreviewsTemp = [null, null, null];
+                    
+                    if (data.morale.signataires) {
+                        data.morale.signataires.forEach((signataire, index) => {
+                            if (signataire.photo_url) signatairePreviewsTemp[index] = getFullUrl(signataire.photo_url);
+                            if (signataire.signature_url) signaturePreviewsTemp[index] = getFullUrl(signataire.signature_url);
+                            if (signataire.cni_photo_recto_url) cniRectoSignatairePreviewsTemp[index] = getFullUrl(signataire.cni_photo_recto_url);
+                            if (signataire.cni_photo_verso_url) cniVersoSignatairePreviewsTemp[index] = getFullUrl(signataire.cni_photo_verso_url);
+                            if (signataire.nui_image_url) nuiImageSignatairePreviewsTemp[index] = getFullUrl(signataire.nui_image_url);
+                            if (signataire.lieu_dit_domicile_photo_url) lieuDitDomicilePhotoPreviewsTemp[index] = getFullUrl(signataire.lieu_dit_domicile_photo_url);
+                            if (signataire.photo_localisation_domicile_url) photoLocalisationDomicilePreviewsTemp[index] = getFullUrl(signataire.photo_localisation_domicile_url);
+                        });
+                    }
+                    
+                    setSignatairePreviews(signatairePreviewsTemp);
                     setSignatureSignatairePreviews(signaturePreviewsTemp);
+                    setCniRectoSignatairePreviews(cniRectoSignatairePreviewsTemp);
+                    setCniVersoSignatairePreviews(cniVersoSignatairePreviewsTemp);
+                    setNuiImageSignatairePreviews(nuiImageSignatairePreviewsTemp);
+                    setLieuDitDomicilePhotoPreviews(lieuDitDomicilePhotoPreviewsTemp);
+                    setPhotoLocalisationDomicilePreviews(photoLocalisationDomicilePreviewsTemp);
                     
                     // Documents juridiques
                     if (data.morale.extrait_rccm_image_url) setExtraitRccmPreview(getFullUrl(data.morale.extrait_rccm_image_url));
                     if (data.morale.titre_patente_image_url) setTitrePatentePreview(getFullUrl(data.morale.titre_patente_image_url));
-                    if (data.morale.niu_image_url) setNiuImagePreview(getFullUrl(data.morale.niu_image_url));
+                    if (data.morale.niu_image_url) setNiuImageMoralePreview(getFullUrl(data.morale.niu_image_url));
                     if (data.morale.statuts_image_url) setStatutsPreview(getFullUrl(data.morale.statuts_image_url));
                     if (data.morale.pv_agc_image_url) setPvAgcPreview(getFullUrl(data.morale.pv_agc_image_url));
                     if (data.morale.attestation_non_redevance_image_url) setAttestationPreview(getFullUrl(data.morale.attestation_non_redevance_image_url));
@@ -331,11 +455,18 @@ export default function ModifierClient() {
                     if (data.morale.facture_electricite_signataire2_image_url) factureElecPreviewsTemp[1] = getFullUrl(data.morale.facture_electricite_signataire2_image_url);
                     if (data.morale.facture_electricite_signataire3_image_url) factureElecPreviewsTemp[2] = getFullUrl(data.morale.facture_electricite_signataire3_image_url);
                     setFactureElecSignatairePreviews(factureElecPreviewsTemp);
+                    
+                    // PDFs
+                    if (data.morale.liste_membres_pdf_url) setListeMembresPdfName('Liste membres.pdf');
+                    if (data.morale.attestation_conformite_pdf_url) setAttestationConformitePdfName('Attestation conformité.pdf');
                 }
                 
                 // Photos de localisation (communes)
                 if (data.photo_localisation_domicile_url) setDomicilePreview(getFullUrl(data.photo_localisation_domicile_url));
                 if (data.photo_localisation_activite_url) setActivitePreview(getFullUrl(data.photo_localisation_activite_url));
+                
+                // PDFs communs
+                if (data.liste_membres_pdf_url) setListeMembresPdfName('Liste membres.pdf');
                 
             } catch (error) { 
                 console.error("Erreur lors de la récupération:", error);
@@ -410,6 +541,21 @@ export default function ModifierClient() {
         }));
     };
 
+    const handleSignataireChange = (index, e) => {
+        const { name, value } = e.target;
+        setFormDataState(prev => {
+            const newSignataires = [...prev.signataires];
+            newSignataires[index] = {
+                ...newSignataires[index],
+                [name]: value
+            };
+            return {
+                ...prev,
+                signataires: newSignataires
+            };
+        });
+    };
+
     const handleFileChange = (field, e) => {
         const file = e.target.files[0];
         if (file) {
@@ -417,6 +563,13 @@ export default function ModifierClient() {
                 ...prev,
                 [field]: file
             }));
+            
+            // Mettre à jour le nom du fichier pour les PDFs
+            if (field === 'liste_membres_pdf') {
+                setListeMembresPdfName(file.name);
+            } else if (field === 'attestation_conformite_pdf') {
+                setAttestationConformitePdfName(file.name);
+            }
             
             const previewUrl = URL.createObjectURL(file);
             switch(field) {
@@ -438,14 +591,17 @@ export default function ModifierClient() {
                 case 'cni_verso':
                     setCniVersoPreview(previewUrl);
                     break;
+                case 'niu_image':
+                    setNuiImagePreview(previewUrl);
+                    break;
                 case 'extrait_rccm_image':
                     setExtraitRccmPreview(previewUrl);
                     break;
                 case 'titre_patente_image':
                     setTitrePatentePreview(previewUrl);
                     break;
-                case 'niu_image':
-                    setNiuImagePreview(previewUrl);
+                case 'niu_image_morale':
+                    setNiuImageMoralePreview(previewUrl);
                     break;
                 case 'statuts_image':
                     setStatutsPreview(previewUrl);
@@ -523,6 +679,91 @@ export default function ModifierClient() {
         }
     };
 
+    const handleCniRectoSignataireChange = (index, e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const field = index === 0 ? 'cni_photo_recto_signataire' : 
+                         index === 1 ? 'cni_photo_recto_signataire2' : 
+                         'cni_photo_recto_signataire3';
+            setFormDataState(prev => ({
+                ...prev,
+                [field]: file
+            }));
+            
+            const newPreviews = [...cniRectoSignatairePreviews];
+            newPreviews[index] = URL.createObjectURL(file);
+            setCniRectoSignatairePreviews(newPreviews);
+        }
+    };
+
+    const handleCniVersoSignataireChange = (index, e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const field = index === 0 ? 'cni_photo_verso_signataire' : 
+                         index === 1 ? 'cni_photo_verso_signataire2' : 
+                         'cni_photo_verso_signataire3';
+            setFormDataState(prev => ({
+                ...prev,
+                [field]: file
+            }));
+            
+            const newPreviews = [...cniVersoSignatairePreviews];
+            newPreviews[index] = URL.createObjectURL(file);
+            setCniVersoSignatairePreviews(newPreviews);
+        }
+    };
+
+    const handleNuiImageSignataireChange = (index, e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const field = index === 0 ? 'nui_image_signataire' : 
+                         index === 1 ? 'nui_image_signataire2' : 
+                         'nui_image_signataire3';
+            setFormDataState(prev => ({
+                ...prev,
+                [field]: file
+            }));
+            
+            const newPreviews = [...nuiImageSignatairePreviews];
+            newPreviews[index] = URL.createObjectURL(file);
+            setNuiImageSignatairePreviews(newPreviews);
+        }
+    };
+
+    const handleLieuDitDomicilePhotoChange = (index, e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const field = index === 0 ? 'lieu_dit_domicile_photo_signataire' : 
+                         index === 1 ? 'lieu_dit_domicile_photo_signataire2' : 
+                         'lieu_dit_domicile_photo_signataire3';
+            setFormDataState(prev => ({
+                ...prev,
+                [field]: file
+            }));
+            
+            const newPreviews = [...lieuDitDomicilePhotoPreviews];
+            newPreviews[index] = URL.createObjectURL(file);
+            setLieuDitDomicilePhotoPreviews(newPreviews);
+        }
+    };
+
+    const handlePhotoLocalisationDomicileChange = (index, e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const field = index === 0 ? 'photo_localisation_domicile_signataire' : 
+                         index === 1 ? 'photo_localisation_domicile_signataire2' : 
+                         'photo_localisation_domicile_signataire3';
+            setFormDataState(prev => ({
+                ...prev,
+                [field]: file
+            }));
+            
+            const newPreviews = [...photoLocalisationDomicilePreviews];
+            newPreviews[index] = URL.createObjectURL(file);
+            setPhotoLocalisationDomicilePreviews(newPreviews);
+        }
+    };
+
     const handlePlanSignataireChange = (index, e) => {
         const file = e.target.files[0];
         if (file) {
@@ -574,13 +815,16 @@ export default function ModifierClient() {
         }
     };
 
-    const removeFile = (field, setPreview = null) => {
+    const removeFile = (field, setPreview = null, setFileName = null) => {
         setFormDataState(prev => ({
             ...prev,
             [field]: null
         }));
         if (setPreview) {
             setPreview(null);
+        }
+        if (setFileName) {
+            setFileName('');
         }
     };
 
@@ -609,7 +853,14 @@ export default function ModifierClient() {
             });
             
             // Ajouter les fichiers communs
-            const commonFileFields = ['photo_localisation_domicile', 'photo_localisation_activite'];
+            const commonFileFields = [
+                'photo_localisation_domicile', 'photo_localisation_activite'
+            ];
+            
+            if (!isPhysique) {
+                commonFileFields.push('liste_membres_pdf');
+            }
+            
             commonFileFields.forEach(field => {
                 if (formDataState[field] instanceof File) {
                     formData.append(field, formDataState[field]);
@@ -633,7 +884,11 @@ export default function ModifierClient() {
                 });
                 
                 // Fichiers physique
-                const physiqueFileFields = ['photo', 'signature', 'cni_recto', 'cni_verso'];
+                const physiqueFileFields = [
+                    'photo', 'signature', 'cni_recto', 'cni_verso', 
+                    'niu_image', 'attestation_conformite_pdf'
+                ];
+                
                 physiqueFileFields.forEach(field => {
                     if (formDataState[field] instanceof File) {
                         formData.append(field, formDataState[field]);
@@ -644,10 +899,7 @@ export default function ModifierClient() {
                 const moraleFields = [
                     'raison_sociale', 'sigle', 'forme_juridique', 'type_entreprise',
                     'rccm', 'nui', 'nom_gerant', 'telephone_gerant',
-                    'nom_gerant2', 'telephone_gerant2',
-                    'nom_signataire', 'telephone_signataire',
-                    'nom_signataire2', 'telephone_signataire2',
-                    'nom_signataire3', 'telephone_signataire3'
+                    'nom_gerant2', 'telephone_gerant2'
                 ];
                 
                 moraleFields.forEach(field => {
@@ -655,20 +907,55 @@ export default function ModifierClient() {
                     formData.append(field, value !== undefined && value !== null ? value : '');
                 });
                 
+                // Champs des signataires
+                formDataState.signataires.forEach((signataire, index) => {
+                    if (signataire.nom) {
+                        const prefix = index === 0 ? '' : index + 1;
+                        formData.append(`nom_signataire${prefix}`, signataire.nom);
+                        formData.append(`sexe_signataire${prefix}`, signataire.sexe);
+                        formData.append(`ville_signataire${prefix}`, signataire.ville);
+                        formData.append(`quartier_signataire${prefix}`, signataire.quartier);
+                        formData.append(`lieu_domicile_signataire${prefix}`, signataire.lieu_domicile);
+                        formData.append(`lieu_dit_domicile_signataire${prefix}`, signataire.lieu_dit_domicile);
+                        formData.append(`telephone_signataire${prefix}`, signataire.telephone);
+                        formData.append(`email_signataire${prefix}`, signataire.email);
+                        formData.append(`cni_signataire${prefix}`, signataire.cni);
+                        formData.append(`nui_signataire${prefix}`, signataire.nui);
+                    }
+                });
+                
                 // Fichiers client moral
                 const moraleFileFields = [
                     'photo_gerant', 'photo_gerant2',
-                    'photo_signataire', 'photo_signataire2', 'photo_signataire3',
-                    'signature_signataire', 'signature_signataire2', 'signature_signataire3',
-                    'extrait_rccm_image', 'titre_patente_image', 'niu_image', 'statuts_image',
-                    'pv_agc_image', 'attestation_non_redevance_image', 'proces_verbal_image',
-                    'registre_coop_gic_image', 'recepisse_declaration_association_image',
+                    'extrait_rccm_image', 'titre_patente_image', 'niu_image_morale',
+                    'statuts_image', 'pv_agc_image', 'attestation_non_redevance_image',
+                    'proces_verbal_image', 'registre_coop_gic_image', 'recepisse_declaration_association_image',
                     'acte_designation_signataires_pdf', 'liste_conseil_administration_pdf',
                     'plan_localisation_siege_image', 'facture_eau_siege_image', 'facture_electricite_siege_image',
                     'plan_localisation_signataire1_image', 'plan_localisation_signataire2_image', 'plan_localisation_signataire3_image',
                     'facture_eau_signataire1_image', 'facture_eau_signataire2_image', 'facture_eau_signataire3_image',
-                    'facture_electricite_signataire1_image', 'facture_electricite_signataire2_image', 'facture_electricite_signataire3_image'
+                    'facture_electricite_signataire1_image', 'facture_electricite_signataire2_image', 'facture_electricite_signataire3_image',
+                    'attestation_conformite_pdf'
                 ];
+                
+                // Fichiers des signataires
+                for (let i = 0; i < 3; i++) {
+                    const fields = [
+                        `photo_signataire${i === 0 ? '' : i + 1}`,
+                        `signature_signataire${i === 0 ? '' : i + 1}`,
+                        `cni_photo_recto_signataire${i === 0 ? '' : i + 1}`,
+                        `cni_photo_verso_signataire${i === 0 ? '' : i + 1}`,
+                        `nui_image_signataire${i === 0 ? '' : i + 1}`,
+                        `lieu_dit_domicile_photo_signataire${i === 0 ? '' : i + 1}`,
+                        `photo_localisation_domicile_signataire${i === 0 ? '' : i + 1}`
+                    ];
+                    
+                    fields.forEach(field => {
+                        if (formDataState[field] instanceof File) {
+                            formData.append(field, formDataState[field]);
+                        }
+                    });
+                }
                 
                 moraleFileFields.forEach(field => {
                     if (formDataState[field] instanceof File) {
@@ -718,6 +1005,7 @@ export default function ModifierClient() {
     const isPhysique = formDataState.type_client === 'physique';
     const activeGradient = 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)';
     const typeEntreprise = formDataState.morale?.type_entreprise || 'entreprise';
+    const currentSignataire = formDataState.signataires[activeSignataireTab];
 
     return (
         <Layout>
@@ -1065,6 +1353,65 @@ export default function ModifierClient() {
                                             </CardContent>
                                         </Card>
                                         
+                                        {/* Documents PDF communs */}
+                                        <Card sx={{ borderRadius: 5, boxShadow: '0 10px 30px rgba(0,0,0,0.04)' }}>
+                                            <CardContent>
+                                                <Typography variant="subtitle1" fontWeight="800" sx={{ mb: 2 }}>Documents communs</Typography>
+                                                <Stack spacing={2}>
+                                                    {isPhysique ? (
+                                                        <>
+                                                            <FileUploadPdfField
+                                                                label="Attestation de conformité (PDF)"
+                                                                fileName={attestationConformitePdfName}
+                                                                onClick={() => attestationConformitePdfRef.current.click()}
+                                                                inputRef={attestationConformitePdfRef}
+                                                                onChange={(e) => handleFileChange('attestation_conformite_pdf', e)}
+                                                                onRemove={() => removeFile('attestation_conformite_pdf', null, setAttestationConformitePdfName)}
+                                                            />
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <FileUploadPdfField
+                                                                label="Liste des membres (PDF)"
+                                                                fileName={listeMembresPdfName}
+                                                                onClick={() => listeMembresPdfRef.current.click()}
+                                                                inputRef={listeMembresPdfRef}
+                                                                onChange={(e) => handleFileChange('liste_membres_pdf', e)}
+                                                                onRemove={() => removeFile('liste_membres_pdf', null, setListeMembresPdfName)}
+                                                            />
+                                                            <FileUploadPdfField
+                                                                label="Attestation de conformité (PDF)"
+                                                                fileName={attestationConformitePdfName}
+                                                                onClick={() => attestationConformitePdfRef.current.click()}
+                                                                inputRef={attestationConformitePdfRef}
+                                                                onChange={(e) => handleFileChange('attestation_conformite_pdf', e)}
+                                                                onRemove={() => removeFile('attestation_conformite_pdf', null, setAttestationConformitePdfName)}
+                                                            />
+                                                        </>
+                                                    )}
+                                                </Stack>
+                                            </CardContent>
+                                        </Card>
+                                        
+                                        {/* Documents supplémentaires pour client physique */}
+                                        {isPhysique && (
+                                            <Card sx={{ borderRadius: 5, boxShadow: '0 10px 30px rgba(0,0,0,0.04)' }}>
+                                                <CardContent>
+                                                    <Typography variant="subtitle1" fontWeight="800" sx={{ mb: 2 }}>Documents supplémentaires</Typography>
+                                                    <Stack spacing={2}>
+                                                        <FileUploadField
+                                                            label="Photocopie NUI"
+                                                            preview={nuiImagePreview}
+                                                            onRemove={() => removeFile('niu_image', setNuiImagePreview)}
+                                                            onClick={() => nuiImageRef.current.click()}
+                                                            inputRef={nuiImageRef}
+                                                            onChange={(e) => handleFileChange('niu_image', e)}
+                                                        />
+                                                    </Stack>
+                                                </CardContent>
+                                            </Card>
+                                        )}
+                                        
                                         {!isPhysique && (
                                             <>
                                                 {/* Documents juridiques selon le type d'entreprise */}
@@ -1094,11 +1441,11 @@ export default function ModifierClient() {
                                                                     />
                                                                     <FileUploadField
                                                                         label="Photocopie NUI"
-                                                                        preview={niuImagePreview}
-                                                                        onRemove={() => removeFile('niu_image', setNiuImagePreview)}
-                                                                        onClick={() => niuImageRef.current.click()}
-                                                                        inputRef={niuImageRef}
-                                                                        onChange={(e) => handleFileChange('niu_image', e)}
+                                                                        preview={niuImageMoralePreview}
+                                                                        onRemove={() => removeFile('niu_image_morale', setNiuImageMoralePreview)}
+                                                                        onClick={() => niuImageMoraleRef.current.click()}
+                                                                        inputRef={niuImageMoraleRef}
+                                                                        onChange={(e) => handleFileChange('niu_image_morale', e)}
                                                                     />
                                                                     <FileUploadField
                                                                         label="Photocopie des Statuts"
@@ -1108,9 +1455,8 @@ export default function ModifierClient() {
                                                                         inputRef={statutsRef}
                                                                         onChange={(e) => handleFileChange('statuts_image', e)}
                                                                     />
-                                                                    <FileUploadField
+                                                                    <FileUploadPdfField
                                                                         label="Acte de Désignation (PDF)"
-                                                                        isPdf={true}
                                                                         onClick={() => acteDesignationPdfRef.current.click()}
                                                                         inputRef={acteDesignationPdfRef}
                                                                         onChange={(e) => handleFileChange('acte_designation_signataires_pdf', e)}
@@ -1160,9 +1506,8 @@ export default function ModifierClient() {
                                                                     />
                                                                 </>
                                                             )}
-                                                            <FileUploadField
+                                                            <FileUploadPdfField
                                                                 label="Liste Conseil d'Administration (PDF)"
-                                                                isPdf={true}
                                                                 onClick={() => listeConseilPdfRef.current.click()}
                                                                 inputRef={listeConseilPdfRef}
                                                                 onChange={(e) => handleFileChange('liste_conseil_administration_pdf', e)}
@@ -1808,34 +2153,96 @@ export default function ModifierClient() {
                                                 <TextField 
                                                     fullWidth 
                                                     label={`Nom Signataire ${activeSignataireTab + 1}`} 
-                                                    name={`nom_signataire${activeSignataireTab === 0 ? '' : activeSignataireTab + 1}`} 
-                                                    value={
-                                                        activeSignataireTab === 0 ? formDataState.morale?.nom_signataire || '' :
-                                                        activeSignataireTab === 1 ? formDataState.morale?.nom_signataire2 || '' :
-                                                        formDataState.morale?.nom_signataire3 || ''
-                                                    } 
-                                                    onChange={(e) => {
-                                                        const field = activeSignataireTab === 0 ? 'nom_signataire' : 
-                                                                    activeSignataireTab === 1 ? 'nom_signataire2' : 'nom_signataire3';
-                                                        handleNestedChange('morale', {target: {name: field, value: e.target.value}});
-                                                    }} 
+                                                    name="nom" 
+                                                    value={currentSignataire?.nom || ''} 
+                                                    onChange={(e) => handleSignataireChange(activeSignataireTab, e)} 
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                                <TextField 
+                                                    select 
+                                                    fullWidth 
+                                                    label="Sexe" 
+                                                    name="sexe" 
+                                                    value={currentSignataire?.sexe || ''} 
+                                                    onChange={(e) => handleSignataireChange(activeSignataireTab, e)}
+                                                >
+                                                    <MenuItem value="">Sélectionner</MenuItem>
+                                                    <MenuItem value="M">Masculin</MenuItem>
+                                                    <MenuItem value="F">Féminin</MenuItem>
+                                                </TextField>
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                                <TextField 
+                                                    fullWidth 
+                                                    label="Ville" 
+                                                    name="ville" 
+                                                    value={currentSignataire?.ville || ''} 
+                                                    onChange={(e) => handleSignataireChange(activeSignataireTab, e)} 
                                                 />
                                             </Grid>
                                             <Grid item xs={12} md={6}>
                                                 <TextField 
                                                     fullWidth 
-                                                    label={`Téléphone Signataire ${activeSignataireTab + 1}`} 
-                                                    name={`telephone_signataire${activeSignataireTab === 0 ? '' : activeSignataireTab + 1}`} 
-                                                    value={
-                                                        activeSignataireTab === 0 ? formDataState.morale?.telephone_signataire || '' :
-                                                        activeSignataireTab === 1 ? formDataState.morale?.telephone_signataire2 || '' :
-                                                        formDataState.morale?.telephone_signataire3 || ''
-                                                    } 
-                                                    onChange={(e) => {
-                                                        const field = activeSignataireTab === 0 ? 'telephone_signataire' : 
-                                                                    activeSignataireTab === 1 ? 'telephone_signataire2' : 'telephone_signataire3';
-                                                        handleNestedChange('morale', {target: {name: field, value: e.target.value}});
-                                                    }} 
+                                                    label="Quartier" 
+                                                    name="quartier" 
+                                                    value={currentSignataire?.quartier || ''} 
+                                                    onChange={(e) => handleSignataireChange(activeSignataireTab, e)} 
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                                <TextField 
+                                                    fullWidth 
+                                                    label="Lieu Domicile" 
+                                                    name="lieu_domicile" 
+                                                    value={currentSignataire?.lieu_domicile || ''} 
+                                                    onChange={(e) => handleSignataireChange(activeSignataireTab, e)} 
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                                <TextField 
+                                                    fullWidth 
+                                                    label="Lieu-dit Domicile" 
+                                                    name="lieu_dit_domicile" 
+                                                    value={currentSignataire?.lieu_dit_domicile || ''} 
+                                                    onChange={(e) => handleSignataireChange(activeSignataireTab, e)} 
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                                <TextField 
+                                                    fullWidth 
+                                                    label="Téléphone" 
+                                                    name="telephone" 
+                                                    value={currentSignataire?.telephone || ''} 
+                                                    onChange={(e) => handleSignataireChange(activeSignataireTab, e)} 
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                                <TextField 
+                                                    fullWidth 
+                                                    label="Email" 
+                                                    name="email" 
+                                                    type="email"
+                                                    value={currentSignataire?.email || ''} 
+                                                    onChange={(e) => handleSignataireChange(activeSignataireTab, e)} 
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                                <TextField 
+                                                    fullWidth 
+                                                    label="CNI" 
+                                                    name="cni" 
+                                                    value={currentSignataire?.cni || ''} 
+                                                    onChange={(e) => handleSignataireChange(activeSignataireTab, e)} 
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                                <TextField 
+                                                    fullWidth 
+                                                    label="NUI" 
+                                                    name="nui" 
+                                                    value={currentSignataire?.nui || ''} 
+                                                    onChange={(e) => handleSignataireChange(activeSignataireTab, e)} 
                                                 />
                                             </Grid>
                                         </Grid>
@@ -1862,9 +2269,6 @@ export default function ModifierClient() {
                                                                                 const newPreviews = [...signatairePreviews];
                                                                                 newPreviews[activeSignataireTab] = null;
                                                                                 setSignatairePreviews(newPreviews);
-                                                                                const field = activeSignataireTab === 0 ? 'photo_signataire' : 
-                                                                                            activeSignataireTab === 1 ? 'photo_signataire2' : 'photo_signataire3';
-                                                                                removeFile(field);
                                                                             }}
                                                                         >
                                                                             <CloseIcon fontSize="small" />
@@ -1904,9 +2308,6 @@ export default function ModifierClient() {
                                                                                 const newPreviews = [...signatureSignatairePreviews];
                                                                                 newPreviews[activeSignataireTab] = null;
                                                                                 setSignatureSignatairePreviews(newPreviews);
-                                                                                const field = activeSignataireTab === 0 ? 'signature_signataire' : 
-                                                                                            activeSignataireTab === 1 ? 'signature_signataire2' : 'signature_signataire3';
-                                                                                removeFile(field);
                                                                             }}
                                                                         >
                                                                             <CloseIcon fontSize="small" />
@@ -1930,6 +2331,201 @@ export default function ModifierClient() {
                                                                 />
                                                             </Stack>
                                                         </Box>
+                                                        <Box>
+                                                            <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>Recto CNI</Typography>
+                                                            <Stack direction="row" spacing={2} alignItems="center">
+                                                                {cniRectoSignatairePreviews[activeSignataireTab] && (
+                                                                    <>
+                                                                        <Avatar 
+                                                                            variant="rounded"
+                                                                            src={cniRectoSignatairePreviews[activeSignataireTab]}
+                                                                            sx={{ width: 60, height: 60 }}
+                                                                        />
+                                                                        <IconButton 
+                                                                            size="small" 
+                                                                            onClick={() => {
+                                                                                const newPreviews = [...cniRectoSignatairePreviews];
+                                                                                newPreviews[activeSignataireTab] = null;
+                                                                                setCniRectoSignatairePreviews(newPreviews);
+                                                                            }}
+                                                                        >
+                                                                            <CloseIcon fontSize="small" />
+                                                                        </IconButton>
+                                                                    </>
+                                                                )}
+                                                                <Button
+                                                                    variant="outlined"
+                                                                    size="small"
+                                                                    startIcon={<PhotoCameraIcon />}
+                                                                    onClick={() => cniRectoSignataireRefs[activeSignataireTab].current.click()}
+                                                                >
+                                                                    {cniRectoSignatairePreviews[activeSignataireTab] ? 'Changer' : 'Ajouter'}
+                                                                </Button>
+                                                                <input 
+                                                                    type="file" 
+                                                                    hidden 
+                                                                    ref={cniRectoSignataireRefs[activeSignataireTab]} 
+                                                                    onChange={(e) => handleCniRectoSignataireChange(activeSignataireTab, e)} 
+                                                                    accept="image/*" 
+                                                                />
+                                                            </Stack>
+                                                        </Box>
+                                                        <Box>
+                                                            <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>Verso CNI</Typography>
+                                                            <Stack direction="row" spacing={2} alignItems="center">
+                                                                {cniVersoSignatairePreviews[activeSignataireTab] && (
+                                                                    <>
+                                                                        <Avatar 
+                                                                            variant="rounded"
+                                                                            src={cniVersoSignatairePreviews[activeSignataireTab]}
+                                                                            sx={{ width: 60, height: 60 }}
+                                                                        />
+                                                                        <IconButton 
+                                                                            size="small" 
+                                                                            onClick={() => {
+                                                                                const newPreviews = [...cniVersoSignatairePreviews];
+                                                                                newPreviews[activeSignataireTab] = null;
+                                                                                setCniVersoSignatairePreviews(newPreviews);
+                                                                            }}
+                                                                        >
+                                                                            <CloseIcon fontSize="small" />
+                                                                        </IconButton>
+                                                                    </>
+                                                                )}
+                                                                <Button
+                                                                    variant="outlined"
+                                                                    size="small"
+                                                                    startIcon={<PhotoCameraIcon />}
+                                                                    onClick={() => cniVersoSignataireRefs[activeSignataireTab].current.click()}
+                                                                >
+                                                                    {cniVersoSignatairePreviews[activeSignataireTab] ? 'Changer' : 'Ajouter'}
+                                                                </Button>
+                                                                <input 
+                                                                    type="file" 
+                                                                    hidden 
+                                                                    ref={cniVersoSignataireRefs[activeSignataireTab]} 
+                                                                    onChange={(e) => handleCniVersoSignataireChange(activeSignataireTab, e)} 
+                                                                    accept="image/*" 
+                                                                />
+                                                            </Stack>
+                                                        </Box>
+                                                        <Box>
+                                                            <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>Photocopie NUI</Typography>
+                                                            <Stack direction="row" spacing={2} alignItems="center">
+                                                                {nuiImageSignatairePreviews[activeSignataireTab] && (
+                                                                    <>
+                                                                        <Avatar 
+                                                                            variant="rounded"
+                                                                            src={nuiImageSignatairePreviews[activeSignataireTab]}
+                                                                            sx={{ width: 60, height: 60 }}
+                                                                        />
+                                                                        <IconButton 
+                                                                            size="small" 
+                                                                            onClick={() => {
+                                                                                const newPreviews = [...nuiImageSignatairePreviews];
+                                                                                newPreviews[activeSignataireTab] = null;
+                                                                                setNuiImageSignatairePreviews(newPreviews);
+                                                                            }}
+                                                                        >
+                                                                            <CloseIcon fontSize="small" />
+                                                                        </IconButton>
+                                                                    </>
+                                                                )}
+                                                                <Button
+                                                                    variant="outlined"
+                                                                    size="small"
+                                                                    startIcon={<PhotoCameraIcon />}
+                                                                    onClick={() => nuiImageSignataireRefs[activeSignataireTab].current.click()}
+                                                                >
+                                                                    {nuiImageSignatairePreviews[activeSignataireTab] ? 'Changer' : 'Ajouter'}
+                                                                </Button>
+                                                                <input 
+                                                                    type="file" 
+                                                                    hidden 
+                                                                    ref={nuiImageSignataireRefs[activeSignataireTab]} 
+                                                                    onChange={(e) => handleNuiImageSignataireChange(activeSignataireTab, e)} 
+                                                                    accept="image/*" 
+                                                                />
+                                                            </Stack>
+                                                        </Box>
+                                                        <Box>
+                                                            <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>Photo lieu-dit domicile</Typography>
+                                                            <Stack direction="row" spacing={2} alignItems="center">
+                                                                {lieuDitDomicilePhotoPreviews[activeSignataireTab] && (
+                                                                    <>
+                                                                        <Avatar 
+                                                                            variant="rounded"
+                                                                            src={lieuDitDomicilePhotoPreviews[activeSignataireTab]}
+                                                                            sx={{ width: 60, height: 60 }}
+                                                                        />
+                                                                        <IconButton 
+                                                                            size="small" 
+                                                                            onClick={() => {
+                                                                                const newPreviews = [...lieuDitDomicilePhotoPreviews];
+                                                                                newPreviews[activeSignataireTab] = null;
+                                                                                setLieuDitDomicilePhotoPreviews(newPreviews);
+                                                                            }}
+                                                                        >
+                                                                            <CloseIcon fontSize="small" />
+                                                                        </IconButton>
+                                                                    </>
+                                                                )}
+                                                                <Button
+                                                                    variant="outlined"
+                                                                    size="small"
+                                                                    startIcon={<PhotoCameraIcon />}
+                                                                    onClick={() => lieuDitDomicilePhotoRefs[activeSignataireTab].current.click()}
+                                                                >
+                                                                    {lieuDitDomicilePhotoPreviews[activeSignataireTab] ? 'Changer' : 'Ajouter'}
+                                                                </Button>
+                                                                <input 
+                                                                    type="file" 
+                                                                    hidden 
+                                                                    ref={lieuDitDomicilePhotoRefs[activeSignataireTab]} 
+                                                                    onChange={(e) => handleLieuDitDomicilePhotoChange(activeSignataireTab, e)} 
+                                                                    accept="image/*" 
+                                                                />
+                                                            </Stack>
+                                                        </Box>
+                                                        <Box>
+                                                            <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>Photo localisation domicile</Typography>
+                                                            <Stack direction="row" spacing={2} alignItems="center">
+                                                                {photoLocalisationDomicilePreviews[activeSignataireTab] && (
+                                                                    <>
+                                                                        <Avatar 
+                                                                            variant="rounded"
+                                                                            src={photoLocalisationDomicilePreviews[activeSignataireTab]}
+                                                                            sx={{ width: 60, height: 60 }}
+                                                                        />
+                                                                        <IconButton 
+                                                                            size="small" 
+                                                                            onClick={() => {
+                                                                                const newPreviews = [...photoLocalisationDomicilePreviews];
+                                                                                newPreviews[activeSignataireTab] = null;
+                                                                                setPhotoLocalisationDomicilePreviews(newPreviews);
+                                                                            }}
+                                                                        >
+                                                                            <CloseIcon fontSize="small" />
+                                                                        </IconButton>
+                                                                    </>
+                                                                )}
+                                                                <Button
+                                                                    variant="outlined"
+                                                                    size="small"
+                                                                    startIcon={<PhotoCameraIcon />}
+                                                                    onClick={() => photoLocalisationDomicileRefs[activeSignataireTab].current.click()}
+                                                                >
+                                                                    {photoLocalisationDomicilePreviews[activeSignataireTab] ? 'Changer' : 'Ajouter'}
+                                                                </Button>
+                                                                <input 
+                                                                    type="file" 
+                                                                    hidden 
+                                                                    ref={photoLocalisationDomicileRefs[activeSignataireTab]} 
+                                                                    onChange={(e) => handlePhotoLocalisationDomicileChange(activeSignataireTab, e)} 
+                                                                    accept="image/*" 
+                                                                />
+                                                            </Stack>
+                                                        </Box>
                                                     </Stack>
                                                 </Grid>
                                                 <Grid item xs={12} md={6}>
@@ -1941,9 +2537,6 @@ export default function ModifierClient() {
                                                                 const newPreviews = [...factureEauSignatairePreviews];
                                                                 newPreviews[activeSignataireTab] = null;
                                                                 setFactureEauSignatairePreviews(newPreviews);
-                                                                const field = activeSignataireTab === 0 ? 'facture_eau_signataire1_image' : 
-                                                                            activeSignataireTab === 1 ? 'facture_eau_signataire2_image' : 'facture_eau_signataire3_image';
-                                                                removeFile(field);
                                                             }}
                                                             onClick={() => factureEauSignataireRefs[activeSignataireTab].current.click()}
                                                             inputRef={factureEauSignataireRefs[activeSignataireTab]}
@@ -1956,9 +2549,6 @@ export default function ModifierClient() {
                                                                 const newPreviews = [...factureElecSignatairePreviews];
                                                                 newPreviews[activeSignataireTab] = null;
                                                                 setFactureElecSignatairePreviews(newPreviews);
-                                                                const field = activeSignataireTab === 0 ? 'facture_electricite_signataire1_image' : 
-                                                                            activeSignataireTab === 1 ? 'facture_electricite_signataire2_image' : 'facture_electricite_signataire3_image';
-                                                                removeFile(field);
                                                             }}
                                                             onClick={() => factureElecSignataireRefs[activeSignataireTab].current.click()}
                                                             inputRef={factureElecSignataireRefs[activeSignataireTab]}
@@ -1990,7 +2580,7 @@ export default function ModifierClient() {
     );
 }
 
-// Composant pour l'upload de fichiers
+// Composant pour l'upload de fichiers images
 function FileUploadField({ label, preview, onRemove, onClick, inputRef, onChange, isPdf = false }) {
     return (
         <Box>
@@ -2022,6 +2612,42 @@ function FileUploadField({ label, preview, onRemove, onClick, inputRef, onChange
                     ref={inputRef} 
                     onChange={onChange} 
                     accept={isPdf ? ".pdf" : "image/*"} 
+                />
+            </Stack>
+        </Box>
+    );
+}
+
+// Composant pour l'upload de fichiers PDF
+function FileUploadPdfField({ label, fileName, onClick, inputRef, onChange, onRemove }) {
+    return (
+        <Box>
+            <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>{label}</Typography>
+            <Stack direction="row" spacing={2} alignItems="center">
+                {fileName && (
+                    <>
+                        <Typography variant="body2" sx={{ color: '#6366f1' }}>
+                            {fileName}
+                        </Typography>
+                        <IconButton size="small" onClick={onRemove}>
+                            <CloseIcon fontSize="small" />
+                        </IconButton>
+                    </>
+                )}
+                <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<UploadIcon />}
+                    onClick={onClick}
+                >
+                    {fileName ? 'Changer' : 'Ajouter'}
+                </Button>
+                <input 
+                    type="file" 
+                    hidden 
+                    ref={inputRef} 
+                    onChange={onChange} 
+                    accept=".pdf" 
                 />
             </Stack>
         </Box>

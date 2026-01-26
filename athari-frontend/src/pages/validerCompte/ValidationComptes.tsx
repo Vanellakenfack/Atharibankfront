@@ -463,11 +463,55 @@ export default function ValidationComptes() {
     handleMenuClose();
   };
 
+  // Fonction pour vérifier si tous les documents requis sont présents POUR LA LEVÉE D'OPPOSITION SEULEMENT
+  const checkDocumentsForOpposition = (compte: Compte) => {
+    const client = compte.client;
+    
+    if (client.type_client === 'physique') {
+      // Pour client physique, vérifier les documents requis pour la levée d'opposition
+      const physique = client.physique;
+      const documentsRequis = [
+        physique?.cni_recto_url,           // CNI Recto
+        physique?.cni_verso_url,           // CNI Verso
+        physique?.niu_image_url,           // NUI (Image)
+        physique?.photo_url,                  // Photo du client
+        client.photo_localisation_domicile, // Photo localisation domicile
+        physique?.nui                      // Informations NUI (texte)
+      ];
+      
+      // Vérifier si tous les documents requis sont présents (non null/undefined)
+      const tousDocumentsPresents = documentsRequis.every(doc => 
+        doc !== null && doc !== undefined && doc !== ''
+      );
+      
+      return tousDocumentsPresents;
+    } else if (client.type_client === 'morale') {
+      // Pour client moral, vérifier les documents requis pour la levée d'opposition
+      const morale = client.morale;
+      const documentsRequis = [
+        morale?.plan_localisation_siege_image_url, // plan_localisation_siege_image
+        morale?.nui,                           // nui (texte)
+        morale?.niu_image_url,                 // niu_image
+        morale?.acte_designation_signataires_pdf_url // acte_designation_signataires_pdf
+      ];
+      
+      // Vérifier si tous les documents requis sont présents (non null/undefined)
+      const tousDocumentsPresents = documentsRequis.every(doc => 
+        doc !== null && doc !== undefined && doc !== ''
+      );
+      
+      return tousDocumentsPresents;
+    }
+    
+    return false;
+  };
+
   // Fonction pour le bouton Valider dans le menu contextuel (ouvre modal avec checkboxes)
   const handleValidateClick = () => {
     if (selectedId) {
       const compte = comptes.find(c => c.id === selectedId);
       if (compte) {
+        // Réinitialiser les checkboxes à chaque ouverture
         initializeChecklist(compte);
         setValidationDialog({
           open: true,
@@ -619,6 +663,14 @@ export default function ValidationComptes() {
     
     setLoadingAction(true);
     try {
+      // Vérifier si tous les documents sont présents pour la levée d'opposition
+      const documentsPresents = checkDocumentsForOpposition(leverOppositionDialog.compte);
+      if (!documentsPresents) {
+        showSnackbar('Tous les documents requis ne sont pas présents. Impossible de lever l\'opposition.', 'error');
+        setLoadingAction(false);
+        return;
+      }
+      
       // Préparer les données pour lever l'opposition
       const checkboxesArray = [];
       if (leverOppositionDialog.checklist.cni_valide) checkboxesArray.push('cni_valide');
@@ -879,10 +931,6 @@ export default function ValidationComptes() {
           </Grid>
           
           <Grid item xs={12} md={6}>
-            {renderDocument('Signature', physique.signature_url)}
-          </Grid>
-          
-          <Grid item xs={12} md={6}>
             {renderDocument('CNI Recto', physique.cni_recto_url)}
           </Grid>
           
@@ -891,11 +939,7 @@ export default function ValidationComptes() {
           </Grid>
           
           <Grid item xs={12} md={6}>
-            {renderDocument('Photo localisation activité', client.photo_localisation_activite_url)}
-          </Grid>
-          
-          <Grid item xs={12} md={6}>
-            {renderDocument('Photo localisation domicile', client.photo_localisation_domicile_url)}
+            {renderDocument('Photo localisation domicile', client.photo_localisation_domicile)}
           </Grid>
           
           <Grid item xs={12} md={6}>
@@ -952,52 +996,6 @@ export default function ValidationComptes() {
             {renderDocument('Liste conseil administration', morale.liste_conseil_administration_pdf_url, 'pdf')}
           </Grid>
           
-          <Grid item xs={12} md={6}>
-            {renderDocument('Attestation conformité', morale.attestation_conformite_pdf_url, 'pdf')}
-          </Grid>
-          
-          <Grid item xs={12}>
-            <Typography variant="subtitle1" fontWeight="bold" color="primary" sx={{ mb: 2, mt: 2 }}>
-              Localisation et factures des signataires
-            </Typography>
-          </Grid>
-          
-          <Grid item xs={12} md={4}>
-            {renderDocument('Localisation signataire 1', morale.plan_localisation_signataire1_image_url)}
-          </Grid>
-          
-          <Grid item xs={12} md={4}>
-            {renderDocument('Facture eau signataire 1', morale.facture_eau_signataire1_image_url)}
-          </Grid>
-          
-          <Grid item xs={12} md={4}>
-            {renderDocument('Facture électricité signataire 1', morale.facture_electricite_signataire1_image_url)}
-          </Grid>
-          
-          <Grid item xs={12} md={4}>
-            {renderDocument('Localisation signataire 2', morale.plan_localisation_signataire2_image_url)}
-          </Grid>
-          
-          <Grid item xs={12} md={4}>
-            {renderDocument('Facture eau signataire 2', morale.facture_eau_signataire2_image_url)}
-          </Grid>
-          
-          <Grid item xs={12} md={4}>
-            {renderDocument('Facture électricité signataire 2', morale.facture_electricite_signataire2_image_url)}
-          </Grid>
-          
-          <Grid item xs={12} md={4}>
-            {renderDocument('Localisation signataire 3', morale.plan_localisation_signataire3_image_url)}
-          </Grid>
-          
-          <Grid item xs={12} md={4}>
-            {renderDocument('Facture eau signataire 3', morale.facture_eau_signataire3_image_url)}
-          </Grid>
-          
-          <Grid item xs={12} md={4}>
-            {renderDocument('Facture électricité signataire 3', morale.facture_electricite_signataire3_image_url)}
-          </Grid>
-          
           <Grid item xs={12}>
             <Typography variant="subtitle1" fontWeight="bold" color="primary" sx={{ mb: 2, mt: 2 }}>
               Localisation et factures du siège
@@ -1043,37 +1041,49 @@ export default function ValidationComptes() {
     setDetailDialog(prev => ({ ...prev, activeTab: newValue }));
   };
 
+  // Fonction pour vérifier si tous les checkboxes sont cochés dans la levée d'opposition
+  const areAllOppositionCheckboxesChecked = () => {
+    return Object.values(leverOppositionDialog.checklist).every(value => value);
+  };
+
+  // Fonction pour initialiser les checkboxes
   const initializeChecklist = (compte: Compte) => {
-    if (compte.checklist_juridique && Array.isArray(compte.checklist_juridique)) {
-      setChecklistItems(compte.checklist_juridique.map((item: any) => ({
-        id: item.id || item.label,
-        label: item.label || item,
-        checked: item.checked || false,
-      })));
-    } else {
-      const client = compte.client;
-      let defaultChecklist = [];
-      
-      if (client.type_client === 'physique') {
-        defaultChecklist = [
-          { id: 'documents_complets', label: 'Tous les documents sont complets (CNI, photo, signature)', checked: false },
-          { id: 'identite_verifiee', label: 'Identité du client vérifiée', checked: false },
-          { id: 'conformite_legale', label: 'Conformité légale vérifiée', checked: false },
-          { id: 'signatures_valides', label: 'Signatures valides', checked: false },
-          { id: 'localisations_verifiees', label: 'Localisations vérifiées', checked: false },
-        ];
+    // D'abord réinitialiser les checkboxes
+    setChecklistItems([]);
+    
+    // Utiliser setTimeout pour s'assurer que la réinitialisation est faite avant de définir les nouvelles valeurs
+    setTimeout(() => {
+      if (compte.checklist_juridique && Array.isArray(compte.checklist_juridique)) {
+        setChecklistItems(compte.checklist_juridique.map((item: any) => ({
+          id: item.id || item.label,
+          label: item.label || item,
+          checked: item.checked || false,
+        })));
       } else {
-        defaultChecklist = [
-          { id: 'documents_legaux_complets', label: 'Documents légaux complets (PV AGC, statuts, etc.)', checked: false },
-          { id: 'representants_verifies', label: 'Représentants légaux vérifiés', checked: false },
-          { id: 'conformite_legale', label: 'Conformité légale de l\'entreprise vérifiée', checked: false },
-          { id: 'signatures_valides', label: 'Signatures des mandataires valides', checked: false },
-          { id: 'localisations_verifiees', label: 'Localisations du siège et signataires vérifiées', checked: false },
-          { id: 'factures_verifiees', label: 'Factures de services vérifiées', checked: false },
-        ];
+        const client = compte.client;
+        let defaultChecklist = [];
+        
+        if (client.type_client === 'physique') {
+          defaultChecklist = [
+            { id: 'documents_complets', label: 'Tous les documents sont complets (CNI, photo, signature)', checked: false },
+            { id: 'identite_verifiee', label: 'Identité du client vérifiée', checked: false },
+            { id: 'conformite_legale', label: 'Conformité légale vérifiée', checked: false },
+            { id: 'signatures_valides', label: 'Signatures valides', checked: false },
+            { id: 'localisations_verifiees', label: 'Localisations vérifiées', checked: false },
+          ];
+        } else {
+          defaultChecklist = [
+            { id: 'documents_legaux_complets', label: 'Documents légaux complets (PV AGC, statuts, etc.)', checked: false },
+            { id: 'representants_verifies', label: 'Représentants légaux vérifiés', checked: false },
+            { id: 'conformite_legale', label: 'Conformité légale de l\'entreprise vérifiée', checked: false },
+            { id: 'signatures_valides', label: 'Signatures des mandataires valides', checked: false },
+            { id: 'localisations_verifiees', label: 'Localisations du siège et signataires vérifiées', checked: false },
+            { id: 'factures_verifiees', label: 'Factures de services vérifiées', checked: false },
+          ];
+        }
+        setChecklistItems(defaultChecklist);
       }
-      setChecklistItems(defaultChecklist);
-    }
+    }, 0);
   };
 
   const handleChecklistChange = (id: string) => {
@@ -1228,7 +1238,6 @@ export default function ValidationComptes() {
                 </Card>
               </Grid>
             </Grid>
-
             {/* Table */}
             <TableContainer>
               <Table>
@@ -1437,11 +1446,13 @@ export default function ValidationComptes() {
                 
                 return (
                   <>
-                    {/* Bouton Valider dans le menu contextuel - ouvre modal avec checkboxes
-                    <MenuItem onClick={handleValidateClick}>
-                      <CheckCircleIcon fontSize="small" sx={{ mr: 1, color: green[600] }} />
-                      Valider le compte
-                    </MenuItem> */}
+                    {/* Bouton Valider dans le menu contextuel - ouvre modal avec checkboxes */}
+                    {etat === 'enAttenteValidation' && (
+                      <MenuItem onClick={handleValidateClick}>
+                        <CheckCircleIcon fontSize="small" sx={{ mr: 1, color: green[600] }} />
+                        Valider le compte
+                      </MenuItem>
+                    )}
                     
                     {/* Bouton VALIDER pour lever l'opposition */}
                     {etat === 'MiseEnOposition' && (
@@ -1903,13 +1914,24 @@ export default function ValidationComptes() {
                                   {checklistItems.map((item) => (
                                     <ListItem key={item.id}>
                                       <ListItemIcon>
-                                        {item.checked ? (
-                                          <CheckBoxIcon color="success" />
-                                        ) : (
-                                          <CheckBoxOutlineBlankIcon />
-                                        )}
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => handleChecklistChange(item.id)}
+                                        >
+                                          {item.checked ? (
+                                            <CheckBoxIcon color="success" />
+                                          ) : (
+                                            <CheckBoxOutlineBlankIcon />
+                                          )}
+                                        </IconButton>
                                       </ListItemIcon>
-                                      <ListItemText primary={item.label} />
+                                      <ListItemText 
+                                        primary={item.label}
+                                        sx={{ 
+                                          textDecoration: item.checked ? 'line-through' : 'none',
+                                          color: item.checked ? 'text.secondary' : 'text.primary'
+                                        }}
+                                      />
                                     </ListItem>
                                   ))}
                                 </List>
@@ -2105,46 +2127,45 @@ export default function ValidationComptes() {
                           Checklist de vérification
                         </Typography>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <FormControlLabel
-                            control={
-                              <Checkbox
-                                checked={leverOppositionDialog.checklist.cni_valide}
-                                onChange={() => handleLeverOppositionChecklistChange('cni_valide')}
-                                color="primary"
-                              />
+                          {Object.entries(leverOppositionDialog.checklist).map(([key, checked]) => {
+                            let label = '';
+                            switch(key) {
+                              case 'cni_valide':
+                                label = 'CNI valide et à jour';
+                                break;
+                              case 'plan_localisation':
+                                label = 'Plan de localisation vérifié';
+                                break;
+                              case 'photo_identite':
+                                label = 'Photo d\'identité conforme';
+                                break;
+                              case 'signature_specimen':
+                                label = 'Spécimen de signature vérifié';
+                                break;
                             }
-                            label="CNI valide et à jour"
-                          />
-                          <FormControlLabel
-                            control={
-                              <Checkbox
-                                checked={leverOppositionDialog.checklist.plan_localisation}
-                                onChange={() => handleLeverOppositionChecklistChange('plan_localisation')}
-                                color="primary"
+                            
+                            const documentsPresents = leverOppositionDialog.compte 
+                              ? checkDocumentsForOpposition(leverOppositionDialog.compte)
+                              : false;
+                            
+                            return (
+                              <FormControlLabel
+                                key={key}
+                                control={
+                                  <Checkbox
+                                    checked={checked}
+                                    onChange={() => handleLeverOppositionChecklistChange(key as keyof LeverOppositionDialogState['checklist'])}
+                                    color="primary"
+                                    disabled={!documentsPresents}
+                                  />
+                                }
+                                label={label}
+                                sx={{
+                                  color: !documentsPresents ? 'text.disabled' : 'inherit',
+                                }}
                               />
-                            }
-                            label="Plan de localisation vérifié"
-                          />
-                          <FormControlLabel
-                            control={
-                              <Checkbox
-                                checked={leverOppositionDialog.checklist.photo_identite}
-                                onChange={() => handleLeverOppositionChecklistChange('photo_identite')}
-                                color="primary"
-                              />
-                            }
-                            label="Photo d'identité conforme"
-                          />
-                          <FormControlLabel
-                            control={
-                              <Checkbox
-                                checked={leverOppositionDialog.checklist.signature_specimen}
-                                onChange={() => handleLeverOppositionChecklistChange('signature_specimen')}
-                                color="primary"
-                              />
-                            }
-                            label="Spécimen de signature vérifié"
-                          />
+                            );
+                          })}
                         </Box>
                       </CardContent>
                     </Card>
@@ -2222,7 +2243,7 @@ export default function ValidationComptes() {
                   onClick={handleLeverOppositionCompte}
                   variant="contained"
                   color="warning"
-                  disabled={loadingAction}
+                  disabled={loadingAction || !areAllOppositionCheckboxesChecked() || !checkDocumentsForOpposition(leverOppositionDialog.compte!)}
                   startIcon={loadingAction ? <CircularProgress size={20} color="inherit" /> : <LockOpenIcon />}
                   sx={{
                     '&:disabled': {

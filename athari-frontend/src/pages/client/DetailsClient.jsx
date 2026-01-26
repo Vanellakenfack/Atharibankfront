@@ -4,7 +4,8 @@ import {
     Box, Paper, Typography, Grid, Divider, Chip, 
     Button, Avatar, Card, CardContent, List, ListItem, ListItemText,
     IconButton, CircularProgress, Stack, Alert,
-    Dialog, DialogContent, DialogTitle, Tabs, Tab
+    Dialog, DialogContent, DialogTitle, Tabs, Tab,
+    Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
 import {
     ArrowBack as ArrowBackIcon, Edit as EditIcon, Person as PersonIcon,
@@ -17,7 +18,23 @@ import {
     AttachFile as AttachFileIcon, PictureAsPdf as PdfIcon,
     AccountCircle as AccountIcon, Create as SignatureIcon,
     Receipt as ReceiptIcon, WaterDrop as WaterIcon, 
-    Bolt as BoltIcon, Map as MapIcon
+    Bolt as BoltIcon, Map as MapIcon, ExpandMore as ExpandMoreIcon,
+    Fingerprint as FingerprintIcon, DateRange as DateRangeIcon,
+    Language as LanguageIcon, School as SchoolIcon,
+    CorporateFare as CorporateFareIcon, Group as GroupIcon,
+    DocumentScanner as DocumentScannerIcon, Task as TaskIcon,
+    PermIdentity as PermIdentityIcon, HomeWork as HomeWorkIcon,
+    Apartment as ApartmentIcon, AccountBalance as AccountBalanceIcon,
+    LocalAtm as LocalAtmIcon, MonetizationOn as MonetizationOnIcon,
+    AttachMoney as AttachMoneyIcon, AccountTree as AccountTreeIcon,
+    ContactPhone as ContactPhoneIcon, LocationCity as LocationCityIcon,
+    Domain as DomainIcon, Business as BusinessOutlineIcon,
+    Description as DescriptionOutlineIcon, ListAlt as ListAltIcon,
+    Assignment as AssignmentIcon, InsertDriveFile as InsertDriveFileIcon,
+    NoteAdd as NoteAddIcon, ReceiptLong as ReceiptLongIcon,
+    Paid as PaidIcon, AccountBox as AccountBoxIcon,
+    SupervisorAccount as SupervisorAccountIcon,
+    HowToReg as HowToRegIcon, BadgeOutlined as BadgeOutlinedIcon
 } from '@mui/icons-material';
 import apiClient from '../../services/api/ApiClient';
 import Layout from '../../components/layout/Layout';
@@ -29,20 +46,36 @@ export default function DetailsClient() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     
-    // États pour les modales d'aperçu
-    const [openDomicileModal, setOpenDomicileModal] = useState(false);
-    const [openActiviteModal, setOpenActiviteModal] = useState(false);
-    const [openPhotoModal, setOpenPhotoModal] = useState(false);
-    const [openSignatureModal, setOpenSignatureModal] = useState(false);
-    const [openGerantModal, setOpenGerantModal] = useState([false, false]);
-    const [openSignatairePhotoModal, setOpenSignatairePhotoModal] = useState([false, false, false]);
-    const [openSignataireSignatureModal, setOpenSignataireSignatureModal] = useState([false, false, false]);
-    const [openDocModal, setOpenDocModal] = useState({});
-    const [activeDocTab, setActiveDocTab] = useState(0);
-    
-    // URLs des images pour les modales
+    // États pour les modales
+    const [openImageModal, setOpenImageModal] = useState(false);
     const [currentImage, setCurrentImage] = useState(null);
     const [currentImageTitle, setCurrentImageTitle] = useState('');
+    
+    // Onglets
+    const [activeDocTab, setActiveDocTab] = useState(0);
+    const [activeSignataireTab, setActiveSignataireTab] = useState(0);
+    
+    // Accordions
+    const [expandedAccordions, setExpandedAccordions] = useState({
+        identite: true,
+        professionnel: true,
+        filiation: true,
+        conjoint: true,
+        localisation: true,
+        patrimoine: true,
+        documents: true,
+        entreprise: true,
+        gerants: true,
+        signataires: true,
+        documentsJuridiques: true
+    });
+
+    const handleAccordionChange = (panel) => (event, isExpanded) => {
+        setExpandedAccordions({
+            ...expandedAccordions,
+            [panel]: isExpanded
+        });
+    };
 
     useEffect(() => {
         const fetchDetails = async () => {
@@ -64,54 +97,14 @@ export default function DetailsClient() {
         fetchDetails();
     }, [id]);
 
-    const handleOpenModal = (imageUrl, title) => {
+    const handleOpenImageModal = (imageUrl, title) => {
         setCurrentImage(imageUrl);
         setCurrentImageTitle(title);
-        
-        switch(title) {
-            case 'Photo domicile':
-                setOpenDomicileModal(true);
-                break;
-            case 'Photo activité':
-                setOpenActiviteModal(true);
-                break;
-            case 'Photo du client':
-                setOpenPhotoModal(true);
-                break;
-            case 'Signature':
-                setOpenSignatureModal(true);
-                break;
-            default:
-                if (title.includes('Gérant')) {
-                    const index = title.includes('Principal') ? 0 : 1;
-                    const newState = [...openGerantModal];
-                    newState[index] = true;
-                    setOpenGerantModal(newState);
-                } else if (title.includes('Signataire') && title.includes('Photo')) {
-                    const index = parseInt(title.match(/\d+/)?.[0]) - 1 || 0;
-                    const newState = [...openSignatairePhotoModal];
-                    newState[index] = true;
-                    setOpenSignatairePhotoModal(newState);
-                } else if (title.includes('Signataire') && title.includes('Signature')) {
-                    const index = parseInt(title.match(/\d+/)?.[0]) - 1 || 0;
-                    const newState = [...openSignataireSignatureModal];
-                    newState[index] = true;
-                    setOpenSignataireSignatureModal(newState);
-                } else {
-                    setOpenDocModal({...openDocModal, [title]: true});
-                }
-        }
+        setOpenImageModal(true);
     };
 
     const handleCloseModal = () => {
-        setOpenDomicileModal(false);
-        setOpenActiviteModal(false);
-        setOpenPhotoModal(false);
-        setOpenSignatureModal(false);
-        setOpenGerantModal([false, false]);
-        setOpenSignatairePhotoModal([false, false, false]);
-        setOpenSignataireSignatureModal([false, false, false]);
-        setOpenDocModal({});
+        setOpenImageModal(false);
         setCurrentImage(null);
         setCurrentImageTitle('');
     };
@@ -135,85 +128,99 @@ export default function DetailsClient() {
     );
 
     const isPhysique = client.type_client === 'physique';
-    const detail = isPhysique ? (client.physique || {}) : (client.morale || {});
+    const detail = isPhysique ? client.physique : client.morale;
     const name = isPhysique ? detail?.nom_prenoms : detail?.raison_sociale;
     
-    // URLs des photos - construction manuelle si les URLs ne sont pas fournies
-    const getFullUrl = (path) => {
-        if (!path) return null;
-        if (path.startsWith('http')) return path;
-        if (path.startsWith('/storage/')) return `http://localhost:8000${path}`;
-        return `http://localhost:8000/storage/${path}`;
+    // Formater la date
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        try {
+            return new Date(dateString).toLocaleDateString('fr-FR');
+        } catch {
+            return dateString;
+        }
     };
 
-    // URLs pour client physique
-    const photoUrl = isPhysique ? getFullUrl(client.physique?.photo || client.physique?.photo_url) : null;
-    const signatureUrl = isPhysique ? getFullUrl(client.physique?.signature || client.physique?.signature_url) : null;
-    const cniRectoUrl = isPhysique ? getFullUrl(client.physique?.cni_recto || client.physique?.cni_recto_url) : null;
-    const cniVersoUrl = isPhysique ? getFullUrl(client.physique?.cni_verso || client.physique?.cni_verso_url) : null;
+    // Vérifier si une valeur existe
+    const hasValue = (value) => {
+        return value !== null && value !== undefined && value !== '';
+    };
 
-    // URLs pour client moral
-    const gerantPhotoUrls = [
-        getFullUrl(client.morale?.photo_gerant || client.morale?.photo_gerant_url),
-        getFullUrl(client.morale?.photo_gerant2 || client.morale?.photo_gerant2_url)
-    ];
-    
-    const signatairePhotoUrls = [
-        getFullUrl(client.morale?.photo_signataire || client.morale?.photo_signataire_url),
-        getFullUrl(client.morale?.photo_signataire2 || client.morale?.photo_signataire2_url),
-        getFullUrl(client.morale?.photo_signataire3 || client.morale?.photo_signataire3_url)
-    ];
-    
-    const signataireSignatureUrls = [
-        getFullUrl(client.morale?.signature_signataire || client.morale?.signature_signataire_url),
-        getFullUrl(client.morale?.signature_signataire2 || client.morale?.signature_signataire2_url),
-        getFullUrl(client.morale?.signature_signataire3 || client.morale?.signature_signataire3_url)
-    ];
+    // Récupérer les URLs correctement selon le type de client
+    const getUrls = () => {
+        if (isPhysique && client.physique) {
+            return {
+                // Documents images
+                photoUrl: client.physique.photo_url,
+                signatureUrl: client.physique.signature_url,
+                cniRectoUrl: client.physique.cni_recto_url,
+                cniVersoUrl: client.physique.cni_verso_url,
+                niuImageUrl: client.physique.niu_image_url,
+                
+                // Documents PDF
+                attestationConformitePdfUrl: null, // Pas dans votre exemple pour physique
+            };
+        } else if (!isPhysique && client.morale) {
+            return {
+                // Photos gérants
+                gerantPhotoUrls: [
+                    client.morale.photo_gerant_url,
+                    client.morale.photo_gerant2_url
+                ],
+                
+                // Signataires
+                signataires: client.morale.signataires || [],
+                
+                // Documents juridiques images
+                extraitRccmUrl: client.morale.extrait_rccm_image_url,
+                titrePatenteUrl: client.morale.titre_patente_image_url,
+                niuImageMoraleUrl: client.morale.niu_image_url,
+                statutsUrl: client.morale.statuts_image_url,
+                pvAgcUrl: client.morale.pv_agc_image_url,
+                attestationNonRedevanceUrl: client.morale.attestation_non_redevance_image_url,
+                procesVerbalUrl: client.morale.proces_verbal_image_url,
+                registreCoopUrl: client.morale.registre_coop_gic_image_url,
+                recepisseDeclarationUrl: client.morale.recepisse_declaration_association_image_url,
+                
+                // Documents juridiques PDF
+                acteDesignationPdfUrl: client.morale.acte_designation_signataires_pdf_url,
+                listeConseilPdfUrl: client.morale.liste_conseil_administration_pdf_url,
+                listeMembresPdfUrl: client.morale.liste_membres_pdf_url,
+                attestationConformitePdfMoraleUrl: null, // Pas dans votre exemple
+                
+                // Plans et factures siège
+                planSiegeUrl: client.morale.plan_localisation_siege_image_url,
+                factureEauSiegeUrl: client.morale.facture_eau_siege_image_url,
+                factureElecSiegeUrl: client.morale.facture_electricite_siege_image_url,
+                
+                // Plans signataires
+                planSignataireUrls: [
+                    client.morale.plan_localisation_signataire1_image_url,
+                    client.morale.plan_localisation_signataire2_image_url,
+                    client.morale.plan_localisation_signataire3_image_url
+                ],
+                
+                // Factures signataires
+                factureEauSignataireUrls: [
+                    client.morale.facture_eau_signataire1_image_url,
+                    client.morale.facture_eau_signataire2_image_url,
+                    client.morale.facture_eau_signataire3_image_url
+                ],
+                factureElecSignataireUrls: [
+                    client.morale.facture_electricite_signataire1_image_url,
+                    client.morale.facture_electricite_signataire2_image_url,
+                    client.morale.facture_electricite_signataire3_image_url
+                ]
+            };
+        }
+        return {};
+    };
 
-    // URLs pour documents juridiques
-    const extraitRccmUrl = getFullUrl(client.morale?.extrait_rccm_image || client.morale?.extrait_rccm_image_url);
-    const titrePatenteUrl = getFullUrl(client.morale?.titre_patente_image || client.morale?.titre_patente_image_url);
-    const niuImageUrl = getFullUrl(client.morale?.niu_image || client.morale?.niu_image_url);
-    const statutsUrl = getFullUrl(client.morale?.statuts_image || client.morale?.statuts_image_url);
-    const pvAgcUrl = getFullUrl(client.morale?.pv_agc_image || client.morale?.pv_agc_image_url);
-    const attestationUrl = getFullUrl(client.morale?.attestation_non_redevance_image || client.morale?.attestation_non_redevance_image_url);
-    const procesVerbalUrl = getFullUrl(client.morale?.proces_verbal_image || client.morale?.proces_verbal_image_url);
-    const registreCoopUrl = getFullUrl(client.morale?.registre_coop_gic_image || client.morale?.registre_coop_gic_image_url);
-    const recepisseUrl = getFullUrl(client.morale?.recepisse_declaration_association_image || client.morale?.recepisse_declaration_association_image_url);
+    const urls = getUrls();
     
-    // URLs pour PDF
-    const acteDesignationPdfUrl = getFullUrl(client.morale?.acte_designation_signataires_pdf || client.morale?.acte_designation_signataires_pdf_url);
-    const listeConseilPdfUrl = getFullUrl(client.morale?.liste_conseil_administration_pdf || client.morale?.liste_conseil_administration_pdf_url);
-    
-    // URLs pour plans et factures siège
-    const planSiegeUrl = getFullUrl(client.morale?.plan_localisation_siege_image || client.morale?.plan_localisation_siege_image_url);
-    const factureEauSiegeUrl = getFullUrl(client.morale?.facture_eau_siege_image || client.morale?.facture_eau_siege_image_url);
-    const factureElecSiegeUrl = getFullUrl(client.morale?.facture_electricite_siege_image || client.morale?.facture_electricite_siege_image_url);
-    
-    // URLs pour plans signataires
-    const planSignataireUrls = [
-        getFullUrl(client.morale?.plan_localisation_signataire1_image || client.morale?.plan_localisation_signataire1_image_url),
-        getFullUrl(client.morale?.plan_localisation_signataire2_image || client.morale?.plan_localisation_signataire2_image_url),
-        getFullUrl(client.morale?.plan_localisation_signataire3_image || client.morale?.plan_localisation_signataire3_image_url)
-    ];
-    
-    // URLs pour factures eau signataires
-    const factureEauSignataireUrls = [
-        getFullUrl(client.morale?.facture_eau_signataire1_image || client.morale?.facture_eau_signataire1_image_url),
-        getFullUrl(client.morale?.facture_eau_signataire2_image || client.morale?.facture_eau_signataire2_image_url),
-        getFullUrl(client.morale?.facture_eau_signataire3_image || client.morale?.facture_eau_signataire3_image_url)
-    ];
-    
-    // URLs pour factures électricité signataires
-    const factureElecSignataireUrls = [
-        getFullUrl(client.morale?.facture_electricite_signataire1_image || client.morale?.facture_electricite_signataire1_image_url),
-        getFullUrl(client.morale?.facture_electricite_signataire2_image || client.morale?.facture_electricite_signataire2_image_url),
-        getFullUrl(client.morale?.facture_electricite_signataire3_image || client.morale?.facture_electricite_signataire3_image_url)
-    ];
-
     // URLs communes
-    const domicilePhotoUrl = getFullUrl(client.photo_localisation_domicile || client.photo_localisation_domicile_url);
-    const activitePhotoUrl = getFullUrl(client.photo_localisation_activite || client.photo_localisation_activite_url);
+    const domicilePhotoUrl = client.photo_localisation_domicile_url;
+    const activitePhotoUrl = client.photo_localisation_activite_url;
 
     return (
         <Layout>
@@ -245,26 +252,26 @@ export default function DetailsClient() {
                         <Grid item>
                             <Box sx={{ position: 'relative' }}>
                                 <Avatar 
-                                    src={isPhysique ? photoUrl : gerantPhotoUrls[0]} 
+                                    src={isPhysique ? urls.photoUrl : (urls.gerantPhotoUrls ? urls.gerantPhotoUrls[0] : null)} 
                                     sx={{ 
                                         width: 120, 
                                         height: 120, 
                                         border: '4px solid #F1F5F9', 
                                         boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
-                                        cursor: (isPhysique ? photoUrl : gerantPhotoUrls[0]) ? 'pointer' : 'default',
-                                        '&:hover': (isPhysique ? photoUrl : gerantPhotoUrls[0]) ? { opacity: 0.9 } : {}
+                                        cursor: 'pointer',
+                                        '&:hover': { opacity: 0.9 }
                                     }}
                                     onClick={() => {
-                                        if (isPhysique && photoUrl) {
-                                            handleOpenModal(photoUrl, 'Photo du client');
-                                        } else if (!isPhysique && gerantPhotoUrls[0]) {
-                                            handleOpenModal(gerantPhotoUrls[0], 'Photo Gérant Principal');
+                                        if (isPhysique && urls.photoUrl) {
+                                            handleOpenImageModal(urls.photoUrl, 'Photo du client');
+                                        } else if (!isPhysique && urls.gerantPhotoUrls && urls.gerantPhotoUrls[0]) {
+                                            handleOpenImageModal(urls.gerantPhotoUrls[0], 'Photo Gérant Principal');
                                         }
                                     }}
                                 >
                                     {isPhysique ? <PersonIcon fontSize="large" /> : <BusinessIcon fontSize="large" />}
                                 </Avatar>
-                                {(isPhysique ? photoUrl : gerantPhotoUrls[0]) && (
+                                {((isPhysique && urls.photoUrl) || (!isPhysique && urls.gerantPhotoUrls && urls.gerantPhotoUrls[0])) && (
                                     <IconButton
                                         size="small"
                                         sx={{
@@ -276,10 +283,10 @@ export default function DetailsClient() {
                                             '&:hover': { backgroundColor: '#f5f5f5' }
                                         }}
                                         onClick={() => {
-                                            if (isPhysique && photoUrl) {
-                                                handleOpenModal(photoUrl, 'Photo du client');
-                                            } else if (!isPhysique && gerantPhotoUrls[0]) {
-                                                handleOpenModal(gerantPhotoUrls[0], 'Photo Gérant Principal');
+                                            if (isPhysique && urls.photoUrl) {
+                                                handleOpenImageModal(urls.photoUrl, 'Photo du client');
+                                            } else if (!isPhysique && urls.gerantPhotoUrls && urls.gerantPhotoUrls[0]) {
+                                                handleOpenImageModal(urls.gerantPhotoUrls[0], 'Photo Gérant Principal');
                                             }
                                         }}
                                     >
@@ -293,7 +300,7 @@ export default function DetailsClient() {
                         <Grid item xs={12} sm>
                             <Typography variant="h4" fontWeight="900" sx={{ color: '#1E293B' }}>
                                 {name || "Nom inconnu"}
-                                {detail?.sigle && ` (${detail.sigle})`}
+                                {!isPhysique && detail?.sigle && ` (${detail.sigle})`}
                             </Typography>
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mt: 1 }}>
                                 <Typography variant="body1" fontWeight="700" sx={{ color: '#6366f1' }}>
@@ -352,10 +359,10 @@ export default function DetailsClient() {
                 </Paper>
 
                 <Grid container spacing={3}>
-                    {/* Colonne Gauche - Contact et Documents */}
+                    {/* Colonne Gauche - Informations principales */}
                     <Grid item xs={12} md={4}>
                         {/* Contact */}
-                        <Card sx={{ borderRadius: 5, p: 2, mb: 3, boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+                        <Card sx={{ borderRadius: 5, mb: 3, boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
                             <CardContent>
                                 <SectionTitle icon={<PhoneIcon />} title="Contact" />
                                 <List dense>
@@ -407,461 +414,679 @@ export default function DetailsClient() {
                             </CardContent>
                         </Card>
 
-                        {/* Documents & Photos */}
-                        <Card sx={{ borderRadius: 5, p: 2, boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+                        {/* Informations rapides */}
+                        <Card sx={{ borderRadius: 5, mb: 3, boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
                             <CardContent>
-                                <SectionTitle icon={<CameraIcon />} title="Documents & Photos" />
-                                
+                                <SectionTitle icon={<BadgeOutlinedIcon />} title="Informations Rapides" />
                                 {isPhysique ? (
-                                    // Documents pour client physique
-                                    <Stack spacing={3}>
-                                        {/* CNI */}
-                                        {(cniRectoUrl || cniVersoUrl) && (
-                                            <Box>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                                    <CreditCardIcon fontSize="small" sx={{ color: '#6366f1' }} />
-                                                    <Typography variant="caption" fontWeight="700" color="textSecondary">
-                                                        Carte Nationale d'Identité
-                                                    </Typography>
-                                                </Box>
-                                                <Grid container spacing={2}>
-                                                    {cniRectoUrl && (
-                                                        <Grid item xs={6}>
-                                                            <ImagePreview 
-                                                                src={cniRectoUrl}
-                                                                title="CNI Recto"
-                                                                onClick={() => handleOpenModal(cniRectoUrl, 'CNI Recto')}
-                                                            />
-                                                        </Grid>
-                                                    )}
-                                                    {cniVersoUrl && (
-                                                        <Grid item xs={6}>
-                                                            <ImagePreview 
-                                                                src={cniVersoUrl}
-                                                                title="CNI Verso"
-                                                                onClick={() => handleOpenModal(cniVersoUrl, 'CNI Verso')}
-                                                            />
-                                                        </Grid>
-                                                    )}
-                                                </Grid>
-                                            </Box>
-                                        )}
-                                        
-                                        {/* Photo client */}
-                                        {photoUrl && (
-                                            <ImagePreview 
-                                                src={photoUrl}
-                                                title="Photo du client"
-                                                label="Photo du client"
-                                                onClick={() => handleOpenModal(photoUrl, 'Photo du client')}
-                                                height={150}
-                                            />
-                                        )}
-                                        
-                                        {/* Signature */}
-                                        {signatureUrl && (
-                                            <ImagePreview 
-                                                src={signatureUrl}
-                                                title="Signature"
-                                                label="Signature"
-                                                onClick={() => handleOpenModal(signatureUrl, 'Signature')}
-                                                height={100}
-                                            />
-                                        )}
-                                    </Stack>
+                                    <>
+                                        <InfoRow label="Sexe" value={detail?.sexe === 'M' ? 'Masculin' : (detail?.sexe === 'F' ? 'Féminin' : 'Non renseigné')} />
+                                        <InfoRow label="Nationalité" value={detail?.nationalite} />
+                                        <InfoRow label="Date de naissance" value={formatDate(detail?.date_naissance)} />
+                                        <InfoRow label="Lieu de naissance" value={detail?.lieu_naissance} />
+                                        <InfoRow label="CNI" value={detail?.cni_numero} />
+                                        <InfoRow label="NUI" value={detail?.nui} />
+                                        <InfoRow label="Profession" value={detail?.profession} />
+                                        <InfoRow label="Employeur" value={detail?.employeur} />
+                                    </>
                                 ) : (
-                                    // Documents pour client moral
-                                    <Stack spacing={3}>
-                                        {/* Photos des gérants */}
-                                        <Box>
-                                            <Typography variant="caption" fontWeight="700" color="textSecondary" sx={{ mb: 1 }}>
-                                                Photos des Gérants
-                                            </Typography>
-                                            <Grid container spacing={2}>
-                                                {gerantPhotoUrls.map((url, index) => (
-                                                    url && (
-                                                        <Grid item xs={6} key={index}>
-                                                            <ImagePreview 
-                                                                src={url}
-                                                                title={`Photo Gérant ${index === 0 ? 'Principal' : 'Secondaire'}`}
-                                                                label={`Gérant ${index + 1}`}
-                                                                onClick={() => handleOpenModal(url, `Photo Gérant ${index === 0 ? 'Principal' : 'Secondaire'}`)}
-                                                                height={120}
-                                                            />
-                                                        </Grid>
-                                                    )
-                                                ))}
-                                            </Grid>
-                                        </Box>
-                                        
-                                        {/* Photos et signatures des signataires */}
-                                        {signatairePhotoUrls.some(url => url) && (
-                                            <Box>
-                                                <Typography variant="caption" fontWeight="700" color="textSecondary" sx={{ mb: 1 }}>
-                                                    Signataires
-                                                </Typography>
-                                                <Tabs value={activeDocTab} onChange={(e, v) => setActiveDocTab(v)} sx={{ mb: 2 }}>
-                                                    {signatairePhotoUrls.map((url, index) => (
-                                                        url && <Tab key={index} label={`S${index + 1}`} />
-                                                    ))}
-                                                </Tabs>
-                                                <Grid container spacing={2}>
-                                                    {signatairePhotoUrls[activeDocTab] && (
-                                                        <Grid item xs={6}>
-                                                            <ImagePreview 
-                                                                src={signatairePhotoUrls[activeDocTab]}
-                                                                title={`Photo Signataire ${activeDocTab + 1}`}
-                                                                label="Photo"
-                                                                onClick={() => handleOpenModal(signatairePhotoUrls[activeDocTab], `Photo Signataire ${activeDocTab + 1}`)}
-                                                                height={120}
-                                                            />
-                                                        </Grid>
-                                                    )}
-                                                    {signataireSignatureUrls[activeDocTab] && (
-                                                        <Grid item xs={6}>
-                                                            <ImagePreview 
-                                                                src={signataireSignatureUrls[activeDocTab]}
-                                                                title={`Signature Signataire ${activeDocTab + 1}`}
-                                                                label="Signature"
-                                                                onClick={() => handleOpenModal(signataireSignatureUrls[activeDocTab], `Signature Signataire ${activeDocTab + 1}`)}
-                                                                height={120}
-                                                            />
-                                                        </Grid>
-                                                    )}
-                                                </Grid>
-                                            </Box>
-                                        )}
-                                        
-                                        {/* Documents juridiques (un seul à la fois) */}
-                                        <Box>
-                                            <Typography variant="caption" fontWeight="700" color="textSecondary" sx={{ mb: 1 }}>
-                                                Documents Juridiques
-                                            </Typography>
-                                            <Stack spacing={1}>
-                                                {extraitRccmUrl && (
-                                                    <DocumentPreview 
-                                                        src={extraitRccmUrl}
-                                                        title="Extrait RCCM"
-                                                        onClick={() => handleOpenModal(extraitRccmUrl, 'Extrait RCCM')}
-                                                    />
-                                                )}
-                                                {titrePatenteUrl && (
-                                                    <DocumentPreview 
-                                                        src={titrePatenteUrl}
-                                                        title="Titre de Patente"
-                                                        onClick={() => handleOpenModal(titrePatenteUrl, 'Titre de Patente')}
-                                                    />
-                                                )}
-                                                {niuImageUrl && (
-                                                    <DocumentPreview 
-                                                        src={niuImageUrl}
-                                                        title="Photocopie NUI"
-                                                        onClick={() => handleOpenModal(niuImageUrl, 'Photocopie NUI')}
-                                                    />
-                                                )}
-                                                {statutsUrl && (
-                                                    <DocumentPreview 
-                                                        src={statutsUrl}
-                                                        title="Photocopie des Statuts"
-                                                        onClick={() => handleOpenModal(statutsUrl, 'Photocopie des Statuts')}
-                                                    />
-                                                )}
-                                                {pvAgcUrl && (
-                                                    <DocumentPreview 
-                                                        src={pvAgcUrl}
-                                                        title="PV de l'AGC"
-                                                        onClick={() => handleOpenModal(pvAgcUrl, 'PV de l\'AGC')}
-                                                    />
-                                                )}
-                                                {attestationUrl && (
-                                                    <DocumentPreview 
-                                                        src={attestationUrl}
-                                                        title="Attestation de non redevance"
-                                                        onClick={() => handleOpenModal(attestationUrl, 'Attestation de non redevance')}
-                                                    />
-                                                )}
-                                                {procesVerbalUrl && (
-                                                    <DocumentPreview 
-                                                        src={procesVerbalUrl}
-                                                        title="Procès Verbal"
-                                                        onClick={() => handleOpenModal(procesVerbalUrl, 'Procès Verbal')}
-                                                    />
-                                                )}
-                                                {registreCoopUrl && (
-                                                    <DocumentPreview 
-                                                        src={registreCoopUrl}
-                                                        title="Registre COOP-GIC"
-                                                        onClick={() => handleOpenModal(registreCoopUrl, 'Registre COOP-GIC')}
-                                                    />
-                                                )}
-                                                {recepisseUrl && (
-                                                    <DocumentPreview 
-                                                        src={recepisseUrl}
-                                                        title="Récépissé de déclaration"
-                                                        onClick={() => handleOpenModal(recepisseUrl, 'Récépissé de déclaration')}
-                                                    />
-                                                )}
-                                            </Stack>
-                                        </Box>
-                                        
-                                        {/* PDF */}
-                                        <Box>
-                                            <Typography variant="caption" fontWeight="700" color="textSecondary" sx={{ mb: 1 }}>
-                                                Documents PDF
-                                            </Typography>
-                                            <Stack spacing={1}>
-                                                {acteDesignationPdfUrl && (
-                                                    <DocumentPreview 
-                                                        src={acteDesignationPdfUrl}
-                                                        title="Acte de Désignation des Signataires"
-                                                        onClick={() => window.open(acteDesignationPdfUrl, '_blank')}
-                                                        isPdf={true}
-                                                    />
-                                                )}
-                                                {listeConseilPdfUrl && (
-                                                    <DocumentPreview 
-                                                        src={listeConseilPdfUrl}
-                                                        title="Liste du Conseil d'Administration"
-                                                        onClick={() => window.open(listeConseilPdfUrl, '_blank')}
-                                                        isPdf={true}
-                                                    />
-                                                )}
-                                            </Stack>
-                                        </Box>
-                                    </Stack>
+                                    <>
+                                        <InfoRow label="Forme juridique" value={detail?.forme_juridique} />
+                                        <InfoRow label="RCCM" value={detail?.rccm} />
+                                        <InfoRow label="NUI" value={detail?.nui} />
+                                        <InfoRow label="Sigle" value={detail?.sigle} />
+                                        <InfoRow label="Gérant Principal" value={detail?.nom_gerant} />
+                                        <InfoRow label="Gérant Secondaire" value={detail?.nom_gerant2} />
+                                    </>
                                 )}
-                                
-                                {/* Photos de localisation (communes) */}
-                                {(domicilePhotoUrl || activitePhotoUrl) && (
-                                    <Box sx={{ mt: 3 }}>
-                                        <Typography variant="caption" fontWeight="700" color="textSecondary" sx={{ mb: 1 }}>
-                                            Localisation
-                                        </Typography>
-                                        <Grid container spacing={2}>
-                                            {domicilePhotoUrl && (
-                                                <Grid item xs={6}>
-                                                    <ImagePreview 
-                                                        src={domicilePhotoUrl}
-                                                        title="Photo localisation domicile"
-                                                        label="Domicile"
-                                                        onClick={() => handleOpenModal(domicilePhotoUrl, 'Photo domicile')}
-                                                        height={120}
-                                                    />
-                                                </Grid>
-                                            )}
-                                            {activitePhotoUrl && (
-                                                <Grid item xs={6}>
-                                                    <ImagePreview 
-                                                        src={activitePhotoUrl}
-                                                        title="Photo localisation activité"
-                                                        label="Activité"
-                                                        onClick={() => handleOpenModal(activitePhotoUrl, 'Photo activité')}
-                                                        height={120}
-                                                    />
-                                                </Grid>
-                                            )}
-                                        </Grid>
-                                    </Box>
-                                )}
-                                
-                                {!photoUrl && !signatureUrl && !cniRectoUrl && !cniVersoUrl && 
-                                 !gerantPhotoUrls[0] && !signatairePhotoUrls[0] && !domicilePhotoUrl && !activitePhotoUrl && (
-                                    <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 2 }}>
-                                        Aucun document disponible
-                                    </Typography>
-                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Localisation */}
+                        <Card sx={{ borderRadius: 5, mb: 3, boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+                            <CardContent>
+                                <SectionTitle icon={<LocationIcon />} title="Localisation" />
+                                <InfoRow label="Ville" value={client.adresse_ville} />
+                                <InfoRow label="Quartier" value={client.adresse_quartier} />
+                                <InfoRow label="Lieu-dit domicile" value={client.lieu_dit_domicile} />
+                                <InfoRow label="Ville activité" value={client.ville_activite} />
+                                <InfoRow label="Quartier activité" value={client.quartier_activite} />
+                                <InfoRow label="Lieu-dit activité" value={client.lieu_dit_activite} />
+                            </CardContent>
+                        </Card>
+
+                        {/* Patrimoine */}
+                        <Card sx={{ borderRadius: 5, boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+                            <CardContent>
+                                <SectionTitle icon={<WalletIcon />} title="Patrimoine" />
+                                <InfoRow 
+                                    label="Solde initial" 
+                                    value={client.solde_initial ? `${parseFloat(client.solde_initial).toLocaleString('fr-FR')} FCFA` : '0 FCFA'} 
+                                />
+                                <InfoRow label="Immobilière" value={client.immobiliere} />
+                                <InfoRow label="Autres biens" value={client.autres_biens} />
+                                <Divider sx={{my: 2}} />
+                                <InfoRow label="Créé le" value={formatDate(client.created_at)} />
+                                <InfoRow label="Dernière modification" value={formatDate(client.updated_at)} />
                             </CardContent>
                         </Card>
                     </Grid>
 
-                    {/* Colonne Droite - Détails */}
+                    {/* Colonne Droite - Détails complets */}
                     <Grid item xs={12} md={8}>
-                        <Paper sx={{ borderRadius: 5, p: 4, border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
-                            
-                            {isPhysique ? (
-                                // Détails client physique (existant)
-                                <>
-                                    <SectionTitle icon={<BadgeIcon />} title="Identité & Filiation" />
-                                    <Grid container spacing={2} sx={{ mb: 4 }}>
-                                        <DataField label="Sexe" value={detail?.sexe === 'M' ? 'Masculin' : (detail?.sexe === 'F' ? 'Féminin' : 'Non renseigné')} />
-                                        <DataField label="Nationalité" value={detail?.nationalite} />
-                                        <DataField label="Né(e) le" value={detail?.date_naissance ? new Date(detail.date_naissance).toLocaleDateString('fr-FR') : ''} />
-                                        <DataField label="Lieu de naissance" value={detail?.lieu_naissance} />
-                                        <DataField label="CNI" value={detail?.cni_numero} />
-                                        <DataField label="NUI" value={detail?.nui} />
-                                        <DataField label="Délivrance CNI" value={detail?.cni_delivrance ? new Date(detail.cni_delivrance).toLocaleDateString('fr-FR') : ''} />
-                                        <DataField label="Expiration CNI" value={detail?.cni_expiration ? new Date(detail.cni_expiration).toLocaleDateString('fr-FR') : ''} />
-                                    </Grid>
+                        {isPhysique ? (
+                            /* Détails client physique */
+                            <>
+                                {/* Identité & Filiation */}
+                                <Accordion 
+                                    expanded={expandedAccordions.identite}
+                                    onChange={handleAccordionChange('identite')}
+                                    sx={{ borderRadius: '8px !important', mb: 2 }}
+                                >
+                                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <FingerprintIcon sx={{ color: '#6366f1' }} />
+                                            <Typography variant="h6" fontWeight="700">Identité & Filiation</Typography>
+                                        </Box>
+                                    </AccordionSummary>
+                                    <AccordionDetails>
+                                        <Grid container spacing={2}>
+                                            <DetailField label="Nom complet" value={detail?.nom_prenoms} icon={<PermIdentityIcon />} />
+                                            <DetailField label="Sexe" value={detail?.sexe === 'M' ? 'Masculin' : (detail?.sexe === 'F' ? 'Féminin' : 'Non renseigné')} icon={<PermIdentityIcon />} />
+                                            <DetailField label="Date de naissance" value={formatDate(detail?.date_naissance)} icon={<DateRangeIcon />} />
+                                            <DetailField label="Lieu de naissance" value={detail?.lieu_naissance} icon={<LocationIcon />} />
+                                            <DetailField label="Nationalité" value={detail?.nationalite} icon={<LanguageIcon />} />
+                                            <DetailField label="Numéro CNI" value={detail?.cni_numero} icon={<BadgeIcon />} />
+                                            <DetailField label="Délivrance CNI" value={formatDate(detail?.cni_delivrance)} icon={<DateRangeIcon />} />
+                                            <DetailField label="Expiration CNI" value={formatDate(detail?.cni_expiration)} icon={<DateRangeIcon />} />
+                                            <DetailField label="Numéro NUI" value={detail?.nui} icon={<FingerprintIcon />} />
+                                            <DetailField label="Nom du père" value={detail?.nom_pere} icon={<PersonIcon />} />
+                                            <DetailField label="Nationalité père" value={detail?.nationalite_pere} icon={<LanguageIcon />} />
+                                            <DetailField label="Nom de la mère" value={detail?.nom_mere} icon={<PersonIcon />} />
+                                            <DetailField label="Nationalité mère" value={detail?.nationalite_mere} icon={<LanguageIcon />} />
+                                        </Grid>
+                                    </AccordionDetails>
+                                </Accordion>
 
-                                    <SectionTitle icon={<PersonIcon />} title="Filiation" />
-                                    <Grid container spacing={2} sx={{ mb: 4 }}>
-                                        <DataField label="Nom du père" value={detail?.nom_pere} />
-                                        <DataField label="Nationalité père" value={detail?.nationalite_pere} />
-                                        <DataField label="Nom de la mère" value={detail?.nom_mere} />
-                                        <DataField label="Nationalité mère" value={detail?.nationalite_mere} />
-                                    </Grid>
-
-                                    <SectionTitle icon={<WorkIcon />} title="Professionnel" />
-                                    <Grid container spacing={2} sx={{ mb: 4 }}>
-                                        <DataField label="Profession" value={detail?.profession} />
-                                        <DataField label="Employeur" value={detail?.employeur} />
-                                        <DataField label="Situation familiale" value={detail?.situation_familiale} />
-                                        <DataField label="Régime matrimonial" value={detail?.regime_matrimonial} />
-                                    </Grid>
-
-                                    {/* Conjoint */}
-                                    {(detail?.nom_conjoint || detail?.cni_conjoint) && (
-                                        <>
-                                            <SectionTitle icon={<PersonIcon />} title="Conjoint(e)" />
-                                            <Grid container spacing={2} sx={{ mb: 4 }}>
-                                                <DataField label="Nom du conjoint" value={detail?.nom_conjoint} />
-                                                <DataField label="CNI conjoint" value={detail?.cni_conjoint} />
-                                                <DataField label="Date naissance conjoint" value={detail?.date_naissance_conjoint ? new Date(detail.date_naissance_conjoint).toLocaleDateString('fr-FR') : ''} />
-                                                <DataField label="Profession conjoint" value={detail?.profession_conjoint} />
-                                                <DataField label="Salaire conjoint" value={detail?.salaire ? `${parseFloat(detail.salaire).toLocaleString('fr-FR')} FCFA` : ''} />
-                                                <DataField label="Téléphone conjoint" value={detail?.tel_conjoint} />
+                                {/* Informations professionnelles */}
+                                {(detail?.profession || detail?.employeur) && (
+                                    <Accordion 
+                                        expanded={expandedAccordions.professionnel}
+                                        onChange={handleAccordionChange('professionnel')}
+                                        sx={{ borderRadius: '8px !important', mb: 2 }}
+                                    >
+                                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                <WorkIcon sx={{ color: '#6366f1' }} />
+                                                <Typography variant="h6" fontWeight="700">Informations Professionnelles</Typography>
+                                            </Box>
+                                        </AccordionSummary>
+                                        <AccordionDetails>
+                                            <Grid container spacing={2}>
+                                                <DetailField label="Profession" value={detail?.profession} icon={<WorkIcon />} />
+                                                <DetailField label="Employeur" value={detail?.employeur} icon={<BusinessCenterIcon />} />
+                                                <DetailField label="Situation familiale" value={detail?.situation_familiale} icon={<GroupIcon />} />
+                                                <DetailField label="Régime matrimonial" value={detail?.regime_matrimonial} icon={<AccountBalanceIcon />} />
                                             </Grid>
-                                        </>
-                                    )}
-                                </>
-                            ) : (
-                                // Détails client moral (AJOUTÉ)
-                                <>
-                                    <SectionTitle icon={<BusinessIcon />} title="Identité de l'entreprise" />
-                                    <Grid container spacing={2} sx={{ mb: 4 }}>
-                                        <DataField label="Raison sociale" value={detail?.raison_sociale} />
-                                        <DataField label="Sigle" value={detail?.sigle} />
-                                        <DataField label="Forme juridique" value={detail?.forme_juridique} />
-                                        <DataField label="Type d'entreprise" value={detail?.type_entreprise} />
-                                        <DataField label="RCCM" value={detail?.rccm} />
-                                        <DataField label="NUI" value={detail?.nui} />
-                                        <DataField label="Agence" value={client.agency?.name || client.agency?.code} />
-                                    </Grid>
+                                        </AccordionDetails>
+                                    </Accordion>
+                                )}
 
-                                    <SectionTitle icon={<AccountIcon />} title="Gérance" />
-                                    <Grid container spacing={2} sx={{ mb: 4 }}>
-                                        <DataField label="Gérant Principal" value={detail?.nom_gerant} />
-                                        <DataField label="Téléphone Gérant Principal" value={detail?.telephone_gerant} />
-                                        <DataField label="Gérant Secondaire" value={detail?.nom_gerant2} />
-                                        <DataField label="Téléphone Gérant Secondaire" value={detail?.telephone_gerant2} />
-                                    </Grid>
+                                {/* Conjoint(e) */}
+                                {detail?.nom_conjoint && (
+                                    <Accordion 
+                                        expanded={expandedAccordions.conjoint}
+                                        onChange={handleAccordionChange('conjoint')}
+                                        sx={{ borderRadius: '8px !important', mb: 2 }}
+                                    >
+                                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                <PersonIcon sx={{ color: '#6366f1' }} />
+                                                <Typography variant="h6" fontWeight="700">Conjoint(e)</Typography>
+                                            </Box>
+                                        </AccordionSummary>
+                                        <AccordionDetails>
+                                            <Grid container spacing={2}>
+                                                <DetailField label="Nom du conjoint" value={detail?.nom_conjoint} icon={<PersonIcon />} />
+                                                <DetailField label="Date naissance conjoint" value={formatDate(detail?.date_naissance_conjoint)} icon={<DateRangeIcon />} />
+                                                <DetailField label="CNI conjoint" value={detail?.cni_conjoint} icon={<BadgeIcon />} />
+                                                <DetailField label="Profession conjoint" value={detail?.profession_conjoint} icon={<WorkIcon />} />
+                                                <DetailField label="Salaire" value={detail?.salaire ? `${parseFloat(detail.salaire).toLocaleString('fr-FR')} FCFA` : ''} icon={<AttachMoneyIcon />} />
+                                                <DetailField label="Téléphone conjoint" value={detail?.tel_conjoint} icon={<PhoneIcon />} />
+                                            </Grid>
+                                        </AccordionDetails>
+                                    </Accordion>
+                                )}
 
-                                    <SectionTitle icon={<SignatureIcon />} title="Signataires" />
-                                    <Grid container spacing={2} sx={{ mb: 4 }}>
-                                        <DataField label="Signataire 1" value={detail?.nom_signataire} />
-                                        <DataField label="Téléphone Signataire 1" value={detail?.telephone_signataire} />
-                                        <DataField label="Signataire 2" value={detail?.nom_signataire2} />
-                                        <DataField label="Téléphone Signataire 2" value={detail?.telephone_signataire2} />
-                                        <DataField label="Signataire 3" value={detail?.nom_signataire3} />
-                                        <DataField label="Téléphone Signataire 3" value={detail?.telephone_signataire3} />
-                                    </Grid>
+                                {/* Documents */}
+                                <Accordion 
+                                    expanded={expandedAccordions.documents}
+                                    onChange={handleAccordionChange('documents')}
+                                    sx={{ borderRadius: '8px !important', mb: 2 }}
+                                >
+                                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <DescriptionIcon sx={{ color: '#6366f1' }} />
+                                            <Typography variant="h6" fontWeight="700">Documents</Typography>
+                                        </Box>
+                                    </AccordionSummary>
+                                    <AccordionDetails>
+                                        <Stack spacing={3}>
+                                            {/* Documents images */}
+                                            {(urls.photoUrl || urls.signatureUrl || urls.cniRectoUrl || urls.cniVersoUrl || urls.niuImageUrl || domicilePhotoUrl || activitePhotoUrl) && (
+                                                <Box>
+                                                    <Typography variant="subtitle2" fontWeight="700" sx={{ mb: 2 }}>Documents Images</Typography>
+                                                    <Grid container spacing={2}>
+                                                        {urls.cniRectoUrl && (
+                                                            <Grid item xs={12} md={6}>
+                                                                <DocumentCard 
+                                                                    title="Recto CNI"
+                                                                    icon={<CreditCardIcon />}
+                                                                    onClick={() => handleOpenImageModal(urls.cniRectoUrl, 'Recto CNI')}
+                                                                />
+                                                            </Grid>
+                                                        )}
+                                                        {urls.cniVersoUrl && (
+                                                            <Grid item xs={12} md={6}>
+                                                                <DocumentCard 
+                                                                    title="Verso CNI"
+                                                                    icon={<CreditCardIcon />}
+                                                                    onClick={() => handleOpenImageModal(urls.cniVersoUrl, 'Verso CNI')}
+                                                                />
+                                                            </Grid>
+                                                        )}
+                                                        {urls.niuImageUrl && (
+                                                            <Grid item xs={12} md={6}>
+                                                                <DocumentCard 
+                                                                    title="Photocopie NUI"
+                                                                    icon={<FingerprintIcon />}
+                                                                    onClick={() => handleOpenImageModal(urls.niuImageUrl, 'Photocopie NUI')}
+                                                                />
+                                                            </Grid>
+                                                        )}
+                                                        {urls.photoUrl && (
+                                                            <Grid item xs={12} md={6}>
+                                                                <DocumentCard 
+                                                                    title="Photo du client"
+                                                                    icon={<CameraIcon />}
+                                                                    onClick={() => handleOpenImageModal(urls.photoUrl, 'Photo du client')}
+                                                                />
+                                                            </Grid>
+                                                        )}
+                                                        {urls.signatureUrl && (
+                                                            <Grid item xs={12} md={6}>
+                                                                <DocumentCard 
+                                                                    title="Signature"
+                                                                    icon={<SignatureIcon />}
+                                                                    onClick={() => handleOpenImageModal(urls.signatureUrl, 'Signature')}
+                                                                />
+                                                            </Grid>
+                                                        )}
+                                                        {domicilePhotoUrl && (
+                                                            <Grid item xs={12} md={6}>
+                                                                <DocumentCard 
+                                                                    title="Photo domicile"
+                                                                    icon={<HomeIcon />}
+                                                                    onClick={() => handleOpenImageModal(domicilePhotoUrl, 'Photo domicile')}
+                                                                />
+                                                            </Grid>
+                                                        )}
+                                                        {activitePhotoUrl && (
+                                                            <Grid item xs={12} md={6}>
+                                                                <DocumentCard 
+                                                                    title="Photo activité"
+                                                                    icon={<BusinessIcon />}
+                                                                    onClick={() => handleOpenImageModal(activitePhotoUrl, 'Photo activité')}
+                                                                />
+                                                            </Grid>
+                                                        )}
+                                                    </Grid>
+                                                </Box>
+                                            )}
+                                        </Stack>
+                                    </AccordionDetails>
+                                </Accordion>
+                            </>
+                        ) : (
+                            /* Détails client moral */
+                            <>
+                                {/* Informations de l'entreprise */}
+                                <Accordion 
+                                    expanded={expandedAccordions.entreprise}
+                                    onChange={handleAccordionChange('entreprise')}
+                                    sx={{ borderRadius: '8px !important', mb: 2 }}
+                                >
+                                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <BusinessIcon sx={{ color: '#6366f1' }} />
+                                            <Typography variant="h6" fontWeight="700">Informations de l'Entreprise</Typography>
+                                        </Box>
+                                    </AccordionSummary>
+                                    <AccordionDetails>
+                                        <Grid container spacing={2}>
+                                            <DetailField label="Raison sociale" value={detail?.raison_sociale} icon={<CorporateFareIcon />} />
+                                            <DetailField label="Sigle" value={detail?.sigle} icon={<BadgeIcon />} />
+                                            <DetailField label="Forme juridique" value={detail?.forme_juridique} icon={<AccountTreeIcon />} />
+                                            <DetailField label="Type d'entreprise" value={detail?.type_entreprise} icon={<BusinessOutlineIcon />} />
+                                            <DetailField label="Numéro RCCM" value={detail?.rccm} icon={<DocumentScannerIcon />} />
+                                            <DetailField label="Numéro NUI" value={detail?.nui} icon={<FingerprintIcon />} />
+                                            <DetailField label="Solde initial" value={`${parseFloat(client.solde_initial || 0).toLocaleString('fr-FR')} FCFA`} icon={<MonetizationOnIcon />} />
+                                        </Grid>
+                                    </AccordionDetails>
+                                </Accordion>
 
-                                    {/* Documents administratifs supplémentaires */}
-                                    <SectionTitle icon={<DescriptionIcon />} title="Documents Administratifs" />
-                                    <Grid container spacing={2} sx={{ mb: 4 }}>
-                                        {detail?.type_entreprise === 'entreprise' ? (
-                                            <>
-                                                <DataField label="Extrait RCCM" value={extraitRccmUrl ? "✓ Disponible" : "Non fourni"} />
-                                                <DataField label="Titre de Patente" value={titrePatenteUrl ? "✓ Disponible" : "Non fourni"} />
-                                                <DataField label="Photocopie NUI" value={niuImageUrl ? "✓ Disponible" : "Non fourni"} />
-                                                <DataField label="Photocopie des Statuts" value={statutsUrl ? "✓ Disponible" : "Non fourni"} />
-                                                <DataField label="Acte de Désignation" value={acteDesignationPdfUrl ? "✓ Disponible (PDF)" : "Non fourni"} />
-                                            </>
-                                        ) : (
-                                            <>
-                                                <DataField label="PV de l'AGC" value={pvAgcUrl ? "✓ Disponible" : "Non fourni"} />
-                                                <DataField label="Attestation non redevance" value={attestationUrl ? "✓ Disponible" : "Non fourni"} />
-                                                <DataField label="Procès Verbal" value={procesVerbalUrl ? "✓ Disponible" : "Non fourni"} />
-                                                <DataField label="Registre COOP-GIC" value={registreCoopUrl ? "✓ Disponible" : "Non fourni"} />
-                                                <DataField label="Récépissé de déclaration" value={recepisseUrl ? "✓ Disponible" : "Non fourni"} />
-                                            </>
+                                {/* Gérants */}
+                                {(detail?.nom_gerant || detail?.nom_gerant2) && (
+                                    <Accordion 
+                                        expanded={expandedAccordions.gerants}
+                                        onChange={handleAccordionChange('gerants')}
+                                        sx={{ borderRadius: '8px !important', mb: 2 }}
+                                    >
+                                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                <SupervisorAccountIcon sx={{ color: '#6366f1' }} />
+                                                <Typography variant="h6" fontWeight="700">Gérants</Typography>
+                                            </Box>
+                                        </AccordionSummary>
+                                        <AccordionDetails>
+                                            <Grid container spacing={3}>
+                                                {/* Gérant principal */}
+                                                {detail?.nom_gerant && (
+                                                    <Grid item xs={12} md={6}>
+                                                        <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                                                            <CardContent>
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                                                                    <Avatar 
+                                                                        src={urls.gerantPhotoUrls && urls.gerantPhotoUrls[0]}
+                                                                        sx={{ width: 60, height: 60 }}
+                                                                        onClick={() => urls.gerantPhotoUrls && urls.gerantPhotoUrls[0] && handleOpenImageModal(urls.gerantPhotoUrls[0], 'Photo Gérant Principal')}
+                                                                    >
+                                                                        <AccountBoxIcon />
+                                                                    </Avatar>
+                                                                    <Box>
+                                                                        <Typography variant="subtitle1" fontWeight="700">Gérant Principal</Typography>
+                                                                        <Typography variant="body2" color="textSecondary">{detail.nom_gerant}</Typography>
+                                                                    </Box>
+                                                                </Box>
+                                                                <InfoRow label="Téléphone" value={detail.telephone_gerant} small />
+                                                                <InfoRow label="Photo" value={urls.gerantPhotoUrls && urls.gerantPhotoUrls[0] ? "✓ Disponible" : "Non fournie"} small />
+                                                            </CardContent>
+                                                        </Card>
+                                                    </Grid>
+                                                )}
+
+                                                {/* Gérant secondaire */}
+                                                {detail?.nom_gerant2 && (
+                                                    <Grid item xs={12} md={6}>
+                                                        <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                                                            <CardContent>
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                                                                    <Avatar 
+                                                                        src={urls.gerantPhotoUrls && urls.gerantPhotoUrls[1]}
+                                                                        sx={{ width: 60, height: 60 }}
+                                                                        onClick={() => urls.gerantPhotoUrls && urls.gerantPhotoUrls[1] && handleOpenImageModal(urls.gerantPhotoUrls[1], 'Photo Gérant Secondaire')}
+                                                                    >
+                                                                        <AccountBoxIcon />
+                                                                    </Avatar>
+                                                                    <Box>
+                                                                        <Typography variant="subtitle1" fontWeight="700">Gérant Secondaire</Typography>
+                                                                        <Typography variant="body2" color="textSecondary">{detail.nom_gerant2}</Typography>
+                                                                    </Box>
+                                                                </Box>
+                                                                <InfoRow label="Téléphone" value={detail.telephone_gerant2} small />
+                                                                <InfoRow label="Photo" value={urls.gerantPhotoUrls && urls.gerantPhotoUrls[1] ? "✓ Disponible" : "Non fournie"} small />
+                                                            </CardContent>
+                                                        </Card>
+                                                    </Grid>
+                                                )}
+                                            </Grid>
+                                        </AccordionDetails>
+                                    </Accordion>
+                                )}
+
+                                {/* Signataires */}
+                                {urls.signataires && urls.signataires.length > 0 && (
+                                    <Accordion 
+                                        expanded={expandedAccordions.signataires}
+                                        onChange={handleAccordionChange('signataires')}
+                                        sx={{ borderRadius: '8px !important', mb: 2 }}
+                                    >
+                                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                <HowToRegIcon sx={{ color: '#6366f1' }} />
+                                                <Typography variant="h6" fontWeight="700">Signataires</Typography>
+                                                <Chip label={`${urls.signataires.length} signataire(s)`} size="small" />
+                                            </Box>
+                                        </AccordionSummary>
+                                        <AccordionDetails>
+                                            <Tabs 
+                                                value={activeSignataireTab} 
+                                                onChange={(e, v) => setActiveSignataireTab(v)} 
+                                                sx={{ mb: 3 }}
+                                            >
+                                                {urls.signataires.map((signataire, index) => (
+                                                    <Tab key={index} label={`Signataire ${index + 1}`} />
+                                                ))}
+                                            </Tabs>
+
+                                            <Grid container spacing={3}>
+                                                {urls.signataires.map((signataire, index) => (
+                                                    activeSignataireTab === index && (
+                                                        <React.Fragment key={index}>
+                                                            <Grid item xs={12} md={6}>
+                                                                <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                                                                    <CardContent>
+                                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                                                                            <Avatar 
+                                                                                src={signataire.photo_url}
+                                                                                sx={{ width: 80, height: 80 }}
+                                                                                onClick={() => signataire.photo_url && handleOpenImageModal(signataire.photo_url, `Photo Signataire ${index + 1}`)}
+                                                                            >
+                                                                                <AccountBoxIcon />
+                                                                            </Avatar>
+                                                                            <Box>
+                                                                                <Typography variant="h6" fontWeight="700">{signataire.nom}</Typography>
+                                                                                <Typography variant="body2" color="textSecondary">Signataire {index + 1}</Typography>
+                                                                            </Box>
+                                                                        </Box>
+
+                                                                        <Grid container spacing={2}>
+                                                                            <DetailField label="Sexe" value={signataire.sexe === 'M' ? 'Masculin' : 'Féminin'} small />
+                                                                            <DetailField label="Téléphone" value={signataire.telephone} small />
+                                                                            <DetailField label="Email" value={signataire.email} small />
+                                                                            <DetailField label="CNI" value={signataire.cni} small />
+                                                                            <DetailField label="NUI" value={signataire.nui} small />
+                                                                            <DetailField label="Ville" value={signataire.ville} small />
+                                                                            <DetailField label="Quartier" value={signataire.quartier} small />
+                                                                            <DetailField label="Lieu domicile" value={signataire.lieu_domicile} small />
+                                                                            <DetailField label="Lieu-dit domicile" value={signataire.lieu_dit_domicile} small />
+                                                                        </Grid>
+                                                                    </CardContent>
+                                                                </Card>
+                                                            </Grid>
+
+                                                            <Grid item xs={12} md={6}>
+                                                                <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                                                                    <CardContent>
+                                                                        <Typography variant="subtitle1" fontWeight="700" sx={{ mb: 2 }}>Documents du Signataire</Typography>
+                                                                        <Grid container spacing={2}>
+                                                                            {/* Images */}
+                                                                            <Grid item xs={12}>
+                                                                                <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1 }}>Images</Typography>
+                                                                                <Grid container spacing={1}>
+                                                                                    {signataire.photo_url && (
+                                                                                        <Grid item xs={6}>
+                                                                                            <DocumentCard 
+                                                                                                title="Photo"
+                                                                                                icon={<CameraIcon />}
+                                                                                                small
+                                                                                                onClick={() => handleOpenImageModal(signataire.photo_url, `Photo Signataire ${index + 1}`)}
+                                                                                            />
+                                                                                        </Grid>
+                                                                                    )}
+                                                                                    {signataire.signature_url && (
+                                                                                        <Grid item xs={6}>
+                                                                                            <DocumentCard 
+                                                                                                title="Signature"
+                                                                                                icon={<SignatureIcon />}
+                                                                                                small
+                                                                                                onClick={() => handleOpenImageModal(signataire.signature_url, `Signature Signataire ${index + 1}`)}
+                                                                                            />
+                                                                                        </Grid>
+                                                                                    )}
+                                                                                    {signataire.cni_photo_recto_url && (
+                                                                                        <Grid item xs={6}>
+                                                                                            <DocumentCard 
+                                                                                                title="CNI Recto"
+                                                                                                icon={<CreditCardIcon />}
+                                                                                                small
+                                                                                                onClick={() => handleOpenImageModal(signataire.cni_photo_recto_url, `CNI Recto S${index + 1}`)}
+                                                                                            />
+                                                                                        </Grid>
+                                                                                    )}
+                                                                                    {signataire.cni_photo_verso_url && (
+                                                                                        <Grid item xs={6}>
+                                                                                            <DocumentCard 
+                                                                                                title="CNI Verso"
+                                                                                                icon={<CreditCardIcon />}
+                                                                                                small
+                                                                                                onClick={() => handleOpenImageModal(signataire.cni_photo_verso_url, `CNI Verso S${index + 1}`)}
+                                                                                            />
+                                                                                        </Grid>
+                                                                                    )}
+                                                                                    {signataire.nui_image_url && (
+                                                                                        <Grid item xs={6}>
+                                                                                            <DocumentCard 
+                                                                                                title="NUI"
+                                                                                                icon={<FingerprintIcon />}
+                                                                                                small
+                                                                                                onClick={() => handleOpenImageModal(signataire.nui_image_url, `NUI S${index + 1}`)}
+                                                                                            />
+                                                                                        </Grid>
+                                                                                    )}
+                                                                                </Grid>
+                                                                            </Grid>
+                                                                        </Grid>
+                                                                    </CardContent>
+                                                                </Card>
+                                                            </Grid>
+                                                        </React.Fragment>
+                                                    )
+                                                ))}
+                                            </Grid>
+                                        </AccordionDetails>
+                                    </Accordion>
+                                )}
+
+                                {/* Documents juridiques */}
+                                <Accordion 
+                                    expanded={expandedAccordions.documentsJuridiques}
+                                    onChange={handleAccordionChange('documentsJuridiques')}
+                                    sx={{ borderRadius: '8px !important', mb: 2 }}
+                                >
+                                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <DescriptionOutlineIcon sx={{ color: '#6366f1' }} />
+                                            <Typography variant="h6" fontWeight="700">Documents Juridiques</Typography>
+                                        </Box>
+                                    </AccordionSummary>
+                                    <AccordionDetails>
+                                        <Tabs value={activeDocTab} onChange={(e, v) => setActiveDocTab(v)} sx={{ mb: 3 }}>
+                                            <Tab label="Images" />
+                                            <Tab label="PDF" />
+                                            <Tab label="Localisation" />
+                                        </Tabs>
+
+                                        {activeDocTab === 0 && (
+                                            <Grid container spacing={2}>
+                                                {/* Documents images selon type d'entreprise */}
+                                                {detail?.type_entreprise === 'association' ? (
+                                                    <>
+                                                        {urls.pvAgcUrl && (
+                                                            <Grid item xs={12} md={4}>
+                                                                <DocumentCard 
+                                                                    title="PV de l'AGC"
+                                                                    icon={<DocumentScannerIcon />}
+                                                                    onClick={() => handleOpenImageModal(urls.pvAgcUrl, 'PV de l\'AGC')}
+                                                                />
+                                                            </Grid>
+                                                        )}
+                                                        {urls.attestationNonRedevanceUrl && (
+                                                            <Grid item xs={12} md={4}>
+                                                                <DocumentCard 
+                                                                    title="Attestation de non redevance"
+                                                                    icon={<AssignmentIcon />}
+                                                                    onClick={() => handleOpenImageModal(urls.attestationNonRedevanceUrl, 'Attestation de non redevance')}
+                                                                />
+                                                            </Grid>
+                                                        )}
+                                                        {urls.procesVerbalUrl && (
+                                                            <Grid item xs={12} md={4}>
+                                                                <DocumentCard 
+                                                                    title="Procès Verbal"
+                                                                    icon={<InsertDriveFileIcon />}
+                                                                    onClick={() => handleOpenImageModal(urls.procesVerbalUrl, 'Procès Verbal')}
+                                                                />
+                                                            </Grid>
+                                                        )}
+                                                        {urls.registreCoopUrl && (
+                                                            <Grid item xs={12} md={4}>
+                                                                <DocumentCard 
+                                                                    title="Registre COOP-GIC"
+                                                                    icon={<ListAltIcon />}
+                                                                    onClick={() => handleOpenImageModal(urls.registreCoopUrl, 'Registre COOP-GIC')}
+                                                                />
+                                                            </Grid>
+                                                        )}
+                                                        {urls.recepisseDeclarationUrl && (
+                                                            <Grid item xs={12} md={4}>
+                                                                <DocumentCard 
+                                                                    title="Récépissé de déclaration"
+                                                                    icon={<NoteAddIcon />}
+                                                                    onClick={() => handleOpenImageModal(urls.recepisseDeclarationUrl, 'Récépissé de déclaration')}
+                                                                />
+                                                            </Grid>
+                                                        )}
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        {urls.extraitRccmUrl && (
+                                                            <Grid item xs={12} md={4}>
+                                                                <DocumentCard 
+                                                                    title="Extrait RCCM"
+                                                                    icon={<DocumentScannerIcon />}
+                                                                    onClick={() => handleOpenImageModal(urls.extraitRccmUrl, 'Extrait RCCM')}
+                                                                />
+                                                            </Grid>
+                                                        )}
+                                                        {urls.titrePatenteUrl && (
+                                                            <Grid item xs={12} md={4}>
+                                                                <DocumentCard 
+                                                                    title="Titre de Patente"
+                                                                    icon={<AssignmentIcon />}
+                                                                    onClick={() => handleOpenImageModal(urls.titrePatenteUrl, 'Titre de Patente')}
+                                                                />
+                                                            </Grid>
+                                                        )}
+                                                        {urls.niuImageMoraleUrl && (
+                                                            <Grid item xs={12} md={4}>
+                                                                <DocumentCard 
+                                                                    title="Photocopie NUI"
+                                                                    icon={<FingerprintIcon />}
+                                                                    onClick={() => handleOpenImageModal(urls.niuImageMoraleUrl, 'Photocopie NUI Entreprise')}
+                                                                />
+                                                            </Grid>
+                                                        )}
+                                                        {urls.statutsUrl && (
+                                                            <Grid item xs={12} md={4}>
+                                                                <DocumentCard 
+                                                                    title="Photocopie des Statuts"
+                                                                    icon={<InsertDriveFileIcon />}
+                                                                    onClick={() => handleOpenImageModal(urls.statutsUrl, 'Photocopie des Statuts')}
+                                                                />
+                                                            </Grid>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </Grid>
                                         )}
-                                        <DataField label="Liste Conseil d'Administration" value={listeConseilPdfUrl ? "✓ Disponible (PDF)" : "Non fourni"} />
-                                    </Grid>
 
-                                    {/* Plans et factures siège */}
-                                    <SectionTitle icon={<MapIcon />} title="Localisation du Siège" />
-                                    <Grid container spacing={2} sx={{ mb: 4 }}>
-                                        <DataField label="Plan localisation siège" value={planSiegeUrl ? "✓ Disponible" : "Non fourni"} />
-                                        <DataField label="Facture eau siège" value={factureEauSiegeUrl ? "✓ Disponible" : "Non fourni"} />
-                                        <DataField label="Facture électricité siège" value={factureElecSiegeUrl ? "✓ Disponible" : "Non fourni"} />
-                                    </Grid>
+                                        {activeDocTab === 1 && (
+                                            <Grid container spacing={2}>
+                                                {urls.acteDesignationPdfUrl && (
+                                                    <Grid item xs={12} md={6}>
+                                                        <PdfDocumentCard 
+                                                            title="Acte de Désignation des Signataires"
+                                                            onClick={() => window.open(urls.acteDesignationPdfUrl, '_blank')}
+                                                        />
+                                                    </Grid>
+                                                )}
+                                                {urls.listeConseilPdfUrl && (
+                                                    <Grid item xs={12} md={6}>
+                                                        <PdfDocumentCard 
+                                                            title="Liste Conseil d'Administration"
+                                                            onClick={() => window.open(urls.listeConseilPdfUrl, '_blank')}
+                                                        />
+                                                    </Grid>
+                                                )}
+                                                {urls.listeMembresPdfUrl && (
+                                                    <Grid item xs={12} md={6}>
+                                                        <PdfDocumentCard 
+                                                            title="Liste des Membres"
+                                                            onClick={() => window.open(urls.listeMembresPdfUrl, '_blank')}
+                                                        />
+                                                    </Grid>
+                                                )}
+                                            </Grid>
+                                        )}
 
-                                    {/* Plans signataires */}
-                                    <SectionTitle icon={<LocationIcon />} title="Plans des Signataires" />
-                                    <Grid container spacing={2} sx={{ mb: 4 }}>
-                                        {planSignataireUrls.map((url, index) => (
-                                            <DataField 
-                                                key={index}
-                                                label={`Plan Signataire ${index + 1}`} 
-                                                value={url ? "✓ Disponible" : "Non fourni"} 
-                                            />
-                                        ))}
-                                    </Grid>
-
-                                    {/* Factures signataires */}
-                                    <SectionTitle icon={<ReceiptIcon />} title="Factures des Signataires" />
-                                    <Grid container spacing={2} sx={{ mb: 4 }}>
-                                        {factureEauSignataireUrls.map((url, index) => (
-                                            <DataField 
-                                                key={index}
-                                                label={`Facture eau S${index + 1}`} 
-                                                value={url ? "✓ Disponible" : "Non fourni"} 
-                                            />
-                                        ))}
-                                        {factureElecSignataireUrls.map((url, index) => (
-                                            <DataField 
-                                                key={index}
-                                                label={`Facture électricité S${index + 1}`} 
-                                                value={url ? "✓ Disponible" : "Non fourni"} 
-                                            />
-                                        ))}
-                                    </Grid>
-                                </>
-                            )}
-
-                            {/* Localisation (commun aux deux types) */}
-                            <SectionTitle icon={<LocationIcon />} title="Localisation" />
-                            <Grid container spacing={2} sx={{ mb: 4 }}>
-                                <DataField label="Ville" value={client?.adresse_ville} />
-                                <DataField label="Quartier" value={client?.adresse_quartier} />
-                                <DataField label="Lieu-dit domicile" value={client?.lieu_dit_domicile} />
-                                <DataField label="Ville activité" value={client?.ville_activite} />
-                                <DataField label="Quartier activité" value={client?.quartier_activite} />
-                                <DataField label="Lieu-dit activité" value={client?.lieu_dit_activite} />
-                            </Grid>
-
-                            {/* Biens et patrimoine */}
-                            <SectionTitle icon={<WalletIcon />} title="Patrimoine" />
-                            <Grid container spacing={2}>
-                                <DataField label="Immobilière" value={client?.immobiliere} />
-                                <DataField label="Autres biens" value={client?.autres_biens} />
-                                <DataField label="Créé le" value={client?.created_at ? new Date(client.created_at).toLocaleDateString('fr-FR') : ''} />
-                                <DataField label="Dernière modification" value={client?.updated_at ? new Date(client.updated_at).toLocaleDateString('fr-FR') : ''} />
-                            </Grid>
-                        </Paper>
+                                        {activeDocTab === 2 && (
+                                            <Grid container spacing={2}>
+                                                {urls.planSiegeUrl && (
+                                                    <Grid item xs={12} md={4}>
+                                                        <DocumentCard 
+                                                            title="Plan localisation siège"
+                                                            icon={<MapIcon />}
+                                                            onClick={() => handleOpenImageModal(urls.planSiegeUrl, 'Plan localisation siège')}
+                                                        />
+                                                    </Grid>
+                                                )}
+                                                {urls.factureEauSiegeUrl && (
+                                                    <Grid item xs={12} md={4}>
+                                                        <DocumentCard 
+                                                            title="Facture eau siège"
+                                                            icon={<WaterIcon />}
+                                                            onClick={() => handleOpenImageModal(urls.factureEauSiegeUrl, 'Facture eau siège')}
+                                                        />
+                                                    </Grid>
+                                                )}
+                                                {urls.factureElecSiegeUrl && (
+                                                    <Grid item xs={12} md={4}>
+                                                        <DocumentCard 
+                                                            title="Facture électricité siège"
+                                                            icon={<BoltIcon />}
+                                                            onClick={() => handleOpenImageModal(urls.factureElecSiegeUrl, 'Facture électricité siège')}
+                                                        />
+                                                    </Grid>
+                                                )}
+                                                {domicilePhotoUrl && (
+                                                    <Grid item xs={12} md={4}>
+                                                        <DocumentCard 
+                                                            title="Photo localisation domicile"
+                                                            icon={<HomeIcon />}
+                                                            onClick={() => handleOpenImageModal(domicilePhotoUrl, 'Photo localisation domicile')}
+                                                        />
+                                                    </Grid>
+                                                )}
+                                                {activitePhotoUrl && (
+                                                    <Grid item xs={12} md={4}>
+                                                        <DocumentCard 
+                                                            title="Photo localisation activité"
+                                                            icon={<BusinessIcon />}
+                                                            onClick={() => handleOpenImageModal(activitePhotoUrl, 'Photo localisation activité')}
+                                                        />
+                                                    </Grid>
+                                                )}
+                                            </Grid>
+                                        )}
+                                    </AccordionDetails>
+                                </Accordion>
+                            </>
+                        )}
                     </Grid>
                 </Grid>
             </Box>
 
-            {/* Modal générique pour les images */}
+            {/* Modal pour afficher les images */}
             <Dialog
-                open={openDomicileModal || openActiviteModal || openPhotoModal || openSignatureModal || 
-                      openGerantModal.some(v => v) || openSignatairePhotoModal.some(v => v) || 
-                      openSignataireSignatureModal.some(v => v) || Object.values(openDocModal).some(v => v)}
+                open={openImageModal}
                 onClose={handleCloseModal}
                 maxWidth="lg"
                 fullWidth
             >
                 <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="h6">{currentImageTitle}</Typography>
-                    <IconButton
-                        aria-label="close"
-                        onClick={handleCloseModal}
-                        sx={{
-                            color: (theme) => theme.palette.grey[500],
-                        }}
-                    >
+                    <IconButton onClick={handleCloseModal}>
                         <CloseIcon />
                     </IconButton>
                 </DialogTitle>
@@ -894,15 +1119,33 @@ function SectionTitle({ icon, title }) {
     );
 }
 
-function DataField({ label, value }) {
+function InfoRow({ label, value, small = false }) {
     return (
-        <Grid item xs={12} sm={6} md={4}>
-            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: '700', textTransform: 'uppercase', display: 'block' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+            <Typography variant={small ? "body2" : "body1"} sx={{ color: '#64748b', fontWeight: small ? 500 : 600 }}>
                 {label}
             </Typography>
-            <Typography variant="body1" sx={{ color: '#334155', fontWeight: '600', wordBreak: 'break-word' }}>
+            <Typography variant={small ? "body2" : "body1"} sx={{ color: '#1E293B', fontWeight: small ? 600 : 700 }}>
                 {value || "Non renseigné"}
             </Typography>
+        </Box>
+    );
+}
+
+function DetailField({ label, value, icon, small = false }) {
+    return (
+        <Grid item xs={12} sm={6}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                {icon && <Box sx={{ color: '#94A3B8', mt: 0.5 }}>{icon}</Box>}
+                <Box>
+                    <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', display: 'block' }}>
+                        {label}
+                    </Typography>
+                    <Typography variant={small ? "body2" : "body1"} sx={{ color: '#334155', fontWeight: small ? 600 : 700 }}>
+                        {value || "Non renseigné"}
+                    </Typography>
+                </Box>
+            </Box>
         </Grid>
     );
 }
@@ -918,74 +1161,74 @@ function StackStat({ label, value, color }) {
     );
 }
 
-function ImagePreview({ src, title, label, onClick, height = 120 }) {
+function DocumentCard({ title, icon, onClick, small = false }) {
     return (
-        <Box sx={{ position: 'relative' }}>
-            <Box 
-                component="img"
-                src={src} 
-                alt={title} 
-                sx={{ 
-                    width: '100%', 
-                    height: `${height}px`, 
-                    borderRadius: '8px',
-                    border: '1px solid #e2e8f0',
-                    cursor: 'pointer',
-                    objectFit: 'cover',
-                    '&:hover': { opacity: 0.8 }
-                }}
-                onClick={onClick}
-            />
-            <IconButton
-                size="small"
-                sx={{
-                    position: 'absolute',
-                    bottom: 8,
-                    right: 8,
-                    backgroundColor: 'rgba(255,255,255,0.8)',
-                    border: '1px solid #e0e0e0',
-                    '&:hover': { backgroundColor: 'white' }
-                }}
-                onClick={onClick}
-            >
-                <ZoomInIcon fontSize="small" />
-            </IconButton>
-            {label && (
-                <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', mt: 0.5 }}>
-                    {label}
-                </Typography>
-            )}
-        </Box>
-    );
-}
-
-function DocumentPreview({ src, title, onClick, isPdf = false }) {
-    return (
-        <Box 
+        <Card 
+            variant="outlined" 
             sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 1, 
-                p: 1, 
-                borderRadius: 1, 
-                bgcolor: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                cursor: 'pointer',
-                '&:hover': { bgcolor: '#f1f5f9' }
+                borderRadius: 2, 
+                cursor: 'pointer', 
+                '&:hover': { borderColor: '#6366f1', bgcolor: '#f8fafc' },
+                height: small ? 80 : 120,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                p: 2
             }}
             onClick={onClick}
         >
-            {isPdf ? (
-                <PdfIcon sx={{ color: '#ef4444' }} />
-            ) : (
-                <AttachFileIcon sx={{ color: '#6366f1' }} />
-            )}
-            <Typography variant="body2" sx={{ flexGrow: 1, fontWeight: 500 }}>
+            <Box sx={{ color: '#6366f1', mb: 1 }}>{icon}</Box>
+            <Typography 
+                variant={small ? "caption" : "body2"} 
+                sx={{ 
+                    fontWeight: 600, 
+                    textAlign: 'center',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    display: '-webkit-box',
+                    WebkitLineClamp: small ? 2 : 3,
+                    WebkitBoxOrient: 'vertical'
+                }}
+            >
                 {title}
             </Typography>
-            <IconButton size="small">
-                <ZoomInIcon fontSize="small" />
-            </IconButton>
-        </Box>
+        </Card>
+    );
+}
+
+function PdfDocumentCard({ title, onClick }) {
+    return (
+        <Card 
+            variant="outlined" 
+            sx={{ 
+                borderRadius: 2, 
+                cursor: 'pointer', 
+                '&:hover': { borderColor: '#ef4444', bgcolor: '#fef2f2' },
+                height: 120,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                p: 2
+            }}
+            onClick={onClick}
+        >
+            <PdfIcon sx={{ color: '#ef4444', fontSize: 40, mb: 1 }} />
+            <Typography 
+                variant="body2" 
+                sx={{ 
+                    fontWeight: 600, 
+                    textAlign: 'center',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical'
+                }}
+            >
+                {title}
+            </Typography>
+        </Card>
     );
 }

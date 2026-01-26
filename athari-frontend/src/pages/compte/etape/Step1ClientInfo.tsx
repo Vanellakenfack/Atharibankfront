@@ -35,13 +35,19 @@ type Client = {
   email: string;
   adresse_ville: string;
   adresse_quartier: string;
+  nom_complet?: string;  // Pour les clients moraux
   physique?: {
     nom_prenoms: string;
     sexe: 'M' | 'F';
     date_naissance: string;
     signature_url?: string;
-    cni_recto_url?: string;      // Nouveau champ CNI recto
-    cni_verso_url?: string;      // Nouveau champ CNI verso
+    cni_recto_url?: string;
+    cni_verso_url?: string;
+  };
+  morale?: {
+    raison_sociale: string;  // Raison sociale pour les clients moraux
+    forme_juridique?: string;
+    signature_signataire_url?: string;
   };
 };
 
@@ -67,6 +73,27 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [validating, setValidating] = useState(false);
+
+  // Fonction pour obtenir le nom d'affichage d'un client
+  const getClientDisplayName = (client: Client): string => {
+    if (client.type_client === 'physique') {
+      return client.physique?.nom_prenoms || 'N/A';
+    } else if (client.type_client === 'morale') {
+      // Pour les clients moraux, afficher la raison sociale si disponible, sinon nom_complet
+      return client.morale?.raison_sociale || client.nom_complet || 'N/A';
+    }
+    return 'N/A';
+  };
+
+  // Fonction pour obtenir le nom à utiliser pour le tri
+  const getClientNameForSorting = (client: Client): string => {
+    if (client.type_client === 'physique') {
+      return client.physique?.nom_prenoms || '';
+    } else if (client.type_client === 'morale') {
+      return client.morale?.raison_sociale || client.nom_complet || '';
+    }
+    return '';
+  };
 
   // Charger les clients depuis l'API
   useEffect(() => {
@@ -94,18 +121,30 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
     // Filtrage
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(client => 
-        (client.physique?.nom_prenoms?.toLowerCase().includes(term)) ||
-        (client.num_client?.toLowerCase().includes(term)) ||
-        (client.telephone?.includes(term)) ||
-        (client.email?.toLowerCase().includes(term))
-      );
+      result = result.filter(client => {
+        const displayName = getClientDisplayName(client).toLowerCase();
+        return (
+          displayName.includes(term) ||
+          (client.num_client?.toLowerCase().includes(term)) ||
+          (client.telephone?.includes(term)) ||
+          (client.email?.toLowerCase().includes(term))
+        );
+      });
     }
 
     // Tri
     result.sort((a, b) => {
-      const aValue = a[orderBy] || '';
-      const bValue = b[orderBy] || '';
+      let aValue: string | number = '';
+      let bValue: string | number = '';
+
+      if (orderBy === 'num_client') {
+        aValue = a.num_client || '';
+        bValue = b.num_client || '';
+      } else {
+        // Pour le tri par nom, utiliser la fonction getClientNameForSorting
+        aValue = getClientNameForSorting(a);
+        bValue = getClientNameForSorting(b);
+      }
       
       if (aValue < bValue) return order === 'asc' ? -1 : 1;
       if (aValue > bValue) return order === 'asc' ? 1 : -1;
@@ -122,7 +161,7 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
   };
 
   const handleSelectClient = async (client: Client) => {
-    // Récupérer les URLs des CNI depuis le client
+    // Récupérer les URLs des CNI depuis le client (uniquement pour les physiques)
     const cniRectoUrl = client.physique?.cni_recto_url || null;
     const cniVersoUrl = client.physique?.cni_verso_url || null;
     
@@ -169,7 +208,7 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
               fullWidth
               variant="outlined"
               size="small"
-              placeholder="Rechercher un client..."
+              placeholder="Rechercher un client (nom, raison sociale, numéro, téléphone)..."
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
@@ -214,12 +253,12 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
                     </TableCell>
                     <TableCell sx={{ backgroundColor: 'primary.main' }}>
                       <TableSortLabel
-                        active={orderBy === 'physique.nom_prenoms'}
-                        direction={orderBy === 'physique.nom_prenoms' ? order : 'asc'}
-                        onClick={() => handleRequestSort('physique.nom_prenoms')}
+                        active={true}
+                        direction={order}
+                        onClick={() => handleRequestSort('nom' as any)}
                         sx={{ color: 'white !important', '&:hover': { color: 'rgba(255, 255, 255, 0.8) !important' } }}
                       >
-                        Nom & Prénoms
+                        {clients.some(c => c.type_client === 'morale') ? 'Nom / Raison sociale' : 'Nom & Prénoms'}
                       </TableSortLabel>
                     </TableCell>
                     <TableCell sx={{ backgroundColor: 'primary.main', color: 'white' }}>Téléphone</TableCell>
@@ -268,7 +307,12 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
                           />
                         </TableCell>
                         <TableCell>{client.num_client}</TableCell>
-                        <TableCell>{client.physique?.nom_prenoms || 'N/A'}</TableCell>
+                        <TableCell>
+                          {client.type_client === 'physique' 
+                            ? (client.physique?.nom_prenoms || 'N/A')
+                            : (client.morale?.raison_sociale || client.nom_complet || 'N/A')
+                          }
+                        </TableCell>
                         <TableCell>{client.telephone}</TableCell>
                         <TableCell>{client.email || 'N/A'}</TableCell>
                         <TableCell>{client.adresse_ville}</TableCell>
@@ -353,8 +397,11 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
                 <Grid item xs={12} md={6}>
                   <TextField
                     fullWidth
-                    label="Nom complet"
-                    value={selectedClient.physique?.nom_prenoms || 'N/A'}
+                    label={selectedClient.type_client === 'physique' ? 'Nom complet' : 'Raison sociale'}
+                    value={selectedClient.type_client === 'physique' 
+                      ? (selectedClient.physique?.nom_prenoms || 'N/A')
+                      : (selectedClient.morale?.raison_sociale || selectedClient.nom_complet || 'N/A')
+                    }
                     variant="outlined"
                     size="small"
                     margin="normal"
@@ -428,34 +475,53 @@ const Step1ClientInfo: React.FC<Step1ClientInfoProps> = ({
                     }}
                   />
                 </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Signature disponible"
-                    value={selectedClient.physique?.signature_url ? 'Oui' : 'Non'}
-                    variant="outlined"
-                    size="small"
-                    margin="normal"
-                    InputProps={{
-                      readOnly: true,
-                    }}
-                    helperText={selectedClient.physique?.signature_url ? 'La signature sera automatiquement chargée à l\'étape 4' : 'Aucune signature trouvée pour ce client'}
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="CNI disponible"
-                    value={selectedClient.physique?.cni_recto_url ? 'Oui (Recto & Verso)' : 'Non'}
-                    variant="outlined"
-                    size="small"
-                    margin="normal"
-                    InputProps={{
-                      readOnly: true,
-                    }}
-                    helperText={selectedClient.physique?.cni_recto_url ? 'Les CNI seront automatiquement chargées à l\'étape 4' : 'Aucune CNI trouvée pour ce client'}
-                  />
-                </Grid>
+                
+                {selectedClient.type_client === 'physique' ? (
+                  <>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        fullWidth
+                        label="Signature disponible"
+                        value={selectedClient.physique?.signature_url ? 'Oui' : 'Non'}
+                        variant="outlined"
+                        size="small"
+                        margin="normal"
+                        InputProps={{
+                          readOnly: true,
+                        }}
+                        helperText={selectedClient.physique?.signature_url ? 'La signature sera automatiquement chargée à l\'étape 4' : 'Aucune signature trouvée pour ce client'}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        fullWidth
+                        label="CNI disponible"
+                        value={selectedClient.physique?.cni_recto_url ? 'Oui (Recto & Verso)' : 'Non'}
+                        variant="outlined"
+                        size="small"
+                        margin="normal"
+                        InputProps={{
+                          readOnly: true,
+                        }}
+                        helperText={selectedClient.physique?.cni_recto_url ? 'Les CNI seront automatiquement chargées à l\'étape 4' : 'Aucune CNI trouvée pour ce client'}
+                      />
+                    </Grid>
+                  </>
+                ) : (
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Forme juridique"
+                      value={selectedClient.morale?.forme_juridique || 'N/A'}
+                      variant="outlined"
+                      size="small"
+                      margin="normal"
+                      InputProps={{
+                        readOnly: true,
+                      }}
+                    />
+                  </Grid>
+                )}
               </Grid>
               
               {validating && (
