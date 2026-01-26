@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
@@ -6,7 +6,7 @@ import {
   Dialog, DialogActions, DialogContent, DialogTitle, TextField, 
   FormControlLabel, Checkbox, InputAdornment, Snackbar, Alert,
   Tooltip, Select, MenuItem, Pagination, FormControl, InputLabel,
-  Tabs, Tab, Divider, Grid, Card, CardContent, CardHeader, List, ListItem, ListItemText,
+  Tabs, Tab, Divider, Card, CardContent, CardHeader, List, ListItem, ListItemText,
   Autocomplete, LinearProgress
 } from '@mui/material';
 import { useSnackbar } from 'notistack';
@@ -25,9 +25,13 @@ import PercentIcon from '@mui/icons-material/Percent';
 import WarningIcon from '@mui/icons-material/Warning';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import CloseIcon from '@mui/icons-material/Close';
-import BlockIcon from '@mui/icons-material/Block';
 import SaveIcon from '@mui/icons-material/Save';
 import CheckIcon from '@mui/icons-material/Check';
+import LocalLibraryIcon from '@mui/icons-material/LocalLibrary';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import BookIcon from '@mui/icons-material/Book';
+import LocalAtmIcon from '@mui/icons-material/LocalAtm';
+import SettingsIcon from '@mui/icons-material/Settings';
 import ApiClient from '@/services/api/ApiClient';
 import Sidebar from '@/components/layout/Sidebar';
 import TopBar from '@/components/layout/TopBar';
@@ -96,7 +100,21 @@ interface TypeCompte {
   frais_perte_carnet?: number | null;
   frais_perte_actif?: boolean;
   chapitre_perte_id?: number | null;
+  frais_chequier?: number | null;
+  frais_chequier_actif?: boolean;
+  chapitre_frais_chequier_id?: number | null;
+  chapitre_chequier_id?: number | null;
+  frais_cheque_guichet?: number | null;
+  frais_cheque_guichet_actif?: boolean;
+  chapitre_cheque_guichet_id?: number | null;
+  frais_livret?: number | null;
+  frais_livret_actif?: boolean;
+  chapitre_livret_id?: number | null;
+  frais_renouvellement_livret?: number | null;
+  commission_mensuel?: number | null;
   commission_mensuelle_actif?: boolean;
+  chapitre_commission_mensuelle_id?: number | null;
+  chapitre_minimum_id?: number | null;
   seuil_commission?: number | null;
   commission_si_superieur?: number | null;
   commission_si_inferieur?: number | null;
@@ -158,7 +176,7 @@ const TypeCompteList = () => {
   const [openEditModal, setOpenEditModal] = useState(false);
   const [editingType, setEditingType] = useState<TypeCompte | null>(null);
   const [activeTab, setActiveTab] = useState(0);
-  const { enqueueSnackbar, closeSnackbar } = useSnackbar();
+  const { enqueueSnackbar } = useSnackbar();
   
   // États pour la confirmation
   const [confirmModal, setConfirmModal] = useState({
@@ -210,11 +228,33 @@ const TypeCompteList = () => {
     frais_cloture_anticipe: yup.number().nullable(),
     frais_cloture_anticipe_actif: yup.boolean().default(false),
     chapitre_cloture_anticipe_id: yup.number().nullable(),
+    frais_chequier: yup.number().nullable(),
+    frais_chequier_actif: yup.boolean().default(false),
+    chapitre_frais_chequier_id: yup.number().nullable(),
+    chapitre_chequier_id: yup.number().nullable(),
+    frais_cheque_guichet: yup.number().nullable(),
+    frais_cheque_guichet_actif: yup.boolean().default(false),
+    chapitre_cheque_guichet_id: yup.number().nullable(),
+    frais_livret: yup.number().nullable(),
+    frais_livret_actif: yup.boolean().default(false),
+    chapitre_livret_id: yup.number().nullable(),
+    frais_renouvellement_livret: yup.number().nullable(),
+    frais_renouvellement_actif: yup.boolean().default(false),
+    frais_perte_carnet: yup.number().nullable(),
+    frais_perte_actif: yup.boolean().default(false),
+    chapitre_perte_id: yup.number().nullable(),
+    commission_mensuelle_actif: yup.boolean().default(false),
+    commission_mensuel: yup.number().nullable(),
+    chapitre_commission_mensuelle_id: yup.number().nullable(),
+    seuil_commission: yup.number().nullable(),
+    commission_si_superieur: yup.number().nullable(),
+    commission_si_inferieur: yup.number().nullable(),
+    chapitre_minimum_id: yup.number().nullable(),
     chapitre_defaut_id: yup.number().nullable(),
   });
   
-  const { control, handleSubmit, reset, formState: { errors }, setValue, watch } = useForm<TypeCompte>({
-    resolver: yupResolver(schema),
+  const { control, handleSubmit, reset, setValue, watch } = useForm<TypeCompte>({
+    resolver: yupResolver(schema) as any,
     mode: 'onBlur',
     defaultValues: {
       description: '',
@@ -242,6 +282,28 @@ const TypeCompteList = () => {
       penalite_actif: false,
       frais_cloture_anticipe_actif: false,
       capitalisation_interets: false,
+      frais_chequier: null,
+      frais_chequier_actif: false,
+      chapitre_frais_chequier_id: null,
+      chapitre_chequier_id: null,
+      frais_cheque_guichet: null,
+      frais_cheque_guichet_actif: false,
+      chapitre_cheque_guichet_id: null,
+      frais_livret: null,
+      frais_livret_actif: false,
+      chapitre_livret_id: null,
+      frais_renouvellement_livret: null,
+      frais_renouvellement_actif: false,
+      frais_perte_carnet: null,
+      frais_perte_actif: false,
+      chapitre_perte_id: null,
+      commission_mensuelle_actif: false,
+      commission_mensuel: null,
+      chapitre_commission_mensuelle_id: null,
+      seuil_commission: null,
+      commission_si_superieur: null,
+      commission_si_inferieur: null,
+      chapitre_minimum_id: null,
     }
   });
   
@@ -252,6 +314,12 @@ const TypeCompteList = () => {
   const interetsActifs = watch('interets_actifs');
   const penaliteActif = watch('penalite_actif');
   const fraisClotureActif = watch('frais_cloture_anticipe_actif');
+  const fraisChequerActif = watch('frais_chequier_actif');
+  const fraisChequeGuichetActif = watch('frais_cheque_guichet_actif');
+  const fraisLivretActif = watch('frais_livret_actif');
+  const fraisRenouvellementActif = watch('frais_renouvellement_actif');
+  const fraisPerteActif = watch('frais_perte_actif');
+  const commissionMensuelleActif = watch('commission_mensuelle_actif');
   
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -359,7 +427,7 @@ const TypeCompteList = () => {
   });
 
   // Charger TOUS les chapitres avec PAGINATION AUTOMATIQUE
-  const { data: chapitresData, isLoading: loadingChapitres, refetch: refetchChapitres } = useQuery<Chapitre[]>({
+  const { data: chapitresData, isLoading: loadingChapitres } = useQuery<Chapitre[]>({
     queryKey: ['chapitres'],
     queryFn: async () => {
       console.log('Début du chargement intelligent des chapitres avec pagination...');
@@ -543,7 +611,7 @@ const TypeCompteList = () => {
         throw error;
       }
     },
-    onSuccess: (responseData, variables) => {
+    onSuccess: (_, variables) => {
       // Mettre à jour le tableau localement immédiatement
       if (variables.id && typesData) {
         const updatedTypes = typesData.map(type => 
@@ -584,7 +652,7 @@ const TypeCompteList = () => {
   });
   
   // Gestion du changement d'onglet
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
   
@@ -827,11 +895,12 @@ const TypeCompteList = () => {
   };
 
   // Composant pour le sélecteur de chapitre
-  const ChapitreSelect = ({ name, label, required = false, helperText = "" }: { 
+  const ChapitreSelect = ({ name, label, required = false, helperText = "", disabled = false }: { 
     name: keyof TypeCompte; 
     label: string; 
     required?: boolean;
     helperText?: string;
+    disabled?: boolean;
   }) => {
     const value = watch(name) as number | null;
     const selectedChapitre = value ? allChapitres.find(ch => ch.id === value) : null;
@@ -841,16 +910,17 @@ const TypeCompteList = () => {
         name={name}
         control={control}
         render={({ field, fieldState }) => (
-          <FormControl fullWidth margin="dense" sx={{ mb: 2 }}>
+          <FormControl fullWidth margin="dense" sx={{ mb: 2 }} disabled={disabled}>
             <Autocomplete
               options={allChapitres}
               value={selectedChapitre}
+              disabled={disabled}
               getOptionLabel={(option) => {
                 if (typeof option === 'string') return option;
                 return `${option.code} - ${option.libelle}`;
               }}
               isOptionEqualToValue={(option, value) => option.id === value.id}
-              onChange={(event, newValue) => {
+              onChange={(_, newValue) => {
                 field.onChange(newValue ? newValue.id : null);
               }}
               renderInput={(params) => (
@@ -860,6 +930,7 @@ const TypeCompteList = () => {
                   placeholder="Rechercher un chapitre..."
                   error={!!fieldState.error}
                   helperText={fieldState.error?.message || helperText}
+                  disabled={disabled}
                   InputProps={{
                     ...params.InputProps,
                     endAdornment: (
@@ -1180,7 +1251,7 @@ const TypeCompteList = () => {
                 <Pagination 
                   count={Math.ceil(filteredTypes.length / rowsPerPage)} 
                   page={page + 1} 
-                  onChange={(event, value) => setPage(value - 1)} 
+                  onChange={(_, value) => setPage(value - 1)} 
                   color="primary" 
                   shape="rounded"
                 />
@@ -1223,7 +1294,7 @@ const TypeCompteList = () => {
 
           {/* Modal d'édition */}
           <Dialog open={openEditModal} onClose={() => setOpenEditModal(false)} maxWidth="md" fullWidth>
-            <form onSubmit={handleSubmit(handleSubmitWithConfirmation)}>
+            <form onSubmit={handleSubmit(handleSubmitWithConfirmation as any)}>
               <DialogTitle>
                 <Box display="flex" alignItems="center" gap={1}>
                   <EditIcon color="primary" />
@@ -1245,6 +1316,7 @@ const TypeCompteList = () => {
                     <Tab label="Frais & Commissions" {...a11yProps(1)} />
                     <Tab label="Intérêts" {...a11yProps(2)} />
                     <Tab label="Pénalités" {...a11yProps(3)} />
+                    <Tab label="Avancé" {...a11yProps(4)} />
                   </Tabs>
                 </Box>
 
@@ -1545,6 +1617,346 @@ const TypeCompteList = () => {
                     label="Chapitre commission de retrait"
                     helperText="Chapitre pour comptabiliser les commissions de retrait"
                   />
+
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <LocalLibraryIcon sx={{ mr: 1 }} />
+                    Frais de Chéquier
+                  </Typography>
+                  
+                  <Box display="flex" gap={2} alignItems="center" mb={2}>
+                    <Controller
+                      name="frais_chequier_actif"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={field.value || false}
+                              onChange={(e) => {
+                                field.onChange(e.target.checked);
+                                if (!e.target.checked) {
+                                  setValue('frais_chequier', null);
+                                  setValue('chapitre_frais_chequier_id', null);
+                                }
+                              }}
+                            />
+                          }
+                          label="Activer"
+                        />
+                      )}
+                    />
+                    
+                    <Controller
+                      name="frais_chequier"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          margin="dense"
+                          label="Montant"
+                          type="number"
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                          }}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                          disabled={!fraisChequerActif}
+                          sx={{ flex: 1 }}
+                        />
+                      )}
+                    />
+                  </Box>
+                  
+                  <ChapitreSelect 
+                    name="chapitre_frais_chequier_id" 
+                    label="Chapitre frais de chéquier"
+                    helperText="Chapitre pour comptabiliser les frais de chéquier"
+                    disabled={!fraisChequerActif}
+                  />
+
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <ReceiptIcon sx={{ mr: 1 }} />
+                    Frais de Chèque Guichet
+                  </Typography>
+                  
+                  <Box display="flex" gap={2} alignItems="center" mb={2}>
+                    <Controller
+                      name="frais_cheque_guichet_actif"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={field.value || false}
+                              onChange={(e) => {
+                                field.onChange(e.target.checked);
+                                if (!e.target.checked) {
+                                  setValue('frais_cheque_guichet', null);
+                                  setValue('chapitre_cheque_guichet_id', null);
+                                }
+                              }}
+                            />
+                          }
+                          label="Activer"
+                        />
+                      )}
+                    />
+                    
+                    <Controller
+                      name="frais_cheque_guichet"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          margin="dense"
+                          label="Montant"
+                          type="number"
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                          }}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                          disabled={!fraisChequeGuichetActif}
+                          sx={{ flex: 1 }}
+                        />
+                      )}
+                    />
+                  </Box>
+                  
+                  <ChapitreSelect 
+                    name="chapitre_cheque_guichet_id" 
+                    label="Chapitre frais de chèque guichet"
+                    helperText="Chapitre pour comptabiliser les frais de chèque guichet"
+                    disabled={!fraisChequeGuichetActif}
+                  />
+
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <BookIcon sx={{ mr: 1 }} />
+                    Frais de Livret
+                  </Typography>
+                  
+                  <Box display="flex" gap={2} alignItems="center" mb={2}>
+                    <Controller
+                      name="frais_livret_actif"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={field.value || false}
+                              onChange={(e) => {
+                                field.onChange(e.target.checked);
+                                if (!e.target.checked) {
+                                  setValue('frais_livret', null);
+                                  setValue('chapitre_livret_id', null);
+                                }
+                              }}
+                            />
+                          }
+                          label="Activer"
+                        />
+                      )}
+                    />
+                    
+                    <Controller
+                      name="frais_livret"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          margin="dense"
+                          label="Montant"
+                          type="number"
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                          }}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                          disabled={!fraisLivretActif}
+                          sx={{ flex: 1 }}
+                        />
+                      )}
+                    />
+                  </Box>
+                  
+                  <ChapitreSelect 
+                    name="chapitre_livret_id" 
+                    label="Chapitre frais de livret"
+                    helperText="Chapitre pour comptabiliser les frais de livret"
+                    disabled={!fraisLivretActif}
+                  />
+
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <RefreshIcon sx={{ mr: 1 }} />
+                    Frais de Renouvellement de Livret
+                  </Typography>
+                  
+                  <Box display="flex" gap={2} alignItems="center" mb={2}>
+                    <Controller
+                      name="frais_renouvellement_actif"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={field.value || false}
+                              onChange={(e) => {
+                                field.onChange(e.target.checked);
+                                if (!e.target.checked) {
+                                  setValue('frais_renouvellement_livret', null);
+                                }
+                              }}
+                            />
+                          }
+                          label="Activer"
+                        />
+                      )}
+                    />
+                    
+                    <Controller
+                      name="frais_renouvellement_livret"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          margin="dense"
+                          label="Montant"
+                          type="number"
+                          fullWidth
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                          }}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                          disabled={!fraisRenouvellementActif}
+                        />
+                      )}
+                    />
+                  </Box>
+
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <LocalAtmIcon sx={{ mr: 1 }} />
+                    Frais de Perte de Carnet
+                  </Typography>
+                  
+                  <Box display="flex" gap={2} alignItems="center" mb={2}>
+                    <Controller
+                      name="frais_perte_actif"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={field.value || false}
+                              onChange={(e) => {
+                                field.onChange(e.target.checked);
+                                if (!e.target.checked) {
+                                  setValue('frais_perte_carnet', null);
+                                  setValue('chapitre_perte_id', null);
+                                }
+                              }}
+                            />
+                          }
+                          label="Activer"
+                        />
+                      )}
+                    />
+                    
+                    <Controller
+                      name="frais_perte_carnet"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          margin="dense"
+                          label="Montant"
+                          type="number"
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                          }}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                          disabled={!fraisPerteActif}
+                          sx={{ flex: 1 }}
+                        />
+                      )}
+                    />
+                  </Box>
+                  
+                  <ChapitreSelect 
+                    name="chapitre_perte_id" 
+                    label="Chapitre frais de perte"
+                    helperText="Chapitre pour comptabiliser les frais de perte de carnet"
+                    disabled={!fraisPerteActif}
+                  />
+
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <PercentIcon sx={{ mr: 1 }} />
+                    Commission Mensuelle
+                  </Typography>
+                  
+                  <Box display="flex" gap={2} alignItems="center" mb={2}>
+                    <Controller
+                      name="commission_mensuelle_actif"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={field.value || false}
+                              onChange={(e) => {
+                                field.onChange(e.target.checked);
+                                if (!e.target.checked) {
+                                  setValue('commission_mensuel', null);
+                                  setValue('chapitre_commission_mensuelle_id', null);
+                                }
+                              }}
+                            />
+                          }
+                          label="Activer"
+                        />
+                      )}
+                    />
+                    
+                    <Controller
+                      name="commission_mensuel"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          margin="dense"
+                          label="Commission Mensuelle"
+                          type="number"
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                          }}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                          disabled={!commissionMensuelleActif}
+                          sx={{ flex: 1 }}
+                        />
+                      )}
+                    />
+                  </Box>
+                  
+                  <ChapitreSelect 
+                    name="chapitre_commission_mensuelle_id" 
+                    label="Chapitre commission mensuelle"
+                    helperText="Chapitre pour comptabiliser les commissions mensuelles"
+                    disabled={!commissionMensuelleActif}
+                  />
                 </TabPanel>
 
                 {/* Onglet Intérêts */}
@@ -1767,6 +2179,56 @@ const TypeCompteList = () => {
                     />
                   </Box>
                 </TabPanel>
+
+                {/* Onglet Avancé */}
+                <TabPanel value={activeTab} index={4}>
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <SettingsIcon sx={{ mr: 1 }} />
+                    Paramètres Avancés
+                  </Typography>
+                  
+                  <Box mb={3}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Minimum de Compte
+                    </Typography>
+                    <Controller
+                      name="minimum_compte"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          margin="dense"
+                          label="Montant minimum"
+                          type="number"
+                          fullWidth
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                          }}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                          sx={{ mb: 2 }}
+                        />
+                      )}
+                    />
+
+                    <ChapitreSelect 
+                      name="chapitre_minimum_id" 
+                      label="Chapitre minimum compte"
+                      helperText="Chapitre pour comptabiliser le minimum de compte"
+                    />
+
+                    <Divider sx={{ my: 2 }} />
+                    
+                    <Typography variant="subtitle1" gutterBottom>
+                      Compte d'Attente des Produits
+                    </Typography>
+                    <ChapitreSelect 
+                      name="compte_attente_produits_id" 
+                      label="Compte d'attente des produits"
+                      helperText="Chapitre pour comptabiliser les produits en attente"
+                    />
+                  </Box>
+                </TabPanel>
               </DialogContent>
               
               <DialogActions sx={{ p: 3, justifyContent: 'space-between' }}>
@@ -1780,7 +2242,7 @@ const TypeCompteList = () => {
                       Précédent
                     </Button>
                   )}
-                  {activeTab < 3 && (
+                  {activeTab < 4 && (
                     <Button 
                       onClick={() => setActiveTab(activeTab + 1)}
                       variant="contained"
@@ -1903,9 +2365,9 @@ const TypeCompteList = () => {
             </DialogTitle>
             <DialogContent dividers>
               {selectedType && (
-                <Grid container spacing={3}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
                   {/* Colonne 1: Informations de base */}
-                  <Grid item xs={12} md={6}>
+                  <Box>
                     <Card variant="outlined" sx={{ mb: 3 }}>
                       <CardHeader 
                         title="Informations générales" 
@@ -1945,6 +2407,51 @@ const TypeCompteList = () => {
                       </CardContent>
                     </Card>
 
+                    {/* Frais déduits automatiquement à l'ouverture */}
+                    {((selectedType.frais_ouverture_actif || selectedType.frais_ouverture) || (selectedType.frais_carnet_actif || selectedType.frais_carnet)) && (
+                      <Card variant="outlined" sx={{ mb: 3, bgcolor: '#ffebee', borderColor: '#ef5350', borderWidth: 2 }}>
+                        <CardHeader 
+                          title="⚠️ Frais déduits automatiquement à l'ouverture" 
+                          titleTypographyProps={{ variant: 'h6', fontWeight: 'bold', color: '#c62828' }}
+                          sx={{ bgcolor: '#ffcdd2', color: '#c62828' }}
+                        />
+                        <CardContent>
+                          <Box sx={{ p: 2, bgcolor: '#fff', borderRadius: 1 }}>
+                            {(selectedType.frais_ouverture_actif || selectedType.frais_ouverture) && (
+                              <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>Frais d'ouverture:</Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#ef5350' }}>
+                                  {selectedType.frais_ouverture || 0} FCFA
+                                </Typography>
+                              </Box>
+                            )}
+                            {(selectedType.frais_carnet_actif || selectedType.frais_carnet) && (
+                              <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>Frais de carnet:</Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#ef5350' }}>
+                                  {selectedType.frais_carnet || 0} FCFA
+                                </Typography>
+                              </Box>
+                            )}
+                            {((selectedType.frais_ouverture_actif || selectedType.frais_ouverture) || (selectedType.frais_carnet_actif || selectedType.frais_carnet)) && (
+                              <Box sx={{ 
+                                pt: 2, 
+                                borderTop: '2px solid #ef5350', 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                alignItems: 'center'
+                              }}>
+                                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Montant total à déduire:</Typography>
+                                <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#c62828' }}>
+                                  {(selectedType.frais_ouverture || 0) + (selectedType.frais_carnet || 0)} FCFA
+                                </Typography>
+                              </Box>
+                            )}
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    )}
+
                     {/* Frais et commissions */}
                     <Card variant="outlined" sx={{ mb: 3 }}>
                       <CardHeader 
@@ -1957,11 +2464,12 @@ const TypeCompteList = () => {
                           {selectedType.frais_ouverture_actif && (
                             <>
                               <DetailItem 
-                                label="Frais d'ouverture" 
-                                value={`${selectedType.frais_ouverture || 0} FCFA`} 
+                                label="⚡ Frais d'ouverture (Automatique)" 
+                                value={`${selectedType.frais_ouverture || 0} FCFA`}
+                                color="warning"
                               />
                               <DetailItem 
-                                label="ID Chapitre frais d'ouverture" 
+                                label="ID Chapitre" 
                                 value={selectedType.chapitre_frais_ouverture_id || 'Non défini'}
                               />
                             </>
@@ -1970,16 +2478,29 @@ const TypeCompteList = () => {
                           {selectedType.frais_carnet_actif && (
                             <>
                               <DetailItem 
-                                label="Frais de carnet" 
-                                value={`${selectedType.frais_carnet || 0} FCFA`} 
+                                label="⚡ Frais de carnet (Automatique)" 
+                                value={`${selectedType.frais_carnet || 0} FCFA`}
+                                color="warning"
                               />
                               <DetailItem 
-                                label="ID Chapitre frais carnet" 
+                                label="ID Chapitre" 
                                 value={selectedType.chapitre_frais_carnet_id || 'Non défini'}
                               />
                             </>
                           )}
+                        </List>
+                      </CardContent>
+                    </Card>
 
+                    {/* Autres frais et commissions */}
+                    <Card variant="outlined" sx={{ mb: 3 }}>
+                      <CardHeader 
+                        title="Autres frais et commissions" 
+                        titleTypographyProps={{ variant: 'h6' }}
+                        sx={{ bgcolor: 'grey.100' }}
+                      />
+                      <CardContent>
+                        <List dense>
                           {selectedType.frais_renouvellement_actif && (
                             <>
                               <DetailItem 
@@ -1993,7 +2514,7 @@ const TypeCompteList = () => {
                             </>
                           )}
 
-                          {selectedType.frais_perte_actif && (
+                          {(selectedType.frais_perte_actif || selectedType.frais_perte_carnet) && (
                             <>
                               <DetailItem 
                                 label="Frais perte carnet" 
@@ -2006,7 +2527,55 @@ const TypeCompteList = () => {
                             </>
                           )}
 
-                          {selectedType.commission_retrait_actif && (
+                          {(selectedType.frais_chequier_actif || selectedType.frais_chequier) && (
+                            <>
+                              <DetailItem 
+                                label="Frais de chéquier" 
+                                value={`${selectedType.frais_chequier || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre frais de chéquier" 
+                                value={selectedType.chapitre_frais_chequier_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {(selectedType.frais_cheque_guichet_actif || selectedType.frais_cheque_guichet) && (
+                            <>
+                              <DetailItem 
+                                label="Frais de chèque guichet" 
+                                value={`${selectedType.frais_cheque_guichet || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre frais de chèque guichet" 
+                                value={selectedType.chapitre_cheque_guichet_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {(selectedType.frais_livret_actif || selectedType.frais_livret) && (
+                            <>
+                              <DetailItem 
+                                label="Frais de livret" 
+                                value={`${selectedType.frais_livret || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre frais de livret" 
+                                value={selectedType.chapitre_livret_id || 'Non défini'}
+                              />
+                            </>
+                          )}
+
+                          {(selectedType.frais_renouvellement_actif || selectedType.frais_renouvellement_livret) && (
+                            <>
+                              <DetailItem 
+                                label="Frais de renouvellement de livret" 
+                                value={`${selectedType.frais_renouvellement_livret || 0} FCFA`} 
+                              />
+                            </>
+                          )}
+
+                          {(selectedType.commission_retrait_actif || selectedType.commission_retrait) && (
                             <>
                               <DetailItem 
                                 label="Commission retrait" 
@@ -2032,8 +2601,16 @@ const TypeCompteList = () => {
                             </>
                           )}
 
-                          {selectedType.commission_mensuelle_actif && (
+                          {(selectedType.commission_mensuelle_actif || selectedType.commission_mensuel) && (
                             <>
+                              <DetailItem 
+                                label="Commission Mensuelle" 
+                                value={`${selectedType.commission_mensuel || 0} FCFA`} 
+                              />
+                              <DetailItem 
+                                label="ID Chapitre commission mensuelle" 
+                                value={selectedType.chapitre_commission_mensuelle_id || 'Non défini'}
+                              />
                               <DetailItem 
                                 label="Seuil commission" 
                                 value={`${selectedType.seuil_commission || 0} FCFA`} 
@@ -2051,10 +2628,10 @@ const TypeCompteList = () => {
                         </List>
                       </CardContent>
                     </Card>
-                  </Grid>
+                  </Box>
 
                   {/* Colonne 2: Paramètres avancés */}
-                  <Grid item xs={12} md={6}>
+                  <Box>
                     {/* Paramètres d'intérêts */}
                     {selectedType.interets_actifs && (
                       <Card variant="outlined" sx={{ mb: 3 }}>
@@ -2208,8 +2785,8 @@ const TypeCompteList = () => {
                         </List>
                       </CardContent>
                     </Card>
-                  </Grid>
-                </Grid>
+                  </Box>
+                </Box>
               )}
             </DialogContent>
             <DialogActions sx={{ p: 2, borderTop: 1, borderColor: 'divider', position: 'sticky', bottom: 0, bgcolor: 'background.paper' }}>

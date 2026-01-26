@@ -55,7 +55,7 @@ const sessionService = {
       guichet_session_id: guichetSessionId,
       caisse_id: caisseId,
       billetage: billetage,
-      solde_saisi: soldeSaisi,
+      solde_ouverture: soldeSaisi,
       code_caisse: codeCaisse
     });
     
@@ -63,7 +63,7 @@ const sessionService = {
       guichet_session_id: guichetSessionId,
       caisse_id: caisseId,
       billetage: billetage,
-      solde_saisi: soldeSaisi,
+      solde_ouverture: soldeSaisi,
       code_caisse: codeCaisse || '' // Envoyer même si vide
     });
     

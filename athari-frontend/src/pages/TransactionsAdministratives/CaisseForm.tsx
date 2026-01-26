@@ -92,7 +92,7 @@ const CaisseForm = () => {
     guichet_session_id: '',
     caisse_id: '',
     code_caisse: '',
-    solde_saisi: 0,
+    solde_ouverture: 0,
   });
   
   // États du formulaire FERMETURE
@@ -260,7 +260,7 @@ const CaisseForm = () => {
     if (operation === 'OU') {
       calculateBilletage();
     }
-  }, [billets, formDataOuverture.solde_saisi]);
+  }, [billets, formDataOuverture.solde_ouverture]);
 
   const getSelectedCaisse = () => {
     if (!formDataOuverture.caisse_id) return null;
@@ -300,7 +300,7 @@ const CaisseForm = () => {
         if (montant > 0) {
           setFormDataOuverture(prev => ({
             ...prev,
-            solde_saisi: montant
+            solde_ouverture: montant
           }));
         }
         
@@ -330,7 +330,7 @@ const CaisseForm = () => {
         guichet_session_id: guichetSessionId,
         caisse_id: '',
         code_caisse: '',
-        solde_saisi: 0
+        solde_ouverture: 0
       }));
       resetBilletage();
     }
@@ -348,7 +348,7 @@ const CaisseForm = () => {
       }));
     } else if (name === 'code_caisse') {
       setFormDataOuverture(prev => ({ ...prev, [name]: value as string }));
-    } else if (name === 'solde_saisi') {
+    } else if (name === 'solde_ouverture') {
       const numValue = parseFloat(value as string);
       if (!isNaN(numValue) && numValue >= 0) {
         setFormDataOuverture(prev => ({ ...prev, [name]: numValue }));
@@ -390,10 +390,10 @@ const CaisseForm = () => {
     const total = billets.reduce((sum, billet) => sum + billet.total, 0);
     setTotalBilletage(total);
     
-    const diff = formDataOuverture.solde_saisi - total;
+    const diff = formDataOuverture.solde_ouverture - total;
     setDifference(diff);
     
-    if (formDataOuverture.solde_saisi === 0 && total === 0) {
+    if (formDataOuverture.solde_ouverture === 0 && total === 0) {
       setValidationMessage('✅ Solde 0 - Billetage correct');
     } else if (Math.abs(diff) <= 1) {
       setValidationMessage('✅ Billetage équilibré');
@@ -417,7 +417,7 @@ const CaisseForm = () => {
 
   const handleOpenBilletageDialog = () => {
     if (operation === 'OU') {
-      if (formDataOuverture.solde_saisi === undefined || formDataOuverture.solde_saisi < 0) {
+      if (formDataOuverture.solde_ouverture === undefined || formDataOuverture.solde_ouverture < 0) {
         showSnackbar('Veuillez d\'abord saisir un solde valide', 'warning');
         return;
       }
@@ -491,7 +491,7 @@ const CaisseForm = () => {
   };
 
   const suggestBilletage = () => {
-    const solde = operation === 'OU' ? formDataOuverture.solde_saisi : formDataFermeture.solde_fermeture;
+    const solde = operation === 'OU' ? formDataOuverture.solde_ouverture : formDataFermeture.solde_fermeture;
     
     if (solde === undefined || solde < 0) return;
     
@@ -559,14 +559,14 @@ const CaisseForm = () => {
     const billetage = prepareBilletageForApi();
     const sessionIdNum = parseInt(guichetSessionId);
     const caisseIdNum = parseInt(formDataOuverture.caisse_id);
-    const soldeNum = parseFloat(formDataOuverture.solde_saisi.toString());
+    const soldeNum = parseFloat(formDataOuverture.solde_ouverture.toString());
     const codeCaisse = formDataOuverture.code_caisse;
     
     console.log('📤 Données ouverture caisse:', {
       guichet_session_id: sessionIdNum,
       caisse_id: caisseIdNum,
       billetage: billetage,
-      solde_saisi: soldeNum,
+      solde_ouverture: soldeNum,
       code_caisse: codeCaisse
     });
     
@@ -705,7 +705,7 @@ const CaisseForm = () => {
     const caisseSessionId = responseData.data?.caisse_session_id || responseData.data?.id;
     const codeCaisse = responseData.data?.code_caisse || formDataOuverture.code_caisse;
     const caisseId = responseData.data?.caisse_id || formDataOuverture.caisse_id;
-    const soldeOuverture = responseData.data?.solde_ouverture || formDataOuverture.solde_saisi;
+    const soldeOuverture = responseData.data?.solde_ouverture || formDataOuverture.solde_ouverture;
     
     if (caisseSessionId && caisseId && codeCaisse) {
       console.log('💾 Stockage caisse dans localStorage:', {
@@ -780,7 +780,7 @@ const CaisseForm = () => {
       guichet_session_id: guichetSessionId,
       caisse_id: '',
       code_caisse: '',
-      solde_saisi: 0,
+      solde_ouverture: 0,
     });
     
     resetBilletage();
@@ -812,7 +812,7 @@ const CaisseForm = () => {
       return;
     }
 
-    if (formDataOuverture.solde_saisi === undefined || formDataOuverture.solde_saisi < 0) {
+    if (formDataOuverture.solde_ouverture === undefined || formDataOuverture.solde_ouverture < 0) {
       showSnackbar('Veuillez saisir un solde valide (≥ 0)', 'error');
       return;
     }
@@ -821,7 +821,7 @@ const CaisseForm = () => {
     const billetage = prepareBilletageForApi();
     if (Object.keys(billetage).length === 0 || (billetage['0'] === 0 && Object.keys(billetage).length === 1)) {
       // Si le solde est 0, c'est normal d'avoir un billetage vide
-      if (formDataOuverture.solde_saisi === 0) {
+      if (formDataOuverture.solde_ouverture === 0) {
         console.log('✅ Solde 0, billetage vide accepté');
       } else if (Math.abs(difference) > 1) {
         showSnackbar('Le billetage n\'est pas correct. Ajustez le billetage.', 'error');
@@ -935,9 +935,9 @@ const CaisseForm = () => {
     if (operation === 'OU') {
       if (!formDataOuverture.caisse_id) return true;
       if (!formDataOuverture.code_caisse) return true;
-      if (formDataOuverture.solde_saisi === undefined || formDataOuverture.solde_saisi < 0) return true;
+      if (formDataOuverture.solde_ouverture === undefined || formDataOuverture.solde_ouverture < 0) return true;
       // Si le solde est > 0, vérifier que le billetage est correct
-      if (formDataOuverture.solde_saisi > 0 && Math.abs(difference) > 1) return true;
+      if (formDataOuverture.solde_ouverture > 0 && Math.abs(difference) > 1) return true;
     } else if (operation === 'FE') {
       if (!formDataFermeture.caisse_session_id) return true;
       if (!formDataFermeture.code_caisse) return true;
@@ -1115,8 +1115,8 @@ const CaisseForm = () => {
                               fullWidth
                               size="small"
                               label="Solde d'ouverture *"
-                              name="solde_saisi"
-                              value={formDataOuverture.solde_saisi === 0 ? "" : formDataOuverture.solde_saisi || ''}
+                              name="solde_ouverture"
+                              value={formDataOuverture.solde_ouverture === 0 ? "" : formDataOuverture.solde_ouverture || ''}
                               onChange={handleOuvertureChange}
                               required
                               type="number"
@@ -1128,7 +1128,7 @@ const CaisseForm = () => {
                                       <IconButton 
                                         size="small" 
                                         onClick={handleOpenBilletageDialog}
-                                        disabled={!guichetSessionId || formDataOuverture.solde_saisi === undefined || formDataOuverture.solde_saisi < 0}
+                                        disabled={!guichetSessionId || formDataOuverture.solde_ouverture === undefined || formDataOuverture.solde_ouverture < 0}
                                       >
                                         <AttachMoneyIcon />
                                       </IconButton>
@@ -1175,7 +1175,7 @@ const CaisseForm = () => {
                                 )}
                               </Box>
                               
-                              {soldeInfo.montant > 0 && formDataOuverture.solde_saisi > 0 && (
+                              {soldeInfo.montant > 0 && formDataOuverture.solde_ouverture > 0 && (
                                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                                   Vérifiez que le solde saisi correspond au solde informatique.
                                 </Typography>
@@ -1197,7 +1197,7 @@ const CaisseForm = () => {
                           
                           <Box sx={{ mt: 1 }}>
                             <Typography variant="body2">
-                              • Solde à billeter: {formatCurrency(formDataOuverture.solde_saisi)} FCFA
+                              • Solde à billeter: {formatCurrency(formDataOuverture.solde_ouverture)} FCFA
                             </Typography>
                             <Typography variant="body2">
                               • Total billetage: {formatCurrency(totalBilletage)} FCFA
@@ -1217,13 +1217,13 @@ const CaisseForm = () => {
                               size="small"
                               onClick={handleOpenBilletageDialog}
                             >
-                              {formDataOuverture.solde_saisi === 0 ? 'Voir le billetage' : 'Ajuster le billetage'}
+                              {formDataOuverture.solde_ouverture === 0 ? 'Voir le billetage' : 'Ajuster le billetage'}
                             </Button>
                             <Button
                               variant="outlined"
                               size="small"
                               onClick={suggestBilletage}
-                              disabled={formDataOuverture.solde_saisi === 0}
+                              disabled={formDataOuverture.solde_ouverture === 0}
                             >
                               Suggérer automatiquement
                             </Button>
@@ -1449,7 +1449,7 @@ const CaisseForm = () => {
               <Typography variant="body2" color="text.secondary">
                 {operation === 'OU' ? 'Billetage d\'ouverture' : 'Billetage de fermeture'} - 
                 Solde à billeter: {formatCurrency(
-                  operation === 'OU' ? formDataOuverture.solde_saisi : formDataFermeture.solde_fermeture
+                  operation === 'OU' ? formDataOuverture.solde_ouverture : formDataFermeture.solde_fermeture
                 )} FCFA
               </Typography>
             </Box>
@@ -1576,7 +1576,7 @@ const CaisseForm = () => {
                   </Typography>
                   <Typography variant="h4" fontWeight="bold" color="primary">
                     {formatCurrency(
-                      operation === 'OU' ? formDataOuverture.solde_saisi : formDataFermeture.solde_fermeture
+                      operation === 'OU' ? formDataOuverture.solde_ouverture : formDataFermeture.solde_fermeture
                     )} FCFA
                   </Typography>
                 </Box>
@@ -1644,7 +1644,7 @@ const CaisseForm = () => {
                 sx={{ mr: 1 }}
                 disabled={
                   operation === 'OU' 
-                    ? formDataOuverture.solde_saisi === 0
+                    ? formDataOuverture.solde_ouverture === 0
                     : formDataFermeture.solde_fermeture === 0
                 }
                 size="medium"

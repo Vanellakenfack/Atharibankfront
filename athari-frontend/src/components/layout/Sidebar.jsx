@@ -70,6 +70,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     agenceForm: '/agence/form',
     guichetForm: '/guichet/form',
     caisseForm: '/caisse/form',
+    tfc: '/Traitement-Fin-Journee',
     dashboardCaissieres: '/Dashboard-Caissieres',
     entreesSortiesCaisse: '/entrees-sorties-caisse',
     retraitEspeces: '/Retrait-Especes',
@@ -97,7 +98,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     Account: [menuPaths.compte, menuPaths.listeComptes, menuPaths.validationComptes],
     Gestionnaire: [menuPaths.addGestionnaire, menuPaths.listGestionnaire],
     Reporting: [menuPaths.journalComptable, menuPaths.journalCaisse, menuPaths.reporting2],
-    TransactionsAdmin: [menuPaths.agenceForm, menuPaths.guichetForm, menuPaths.caisseForm, menuPaths.validerTransaction],
+    TransactionsAdmin: [menuPaths.agenceForm, menuPaths.guichetForm, menuPaths.caisseForm, menuPaths.validerTransaction, menuPaths.tfc],
     FrontOffice: [
       menuPaths.dashboardCaissieres,
       menuPaths.entreesSortiesCaisse,
@@ -780,6 +781,23 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               >
                 <FileType size={16} strokeWidth={isActivePath(menuPaths.caisseForm) ? 3 : 2} />
                 Ouverture/Fermeture de la caisse
+              </Link>
+
+               <Link
+                to={menuPaths.tfc}
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                  isActivePath(menuPaths.tfc) 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: isActivePath(menuPaths.tfc) ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileType size={16} strokeWidth={isActivePath(menuPaths.tfc) ? 3 : 2} />
+              Traitement de fin de journée
               </Link>
 
               <Link

@@ -41,7 +41,8 @@ import JournalCaissePage from '../pages/journal/JournalCaissePage.js';
 import AddGestionnaire from '../pages/gestionnaire/AddGestionnaire.js';
 import ListGestionnaire from '../pages/gestionnaire/ListGestionnaire.js';
 import EditGestionnaire from '../pages/gestionnaire/EditGestionnaire.js';
-//import ValidationComptes from '../pages/validerCompte/ValidationComptes.js';
+import ValidationComptes from '../pages/validerCompte/ValidationComptes.js';
+import TraitementFinJournee from '../pages/TransactionsAdministratives/TraitementFinJournee.js';
 
 
 // Ajoute "Link" dans l'importation existante
@@ -115,6 +116,9 @@ const AppRoutes = () => {
       <Route path='/agence/form' element={<AgenceForm />} />
       <Route path='/guichet/form' element={<GuichetForm />} />
       <Route path='/caisse/form' element={<CaisseForm />} />
+      <Route path='/Traitement-Fin-Journee' element={<TraitementFinJournee />} />
+       
+
 
       {/* Gestion des transactions front office */}
       <Route path='/Versement' element={<Versement />} />
@@ -128,7 +132,7 @@ const AppRoutes = () => {
 
       <Route path='/AddGestionnaire' element={<AddGestionnaire />} />
       <Route path='/ListGestionnaire' element={<ListGestionnaire />} />
-     {/* <Route path='/ValidationComptes' element={<ValidationComptes />} />*/}
+      <Route path='/ValidationComptes' element={<ValidationComptes />} />
 
       </Route>
 

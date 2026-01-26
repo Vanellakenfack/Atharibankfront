@@ -97,7 +97,41 @@ const fraisCommissionSchema = yup.object().shape({
   frais_perte_actif: yup.boolean().default(false),
   chapitre_perte_id: yup.number().nullable(),
   
+  frais_chequier: yup.number()
+    .min(0, 'Doit être positif')
+    .nullable()
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
+  frais_chequier_actif: yup.boolean().default(false),
+  chapitre_frais_chequier_id: yup.number().nullable(),
+  chapitre_chequier_id: yup.number().nullable(),
+  
+  frais_cheque_guichet: yup.number()
+    .min(0, 'Doit être positif')
+    .nullable()
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
+  frais_cheque_guichet_actif: yup.boolean().default(false),
+  chapitre_cheque_guichet_id: yup.number().nullable(),
+  
+  frais_livret: yup.number()
+    .min(0, 'Doit être positif')
+    .nullable()
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
+  frais_livret_actif: yup.boolean().default(false),
+  chapitre_livret_id: yup.number().nullable(),
+  
+  frais_renouvellement_livret: yup.number()
+    .min(0, 'Doit être positif')
+    .nullable()
+    .transform((value, originalValue) => originalValue === '' ? null : value),
+  
   commission_mensuelle_actif: yup.boolean().default(false),
+  commission_mensuel: yup.number()
+    .min(0, 'Doit être positif')
+    .nullable()
+    .transform((value, originalValue) => originalValue === '' ? null : value),
   seuil_commission: yup.number()
     .min(0, 'Doit être positif')
     .nullable()
@@ -112,6 +146,8 @@ const fraisCommissionSchema = yup.object().shape({
     .min(0, 'Doit être positif')
     .nullable()
     .transform((value, originalValue) => originalValue === '' ? null : value),
+  
+  chapitre_commission_mensuelle_id: yup.number().nullable(),
   
   commission_retrait: yup.number()
     .min(0, 'Doit être positif')
@@ -177,6 +213,8 @@ const fraisCommissionSchema = yup.object().shape({
     .transform((value, originalValue) => originalValue === '' ? null : value),
   
   minimum_compte_actif: yup.boolean().default(false),
+  chapitre_minimum_id: yup.number().nullable(),
+  compte_attente_produits_id: yup.number().nullable(),
   retrait_anticipe_autorise: yup.boolean().default(false),
   validation_retrait_anticipe: yup.boolean().default(false),
   
@@ -501,10 +539,27 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
       frais_perte_actif: false,
       chapitre_perte_id: null,
 
+      frais_chequier: null,
+      frais_chequier_actif: false,
+      chapitre_frais_chequier_id: null,
+      chapitre_chequier_id: null,
+
+      frais_cheque_guichet: null,
+      frais_cheque_guichet_actif: false,
+      chapitre_cheque_guichet_id: null,
+
+      frais_livret: null,
+      frais_livret_actif: false,
+      chapitre_livret_id: null,
+
+      frais_renouvellement_livret: null,
+
       commission_mensuelle_actif: false,
+      commission_mensuel: null,
       seuil_commission: null,
       commission_si_superieur: null,
       commission_si_inferieur: null,
+      chapitre_commission_mensuelle_id: null,
 
       commission_retrait: null,
       commission_retrait_actif: false,
@@ -539,6 +594,8 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
       // Avancé
       minimum_compte: null,
       minimum_compte_actif: false,
+      chapitre_minimum_id: null,
+      compte_attente_produits_id: null,
 
       retrait_anticipe_autorise: false,
       validation_retrait_anticipe: false,
@@ -1069,6 +1126,59 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                     ])}
                   </Grid>
 
+                  <Grid item xs={12}>
+                    {renderToggleSection('frais_chequier_actif', 'Frais de chéquier', [
+                      { 
+                        name: 'frais_chequier', 
+                        label: 'Montant des frais de chéquier', 
+                        type: 'number',
+                        adornment: <InputAdornment position="end">FCFA</InputAdornment>
+                      },
+                      { 
+                        name: 'chapitre_frais_chequier_id', 
+                        label: 'Chapitre des frais de chéquier', 
+                        type: 'chapter' 
+                      },
+                      { 
+                        name: 'chapitre_chequier_id', 
+                        label: 'Chapitre chéquier', 
+                        type: 'chapter' 
+                      }
+                    ])}
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    {renderToggleSection('frais_cheque_guichet_actif', 'Frais de chèque guichet', [
+                      { 
+                        name: 'frais_cheque_guichet', 
+                        label: 'Montant des frais de chèque guichet', 
+                        type: 'number',
+                        adornment: <InputAdornment position="end">FCFA</InputAdornment>
+                      },
+                      { 
+                        name: 'chapitre_cheque_guichet_id', 
+                        label: 'Chapitre des frais de chèque guichet', 
+                        type: 'chapter' 
+                      }
+                    ])}
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    {renderToggleSection('frais_livret_actif', 'Frais de livret', [
+                      { 
+                        name: 'frais_livret', 
+                        label: 'Montant des frais de livret', 
+                        type: 'number',
+                        adornment: <InputAdornment position="end">FCFA</InputAdornment>
+                      },
+                      { 
+                        name: 'chapitre_livret_id', 
+                        label: 'Chapitre des frais de livret', 
+                        type: 'chapter' 
+                      }
+                    ])}
+                  </Grid>
+
                   {/* Section Commission mensuelle */}
                   <Grid item xs={12}>
                     <SectionTitle title="frais d'entretien de compte" icon={PercentIcon} />
@@ -1076,6 +1186,12 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
 
                   <Grid item xs={12}>
                     {renderToggleSection('commission_mensuelle_actif', 'frais d\'entretien de compte', [
+                      { 
+                        name: 'commission_mensuel', 
+                        label: 'Montant des frais d\'entretien', 
+                        type: 'number',
+                        adornment: <InputAdornment position="end">FCFA</InputAdornment>
+                      },
                       { 
                         name: 'seuil_commission', 
                         label: 'Seuil de commission', 
@@ -1093,6 +1209,11 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                         label: 'Commission si inférieur au seuil', 
                         type: 'number',
                         adornment: <InputAdornment position="end">FCFA</InputAdornment>
+                      },
+                      { 
+                        name: 'chapitre_commission_mensuelle_id', 
+                        label: 'Chapitre de la commission', 
+                        type: 'chapter' 
                       }
                     ])}
                   </Grid>
@@ -1285,8 +1406,26 @@ const TypeCompteForm: React.FC<{ isEdit?: boolean }> = ({ isEdit = false }) => {
                         label: 'Montant minimum', 
                         type: 'number',
                         adornment: <InputAdornment position="end">FCFA</InputAdornment>
+                      },
+                      { 
+                        name: 'chapitre_minimum_id', 
+                        label: 'Chapitre du minimum', 
+                        type: 'chapter' 
                       }
                     ])}
+                  </Grid>
+
+                  {/* Compte attente produits */}
+                  <Grid item xs={12}>
+                    <Box sx={{ minWidth: 250 }}>
+                      <ChapterField
+                        name="compte_attente_produits_id"
+                        label="Compte d'attente des produits"
+                        control={control}
+                        chapitres={chapitres}
+                        isSubmitting={isSubmitting}
+                      />
+                    </Box>
                   </Grid>
 
                   {/* Section Retraits anticipés */}

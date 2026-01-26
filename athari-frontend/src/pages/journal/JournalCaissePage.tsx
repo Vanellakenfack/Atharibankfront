@@ -118,11 +118,11 @@ const typeVersementColors: Record<string, string> = {
   'AUTRE': '#757575',
 };
 
-// Fonction pour grouper les mouvements par type de versement
-const groupMovementsByTypeVersement = (mouvements: CaisseMovement[]): CaisseSection[] => {
+// Fonction pour grouper les journal_groupe par type de versement
+const groupMovementsByTypeVersement = (journal_groupe: CaisseMovement[]): CaisseSection[] => {
   const groupedData: Record<string, CaisseMovement[]> = {};
   
-  mouvements.forEach((mouvement: CaisseMovement) => {
+  journal_groupe.forEach((mouvement: CaisseMovement) => {
     const key = mouvement.type_versement || 'AUTRE';
     if (!groupedData[key]) {
       groupedData[key] = [];
@@ -158,7 +158,7 @@ const transformCaisseApiData = (
   caissesList: Caisse[]
 ): CaisseJournalData => {
   
-  if (!apiData.mouvements || apiData.mouvements.length === 0) {
+  if (!apiData.journal_groupe || apiData.journal_groupe.length === 0) {
     let agenceLabel = 'TOUTES LES AGENCES';
     let caisseLabel = 'TOUTES LES CAISSES';
     
@@ -188,7 +188,7 @@ const transformCaisseApiData = (
   }
   
   // Créer les sections par type de versement
-  const sections = groupMovementsByTypeVersement(apiData.mouvements);
+  const sections = groupMovementsByTypeVersement(apiData.journal_groupe);
   
   // Calculer les totaux
   const totalGeneral = sections.reduce((total, section) => total + section.count, 0);
@@ -208,8 +208,8 @@ const transformCaisseApiData = (
     const selectedCaisse = caissesList.find(c => c.id.toString() === filtres.caisse_id);
     caisseLabel = selectedCaisse ? selectedCaisse.libelle : `CAISSE ${filtres.caisse_id}`;
   } else {
-    // Si "all", prendre le nom de la première caisse dans les mouvements
-    const firstCaisseCode = apiData.mouvements[0]?.code_caisse;
+    // Si "all", prendre le nom de la première caisse dans les journal_groupe
+    const firstCaisseCode = apiData.journal_groupe[0]?.code_caisse;
     if (firstCaisseCode) {
       const foundCaisse = caissesList.find(c => c.code_caisse === firstCaisseCode);
       if (foundCaisse) {
@@ -453,7 +453,7 @@ const JournalCaissePage: React.FC = () => {
       const apiData = await journalCaisseService.getCaisseJournalEntries(filtres);
       console.log('✅ Données du journal de caisse reçues:', apiData);
       setDonneesBrutes(apiData);
-      setDebugInfo(`✅ ${apiData.mouvements?.length || 0} mouvements reçus`);
+      setDebugInfo(`✅ ${apiData.journal_groupe?.length || 0} journal_groupe reçus`);
       
       const transformedData = transformCaisseApiData(apiData, filtres, agences, caisses);
       console.log('✅ Données transformées:', transformedData);

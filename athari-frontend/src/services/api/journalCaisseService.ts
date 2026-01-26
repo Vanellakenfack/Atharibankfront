@@ -17,7 +17,7 @@ export interface CaisseMovement {
 export interface CaisseJournalApiResponse {
   statut: string;
   solde_ouverture: number;
-  mouvements: CaisseMovement[];
+  journal_groupe: CaisseMovement[];
   total_debit: number;
   total_credit: number;
   solde_cloture: number;

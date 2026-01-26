@@ -148,7 +148,7 @@ const categorizeParameters = (typeCompte: TypeCompte) => {
   
   const commissionKeys = [
     'commission_retrait', 'commission_sms', 'taux_interet_annuel',
-    'seuil_commission', 'commission_si_inferieur', 'commission_si_superieur'
+    'seuil_commission', 'commission_si_inferieur', 'commission_si_superieur','commission_mensuel'
   ];
   
   const caracteristiqueKeys = [
@@ -932,7 +932,7 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
                 <Card sx={{ mt: 2, mb: 2, backgroundColor: '#f8f9fa' }}>
                   <CardContent>
                     <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                      Nature du solde
+                      sens
                     </Typography>
                     <Chip 
                     label= {natureSolde || 'Non spécifiée'}
@@ -989,44 +989,81 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
                 {/* Frais actifs */}
                 {fraisActiveInactive.active.length > 0 && (
                   <Grid item xs={12} md={6}>
-                    <Card variant="outlined" sx={{ height: '100%' }}>
-                      <CardContent>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2, display: 'flex', alignItems: 'center' }}>
-                          <AttachMoney sx={{ mr: 1, fontSize: 18 }} />
-                          Frais actifs ({fraisActiveInactive.active.length})
-                        </Typography>
-                        <TableContainer>
-                          <Table size="small">
-                            <TableBody>
-                              {fraisActiveInactive.active.map(({ key, value, label }) => (
-                                <TableRow key={key}>
-                                  <TableCell sx={{ fontWeight: 'medium' }}>
-                                    <Tooltip title={key}>
-                                      <span>{label}</span>
-                                    </Tooltip>
-                                  </TableCell>
-                                  <TableCell align="right">
-                                    {key.includes('_actif') ? (
-                                      <Chip 
-                                        label={formatValue(value)} 
-                                        color="success" 
-                                        size="small"
-                                      />
-                                    ) : (
+                    {/* Frais déduits automatiquement */}
+                    {fraisActiveInactive.active.filter(f => ['frais_ouverture', 'frais_carnet'].includes(f.key)).length > 0 && (
+                      <Card variant="outlined" sx={{ height: '100%', mb: 2, bgcolor: '#ffebee', borderColor: '#ef5350', borderWidth: 2 }}>
+                        <CardContent>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2, display: 'flex', alignItems: 'center', color: '#c62828' }}>
+                            ⚡ Frais déduits automatiquement
+                          </Typography>
+                          <TableContainer>
+                            <Table size="small">
+                              <TableBody>
+                                {fraisActiveInactive.active.filter(f => ['frais_ouverture', 'frais_carnet'].includes(f.key)).map(({ key, value, label }) => (
+                                  <TableRow key={key}>
+                                    <TableCell sx={{ fontWeight: 'medium' }}>
+                                      <Tooltip title={key}>
+                                        <span>{label}</span>
+                                      </Tooltip>
+                                    </TableCell>
+                                    <TableCell align="right">
                                       <Chip 
                                         label={formatsolde(value)} 
-                                        color="primary" 
+                                        color="warning" 
                                         size="small"
+                                        sx={{ bgcolor: '#ef5350', color: '#fff' }}
                                       />
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      </CardContent>
-                    </Card>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Autres frais */}
+                    {fraisActiveInactive.active.filter(f => !['frais_ouverture', 'frais_carnet'].includes(f.key)).length > 0 && (
+                      <Card variant="outlined" sx={{ height: '100%' }}>
+                        <CardContent>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2, display: 'flex', alignItems: 'center' }}>
+                            <AttachMoney sx={{ mr: 1, fontSize: 18 }} />
+                            Autres frais ({fraisActiveInactive.active.filter(f => !['frais_ouverture', 'frais_carnet'].includes(f.key)).length})
+                          </Typography>
+                          <TableContainer>
+                            <Table size="small">
+                              <TableBody>
+                                {fraisActiveInactive.active.filter(f => !['frais_ouverture', 'frais_carnet'].includes(f.key)).map(({ key, value, label }) => (
+                                  <TableRow key={key}>
+                                    <TableCell sx={{ fontWeight: 'medium' }}>
+                                      <Tooltip title={key}>
+                                        <span>{label}</span>
+                                      </Tooltip>
+                                    </TableCell>
+                                    <TableCell align="right">
+                                      {key.includes('_actif') ? (
+                                        <Chip 
+                                          label={formatValue(value)} 
+                                          color="success" 
+                                          size="small"
+                                        />
+                                      ) : (
+                                        <Chip 
+                                          label={formatsolde(value)} 
+                                          color="primary" 
+                                          size="small"
+                                        />
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                        </CardContent>
+                      </Card>
+                    )}
                   </Grid>
                 )}
 
@@ -1052,15 +1089,12 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
                                   <TableCell align="right">
                                     <Chip 
                                       label={
-                                        key.includes('taux') || key.includes('commission') ? 
-                                        formatPourcentage(value) : 
                                         key.includes('seuil') ? 
                                         formatsolde(value) : 
-                                        formatValue(value)
+                                        formatsolde(value)
                                       } 
                                       color={
                                         key.includes('penalite') ? 'error' : 
-                                        key.includes('taux') ? 'success' : 
                                         'secondary'
                                       } 
                                       size="small"
