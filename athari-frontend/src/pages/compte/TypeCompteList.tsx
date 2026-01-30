@@ -202,57 +202,82 @@ const TypeCompteList = () => {
   
   // Schéma de validation
   const schema = yup.object().shape({
-    code: yup.string().required('Le code est requis'),
-    libelle: yup.string().required('Le libellé est requis'),
-    description: yup.string().nullable(),
-    est_mata: yup.boolean().default(false),
-    necessite_duree: yup.boolean().default(false),
-    est_islamique: yup.boolean().default(false),
-    actif: yup.boolean().default(true),
-    frais_ouverture: yup.number().nullable(),
-    frais_ouverture_actif: yup.boolean().default(false),
-    chapitre_frais_ouverture_id: yup.number().nullable(),
-    frais_carnet: yup.number().nullable(),
-    frais_carnet_actif: yup.boolean().default(false),
-    chapitre_frais_carnet_id: yup.number().nullable(),
-    commission_retrait: yup.number().nullable(),
-    commission_retrait_actif: yup.boolean().default(false),
-    chapitre_commission_retrait_id: yup.number().nullable(),
-    interets_actifs: yup.boolean().default(false),
-    taux_interet_annuel: yup.number().nullable(),
-    chapitre_interet_credit_id: yup.number().nullable(),
-    capitalisation_interets: yup.boolean().default(false),
-    penalite_retrait_anticipe: yup.number().nullable(),
-    penalite_actif: yup.boolean().default(false),
-    chapitre_penalite_id: yup.number().nullable(),
-    frais_cloture_anticipe: yup.number().nullable(),
-    frais_cloture_anticipe_actif: yup.boolean().default(false),
-    chapitre_cloture_anticipe_id: yup.number().nullable(),
-    frais_chequier: yup.number().nullable(),
-    frais_chequier_actif: yup.boolean().default(false),
-    chapitre_frais_chequier_id: yup.number().nullable(),
-    chapitre_chequier_id: yup.number().nullable(),
-    frais_cheque_guichet: yup.number().nullable(),
-    frais_cheque_guichet_actif: yup.boolean().default(false),
-    chapitre_cheque_guichet_id: yup.number().nullable(),
-    frais_livret: yup.number().nullable(),
-    frais_livret_actif: yup.boolean().default(false),
-    chapitre_livret_id: yup.number().nullable(),
-    frais_renouvellement_livret: yup.number().nullable(),
-    frais_renouvellement_actif: yup.boolean().default(false),
-    frais_perte_carnet: yup.number().nullable(),
-    frais_perte_actif: yup.boolean().default(false),
-    chapitre_perte_id: yup.number().nullable(),
-    commission_mensuelle_actif: yup.boolean().default(false),
-    commission_mensuel: yup.number().nullable(),
-    chapitre_commission_mensuelle_id: yup.number().nullable(),
-    seuil_commission: yup.number().nullable(),
-    commission_si_superieur: yup.number().nullable(),
-    commission_si_inferieur: yup.number().nullable(),
-    chapitre_minimum_id: yup.number().nullable(),
-    chapitre_defaut_id: yup.number().nullable(),
-  });
+  code: yup.string().required('Le code est requis'),
+  libelle: yup.string().required('Le libellé est requis'),
+  description: yup.string().nullable(),
+  est_mata: yup.boolean().default(false),
+  necessite_duree: yup.boolean().default(false),
+  est_islamique: yup.boolean().default(false),
+  actif: yup.boolean().default(true),
+  chapitre_defaut_id: yup.number().nullable(),
+
+  // Frais d'ouverture
+  frais_ouverture: yup.number().nullable(),
+  frais_ouverture_actif: yup.boolean().default(false),
+  chapitre_frais_ouverture_id: yup.number().nullable(),
+
+  // Frais de carnet
+  frais_carnet: yup.number().nullable(),
+  frais_carnet_actif: yup.boolean().default(false),
+  chapitre_frais_carnet_id: yup.number().nullable(),
+
+  // --- NOUVEAU : RENOUVELLEMENT ---
+  frais_renouvellement_actif: yup.boolean().default(false),
+  frais_renouvellement_carnet: yup.number().nullable(),
+  frais_renouvellement_livret: yup.number().nullable(),
+  chapitre_renouvellement_id: yup.number().nullable(),
+
+  // --- NOUVEAU : COMMISSION MENSUELLE ---
+  commission_mensuelle_actif: yup.boolean().default(false),
+  commission_mensuel: yup.number().nullable(),
+  chapitre_commission_mensuelle_id: yup.number().nullable(),
+  seuil_commission: yup.number().nullable(),
+  commission_si_superieur: yup.number().nullable(),
+  commission_si_inferieur: yup.number().nullable(),
+
+  // Commissions de retrait
+  commission_retrait: yup.number().nullable(),
+  commission_retrait_actif: yup.boolean().default(false),
+  chapitre_commission_retrait_id: yup.number().nullable(),
+
+  // Commission SMS
+  commission_sms: yup.number().nullable(),
+  commission_sms_actif: yup.boolean().default(false),
+  chapitre_commission_sms_id: yup.number().nullable(),
+
+  // Intérêts
+  interets_actifs: yup.boolean().default(false),
+  taux_interet_annuel: yup.number().nullable(),
+  chapitre_interet_credit_id: yup.number().nullable(),
+  capitalisation_interets: yup.boolean().default(false),
+
+  // Pénalités et Clôture
+  penalite_retrait_anticipe: yup.number().nullable(),
+  penalite_actif: yup.boolean().default(false),
+  chapitre_penalite_id: yup.number().nullable(),
+  frais_cloture_anticipe: yup.number().nullable(),
+  frais_cloture_anticipe_actif: yup.boolean().default(false),
+  chapitre_cloture_anticipe_id: yup.number().nullable(),
+
+  // Chéquier et Livret
+  frais_chequier: yup.number().nullable(),
+  frais_chequier_actif: yup.boolean().default(false),
+  chapitre_frais_chequier_id: yup.number().nullable(),
+  frais_cheque_guichet: yup.number().nullable(),
+  frais_cheque_guichet_actif: yup.boolean().default(false),
+  chapitre_cheque_guichet_id: yup.number().nullable(),
+  frais_livret: yup.number().nullable(),
+  frais_livret_actif: yup.boolean().default(false),
+  chapitre_livret_id: yup.number().nullable(),
   
+  // Perte
+  frais_perte_carnet: yup.number().nullable(),
+  frais_perte_actif: yup.boolean().default(false),
+  chapitre_perte_id: yup.number().nullable(),
+  
+  // Divers
+  chapitre_minimum_id: yup.number().nullable(),
+});
   const { control, handleSubmit, reset, setValue, watch } = useForm<TypeCompte>({
     resolver: yupResolver(schema) as any,
     mode: 'onBlur',
@@ -268,6 +293,7 @@ const TypeCompteList = () => {
       chapitre_frais_ouverture_id: null,
       chapitre_frais_carnet_id: null,
       chapitre_commission_retrait_id: null,
+      chapitre_commission_sms_id: null,
       chapitre_interet_credit_id: null,
       chapitre_penalite_id: null,
       chapitre_cloture_anticipe_id: null,
@@ -278,6 +304,7 @@ const TypeCompteList = () => {
       frais_ouverture_actif: false,
       frais_carnet_actif: false,
       commission_retrait_actif: false,
+      commission_sms_actif: false,
       interets_actifs: false,
       penalite_actif: false,
       frais_cloture_anticipe_actif: false,
@@ -293,7 +320,9 @@ const TypeCompteList = () => {
       frais_livret_actif: false,
       chapitre_livret_id: null,
       frais_renouvellement_livret: null,
+      frais_renouvellement_carnet: null,
       frais_renouvellement_actif: false,
+      chapitre_renouvellement_id: null,
       frais_perte_carnet: null,
       frais_perte_actif: false,
       chapitre_perte_id: null,
@@ -311,6 +340,7 @@ const TypeCompteList = () => {
   const fraisOuvertureActif = watch('frais_ouverture_actif');
   const fraisCarnetActif = watch('frais_carnet_actif');
   const commissionRetraitActif = watch('commission_retrait_actif');
+  const commissionSmsActif = watch('commission_sms_actif');
   const interetsActifs = watch('interets_actifs');
   const penaliteActif = watch('penalite_actif');
   const fraisClotureActif = watch('frais_cloture_anticipe_actif');
@@ -690,10 +720,36 @@ const TypeCompteList = () => {
       commission_retrait_actif: data.commission_retrait_actif,
       interets_actifs: data.interets_actifs,
       penalite_actif: data.penalite_actif,
+      commission_mensuelle_actif: data.commission_mensuelle_actif,
+      frais_renouvellement_actif: data.frais_renouvellement_actif,
       frais_cloture_anticipe_actif: data.frais_cloture_anticipe_actif,
       capitalisation_interets: data.capitalisation_interets,
+      commission_sms_actif: data.commission_sms_actif,
+
+
     };
     
+  
+
+  // Le Chapitre
+  if (data.frais_ouverture_actif && data.chapitre_frais_ouverture_id) {
+    cleanData.chapitre_frais_ouverture_id = data.chapitre_frais_ouverture_id;
+  }
+
+  // Le Montant
+  if (data.frais_ouverture !== null && data.frais_ouverture !== undefined) {
+    cleanData.frais_ouverture = data.frais_ouverture;
+  }
+
+    // --- SECTION CHAPITRES ---
+    if (data.commission_sms_actif && data.chapitre_commission_sms_id) {
+      cleanData.chapitre_commission_sms_id = data.chapitre_commission_sms_id;
+    }
+
+    // --- SECTION VALEURS NUMÉRIQUES ---
+    if (data.commission_sms !== null && data.commission_sms !== undefined) {
+      cleanData.commission_sms = data.commission_sms;
+    }
     // Ajouter les chapitres seulement s'ils sont définis
     if (data.chapitre_defaut_id !== null && data.chapitre_defaut_id !== undefined) {
       cleanData.chapitre_defaut_id = data.chapitre_defaut_id;
@@ -722,7 +778,9 @@ const TypeCompteList = () => {
     if (data.frais_cloture_anticipe_actif && data.chapitre_cloture_anticipe_id) {
       cleanData.chapitre_cloture_anticipe_id = data.chapitre_cloture_anticipe_id;
     }
-    
+    if (data.commission_mensuelle_actif && data.chapitre_commission_mensuelle_id) {
+      cleanData.chapitre_commission_mensuelle_id = data.chapitre_commission_mensuelle_id;
+    }
     // Ajouter les valeurs numériques seulement si elles sont définies et non nulles
     if (data.frais_ouverture !== null && data.frais_ouverture !== undefined) {
       cleanData.frais_ouverture = data.frais_ouverture;
@@ -747,9 +805,21 @@ const TypeCompteList = () => {
     if (data.penalite_retrait_anticipe !== null && data.penalite_retrait_anticipe !== undefined) {
       cleanData.penalite_retrait_anticipe = data.penalite_retrait_anticipe;
     }
+
+    if (data.frais_renouvellement_actif && data.chapitre_renouvellement_id) {
+      cleanData.chapitre_renouvellement_id = data.chapitre_renouvellement_id;
+    }
+
+    if (data.frais_renouvellement_carnet !== null && data.frais_renouvellement_carnet !== undefined) {
+      cleanData.frais_renouvellement_carnet = data.frais_renouvellement_carnet;
+    }
     
     if (data.frais_cloture_anticipe !== null && data.frais_cloture_anticipe !== undefined) {
       cleanData.frais_cloture_anticipe = data.frais_cloture_anticipe;
+    }
+
+    if (data.commission_mensuel !== null && data.commission_mensuel !== undefined) {
+      cleanData.commission_mensuel = data.commission_mensuel;
     }
     
     updateTypeCompteMutation.mutate(cleanData);
@@ -806,6 +876,9 @@ const TypeCompteList = () => {
       chapitre_interet_credit_id: type.chapitre_interet_credit_id || null,
       chapitre_penalite_id: type.chapitre_penalite_id || null,
       chapitre_cloture_anticipe_id: type.chapitre_cloture_anticipe_id || null,
+      commission_mensuel: type.commission_mensuel || null,
+    chapitre_commission_mensuelle_id: type.chapitre_commission_mensuelle_id || null,
+    commission_mensuelle_actif: !!type.commission_mensuelle_actif,
     };
     
     console.log('Valeurs préparées pour le formulaire:', preparedType);
@@ -1563,6 +1636,65 @@ const TypeCompteList = () => {
                   <Divider sx={{ my: 2 }} />
                   
                   <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <ReceiptIcon sx={{ mr: 1 }} />
+                    Frais de renouvellement de carnet
+                  </Typography>
+                  
+                  <Box display="flex" gap={2} alignItems="center" mb={2}>
+                    <Controller
+                      name="frais_renouvellement_actif"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={field.value || false}
+                              onChange={(e) => {
+                                field.onChange(e.target.checked);
+                                if (!e.target.checked) {
+                                  setValue('frais_renouvellement_carnet', null);
+                                  setValue('chapitre_renouvellement_id', null);
+                                }
+                              }}
+                            />
+                          }
+                          label="Activer"
+                        />
+                      )}
+                    />
+                    
+                    <Controller
+                      name="frais_renouvellement_carnet"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          margin="dense"
+                          label="Montant"
+                          type="number"
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                          }}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                          disabled={!fraisRenouvellementActif}
+                          sx={{ flex: 1 }}
+                        />
+                      )}
+                    />
+                  </Box>
+                  
+                  {/* Chapitre pour frais de renouvellement de carnet */}
+                  <ChapitreSelect 
+                    name="chapitre_renouvellement_id" 
+                    label="Chapitre frais de renouvellement"
+                    helperText="Chapitre pour comptabiliser les frais de renouvellement de carnet"
+                    disabled={!fraisRenouvellementActif}
+                  />
+
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                     <PercentIcon sx={{ mr: 1 }} />
                     Commission de retrait
                   </Typography>
@@ -1616,6 +1748,64 @@ const TypeCompteList = () => {
                     name="chapitre_commission_retrait_id" 
                     label="Chapitre commission de retrait"
                     helperText="Chapitre pour comptabiliser les commissions de retrait"
+                  />
+
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <PercentIcon sx={{ mr: 1 }} />
+                    Commission SMS
+                  </Typography>
+                  
+                  <Box display="flex" gap={2} alignItems="center" mb={2}>
+                    <Controller
+                      name="commission_sms_actif"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={field.value || false}
+                              onChange={(e) => {
+                                field.onChange(e.target.checked);
+                                if (!e.target.checked) {
+                                  setValue('commission_sms', null);
+                                  setValue('chapitre_commission_sms_id', null);
+                                }
+                              }}
+                            />
+                          }
+                          label="Activer"
+                        />
+                      )}
+                    />
+                    
+                    <Controller
+                      name="commission_sms"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          margin="dense"
+                          label="Montant"
+                          type="number"
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                          }}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                          disabled={!commissionSmsActif}
+                          sx={{ flex: 1 }}
+                        />
+                      )}
+                    />
+                  </Box>
+                  
+                  {/* Chapitre pour commission SMS */}
+                  <ChapitreSelect 
+                    name="chapitre_commission_sms_id" 
+                    label="Chapitre commission SMS"
+                    helperText="Chapitre pour comptabiliser les commissions SMS"
                   />
 
                   <Divider sx={{ my: 2 }} />

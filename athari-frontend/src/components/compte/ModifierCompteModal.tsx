@@ -114,6 +114,9 @@ interface FormValues {
   bp: string;
   pays_residence: string;
   duree_blocage_mois: number | null;
+  commission_retrait: number | string;
+  commission_sms: number | string;
+  taux_interet_annuel: number | string;
 }
 
 const validationSchema = Yup.object({
@@ -141,6 +144,9 @@ const validationSchema = Yup.object({
   adresse_quartier: Yup.string().required('Le quartier est requis'),
   bp: Yup.string().required('La boîte postale est requise'),
   pays_residence: Yup.string().required('Le pays de résidence est requis'),
+  commission_retrait: Yup.number().min(0, 'La commission retrait ne peut pas être négative').nullable(),
+  commission_sms: Yup.number().min(0, 'La commission SMS ne peut pas être négative').nullable(),
+  taux_interet_annuel: Yup.number().min(0, 'Le taux intérêt ne peut pas être négatif').nullable(),
 });
 
 const ModifierCompteModal: React.FC<ModifierCompteModalProps> = ({ 
@@ -169,7 +175,10 @@ const ModifierCompteModal: React.FC<ModifierCompteModalProps> = ({
       adresse_quartier: initialCompte?.client?.adresse_quartier || '',
       bp: initialCompte?.client?.bp || '',
       pays_residence: initialCompte?.client?.pays_residence || '',
-      duree_blocage_mois: initialCompte?.duree_blocage_mois || null
+      duree_blocage_mois: initialCompte?.duree_blocage_mois || null,
+      commission_retrait: (initialCompte as any)?.commission_retrait || '',
+      commission_sms: (initialCompte as any)?.commission_sms || '',
+      taux_interet_annuel: (initialCompte as any)?.taux_interet_annuel || '',
     },
     validationSchema,
     enableReinitialize: true,
@@ -520,6 +529,51 @@ const ModifierCompteModal: React.FC<ModifierCompteModalProps> = ({
                 fullWidth
                 margin="normal"
                 inputProps={{ min: 3, max: 12, step: 1 }}
+              />
+
+              {/* Commissions et intérêts */}
+              <Divider sx={{ my: 2 }}>Commissions et intérêts</Divider>
+
+              <TextField
+                label="Commission Retrait (FCFA)"
+                name="commission_retrait"
+                type="number"
+                value={formik.values.commission_retrait || ''}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.commission_retrait && Boolean(formik.errors.commission_retrait)}
+                helperText={formik.touched.commission_retrait && formik.errors.commission_retrait}
+                fullWidth
+                margin="normal"
+                inputProps={{ step: 0.01, min: 0 }}
+              />
+
+              <TextField
+                label="Commission SMS (FCFA)"
+                name="commission_sms"
+                type="number"
+                value={formik.values.commission_sms || ''}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.commission_sms && Boolean(formik.errors.commission_sms)}
+                helperText={formik.touched.commission_sms && formik.errors.commission_sms}
+                fullWidth
+                margin="normal"
+                inputProps={{ step: 0.01, min: 0 }}
+              />
+
+              <TextField
+                label="Taux Intérêt Annuel (%)"
+                name="taux_interet_annuel"
+                type="number"
+                value={formik.values.taux_interet_annuel || ''}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.taux_interet_annuel && Boolean(formik.errors.taux_interet_annuel)}
+                helperText={formik.touched.taux_interet_annuel && formik.errors.taux_interet_annuel}
+                fullWidth
+                margin="normal"
+                inputProps={{ step: 0.01, min: 0 }}
               />
 
               {/* Mandataires */}

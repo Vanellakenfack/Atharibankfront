@@ -43,8 +43,9 @@ import ListGestionnaire from '../pages/gestionnaire/ListGestionnaire.js';
 import EditGestionnaire from '../pages/gestionnaire/EditGestionnaire.js';
 import ValidationComptes from '../pages/validerCompte/ValidationComptes.js';
 import TraitementFinJournee from '../pages/TransactionsAdministratives/TraitementFinJournee.js';
-
-
+import RetraitDistance from '../pages/TransactionFrontOffice/TransactionCaisseEspece/RetraitDistance.jsx';
+import ValidationChefAgence from '../pages/validationca/ValidationChefAgence.jsx';
+import ListeValidationRetrait from '../pages/TransactionFrontOffice/TransactionCaisseEspece/validationcaisse/ListeValidationRetrait.jsx';
 // Ajoute "Link" dans l'importation existante
 
 const AppRoutes = () => {
@@ -128,8 +129,10 @@ const AppRoutes = () => {
       <Route path='/Transfert-Inter-Caisse' element={<TransfertInterCaisse />} />
       <Route path='/Dashboard-Caissieres' element={<DashboardCaissieres />} />            
       <Route path='/Retrait-Especes' element={<RetraitEspeces />} />
+            <Route path='/Retrait-distance' element={<RetraitDistance/>} />
+        <Route path='/validation_retraitd' element={<ValidationChefAgence/>} />
       <Route path='/validation-transaction' element={<ValidationTransaction />} />
-
+      <Route path='/listevalidationRD' element={<ListeValidationRetrait />}  />  
 
     
 

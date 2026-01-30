@@ -88,7 +88,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     fraisApplications: '/frais/applications',
     validerTransaction: '/validation-transaction',
     addGestionnaire: '/AddGestionnaire',
-    listGestionnaire: '/ListGestionnaire'
+    listGestionnaire: '/ListGestionnaire',
+    validerRD:'/validation_retraitd'
   };
 
   // Groupes de chemins pour les menus déroulants
@@ -815,6 +816,23 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               >
                 <FileType size={16} strokeWidth={isActivePath(menuPaths.validerTransaction) ? 3 : 2} />
                 Valider une transaction
+              </Link>
+
+              <Link
+                to={menuPaths.validerRD}
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                  isActivePath(menuPaths.validerRD) 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: isActivePath(menuPaths.validerRD) ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileType size={16} strokeWidth={isActivePath(menuPaths.validerRD) ? 3 : 2} />
+                Valider retrait distance
               </Link>
             </div>
           )}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -565,6 +566,7 @@ const TabPanel: React.FC<TabPanelProps> = (props) => {
 };
 
 const RetraitEspeces: React.FC = () => {
+  const navigate = useNavigate(); // Ajoutez cette ligne
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
   const [tabValue, setTabValue] = useState<number>(0);
   const [agences, setAgences] = useState<AgenceApi[]>([]);
@@ -624,15 +626,7 @@ const RetraitEspeces: React.FC = () => {
   const receiptRef = useRef<HTMLDivElement>(null);
 
   // État pour le retrait à distance
-  const [retraitDistanceData, setRetraitDistanceData] = useState<RetraitDistanceData>({
-    numeroCompte: '',
-    montant: '',
-    procurationFile: null,
-    demandeRetraitFile: null,
-    nomGestionnaire: '',
-    prenomGestionnaire: '',
-    codeGestionnaire: '',
-  });
+
 
   // États pour la validation du CNI
   const [clientRealCni, setClientRealCni] = useState<string>('');
@@ -683,100 +677,7 @@ const RetraitEspeces: React.FC = () => {
     netADebiter: '0',
   });
 
-  // Gestion des changements pour le retrait à distance
-  const handleRetraitDistanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, files } = e.target;
-    
-    if (name === 'procurationFile' || name === 'demandeRetraitFile') {
-      setRetraitDistanceData(prev => ({
-        ...prev,
-        [name]: files ? files[0] : null,
-      }));
-    } else {
-      setRetraitDistanceData(prev => ({
-        ...prev,
-        [name]: value,
-      }));
-    }
-  };
-
-  // Gestion du téléchargement de fichier
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, fileType: 'procurationFile' | 'demandeRetraitFile') => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setRetraitDistanceData(prev => ({
-        ...prev,
-        [fileType]: file,
-      }));
-    }
-  };
-
-  // Validation du retrait à distance
-  const validateRetraitDistance = async () => {
-    // Validation des champs obligatoires
-    if (!retraitDistanceData.numeroCompte) {
-      showSnackbar('Veuillez saisir le numéro de compte', 'error');
-      return;
-    }
-
-    if (!retraitDistanceData.montant || parseFloat(retraitDistanceData.montant) <= 0) {
-      showSnackbar('Veuillez saisir un montant valide', 'error');
-      return;
-    }
-
-    if (!retraitDistanceData.procurationFile) {
-      showSnackbar('Veuillez télécharger la procuration', 'error');
-      return;
-    }
-
-    if (!retraitDistanceData.demandeRetraitFile) {
-      showSnackbar('Veuillez télécharger la demande de retrait', 'error');
-      return;
-    }
-
-    if (!retraitDistanceData.nomGestionnaire) {
-      showSnackbar('Veuillez saisir le nom du gestionnaire', 'error');
-      return;
-    }
-
-    if (!retraitDistanceData.prenomGestionnaire) {
-      showSnackbar('Veuillez saisir le prénom du gestionnaire', 'error');
-      return;
-    }
-
-    if (!retraitDistanceData.codeGestionnaire) {
-      showSnackbar('Veuillez saisir le code du gestionnaire', 'error');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      // Ici, vous ajouterez l'appel API pour valider le retrait à distance
-      // Pour l'instant, on simule un succès
-      
-      // Simuler un délai de traitement
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      showSnackbar('Retrait à distance validé avec succès par le CA', 'success');
-      
-      // Réinitialiser le formulaire
-      setRetraitDistanceData({
-        numeroCompte: '',
-        montant: '',
-        procurationFile: null,
-        demandeRetraitFile: null,
-        nomGestionnaire: '',
-        prenomGestionnaire: '',
-        codeGestionnaire: '',
-      });
-      
-    } catch (error) {
-      console.error('Erreur lors de la validation du retrait à distance:', error);
-      showSnackbar('Erreur lors de la validation du retrait à distance', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+  
 
 // Fonction pour générer et télécharger le reçu PDF simplifié
 const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
@@ -1942,10 +1843,30 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
               Retrait Espèces
             </Typography>
             <Typography variant="body2" sx={{ color: '#64748B' }}>
-              Interface de retrait d'espèces - Turbobank
+              Interface de retrait d'espèces - ATHARIbank
             </Typography>
           </Box>
-
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: '#1a237e' }}>
+              Retrait a distanvce
+            </Typography>
+            
+            <Button
+              variant="outlined"
+              color="primary"
+              startIcon={<CloudDownload />} // Icône symbolisant le retrait à distance
+              onClick={() => navigate('/Retrait-distance')} // Assurez-vous que le chemin correspond à votre Route
+              sx={{ 
+                borderRadius: '8px',
+                textTransform: 'none',
+                fontWeight: 600,
+                borderWidth: '2px',
+                '&:hover': { borderWidth: '2px' }
+              }}
+            >
+              Aller au Retrait à Distance
+            </Button>
+          </Box>
           <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #e0e0e0', overflow: 'hidden' }}>
             {/* Barre d'onglets */}
             <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: '#f8f9fa' }}>
@@ -3072,259 +2993,10 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
                 </Grid>
               </TabPanel>
 
-              {/* Onglet Retrait à distance */}
-              <TabPanel value={tabValue} index={4}>
-                <Grid container spacing={3}>
-                  {/* Informations du compte */}
-                  <Grid item xs={12}>
-                    <StyledCard>
-                      <CardContent>
-                        <Typography variant="subtitle2" sx={{ mb: 3, color: '#1976D2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <AccountBalanceWallet />
-                          Informations du compte client
-                        </Typography>
-                        <Grid container spacing={2}>
-                          <Grid item xs={12} md={6}>
-                            <TextField
-                              fullWidth
-                              label="Numéro de compte *"
-                              name="numeroCompte"
-                              value={retraitDistanceData.numeroCompte}
-                              onChange={handleRetraitDistanceChange}
-                              placeholder="Ex: 1234567890"
-                              sx={{ minWidth: 250 }}
-                            />
-                          </Grid>
-                          <Grid item xs={12} md={6}>
-                            <TextField
-                              fullWidth
-                              label="Montant du retrait *"
-                              name="montant"
-                              value={retraitDistanceData.montant}
-                              onChange={handleRetraitDistanceChange}
-                              placeholder="Montant en FCFA"
-                              type="number"
-                              InputProps={{
-                                startAdornment: <InputAdornment position="start">FCFA</InputAdornment>,
-                              }}
-                              sx={{ minWidth: 250 }}
-                            />
-                          </Grid>
-                        </Grid>
-                      </CardContent>
-                    </StyledCard>
-                  </Grid>
 
-                  {/* Upload de la procuration */}
-                  <Grid item xs={12} md={6}>
-                    <StyledCard sx={{ height: '100%' }}>
-                      <CardContent>
-                        <Typography variant="subtitle2" sx={{ mb: 3, color: '#1976D2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <CloudUpload />
-                          Procuration (Image requise) *
-                        </Typography>
-                        
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleFileUpload(e, 'procurationFile')}
-                          style={{ display: 'none' }}
-                          id="procuration-file-input"
-                        />
-                        
-                        <label htmlFor="procuration-file-input">
-                          <FileUploadBox>
-                            {retraitDistanceData.procurationFile ? (
-                              <Box>
-                                <CheckCircle sx={{ fontSize: 48, color: '#4CAF50', mb: 2 }} />
-                                <Typography variant="body1" fontWeight={500} gutterBottom>
-                                  Procuration téléchargée
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                  {retraitDistanceData.procurationFile.name}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                                  Taille: {(retraitDistanceData.procurationFile.size / 1024).toFixed(2)} KB
-                                </Typography>
-                                <Button 
-                                  variant="outlined" 
-                                  sx={{ mt: 2 }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setRetraitDistanceData(prev => ({ ...prev, procurationFile: null }));
-                                  }}
-                                >
-                                  Supprimer
-                                </Button>
-                              </Box>
-                            ) : (
-                              <Box>
-                                <CloudUpload sx={{ fontSize: 48, color: '#1976D2', mb: 2 }} />
-                                <Typography variant="body1" fontWeight={500} gutterBottom>
-                                  Cliquez pour télécharger la procuration
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                  Formats acceptés: JPG, PNG, GIF
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                                  Taille maximale: 5 MB
-                                </Typography>
-                              </Box>
-                            )}
-                          </FileUploadBox>
-                        </label>
-                        
-                        <Alert severity="info" sx={{ mt: 2 }}>
-                          La procuration doit être signée et inclure les informations d'identification complètes
-                        </Alert>
-                      </CardContent>
-                    </StyledCard>
-                  </Grid>
+                
 
-                  {/* Upload de la demande de retrait */}
-                  <Grid item xs={12} md={6}>
-                    <StyledCard sx={{ height: '100%' }}>
-                      <CardContent>
-                        <Typography variant="subtitle2" sx={{ mb: 3, color: '#1976D2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <CloudUpload />
-                          Demande de retrait (Image requise) *
-                        </Typography>
-                        
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleFileUpload(e, 'demandeRetraitFile')}
-                          style={{ display: 'none' }}
-                          id="demande-retrait-file-input"
-                        />
-                        
-                        <label htmlFor="demande-retrait-file-input">
-                          <FileUploadBox>
-                            {retraitDistanceData.demandeRetraitFile ? (
-                              <Box>
-                                <CheckCircle sx={{ fontSize: 48, color: '#4CAF50', mb: 2 }} />
-                                <Typography variant="body1" fontWeight={500} gutterBottom>
-                                  Demande de retrait téléchargée
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                  {retraitDistanceData.demandeRetraitFile.name}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                                  Taille: {(retraitDistanceData.demandeRetraitFile.size / 1024).toFixed(2)} KB
-                                </Typography>
-                                <Button 
-                                  variant="outlined" 
-                                  sx={{ mt: 2 }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setRetraitDistanceData(prev => ({ ...prev, demandeRetraitFile: null }));
-                                  }}
-                                >
-                                  Supprimer
-                                </Button>
-                              </Box>
-                            ) : (
-                              <Box>
-                                <CloudUpload sx={{ fontSize: 48, color: '#1976D2', mb: 2 }} />
-                                <Typography variant="body1" fontWeight={500} gutterBottom>
-                                  Cliquez pour télécharger la demande de retrait
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                  Formats acceptés: JPG, PNG, GIF
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                                  Taille maximale: 5 MB
-                                </Typography>
-                              </Box>
-                            )}
-                          </FileUploadBox>
-                        </label>
-                        
-                        <Alert severity="info" sx={{ mt: 2 }}>
-                          La demande doit être datée et signée par le client
-                        </Alert>
-                      </CardContent>
-                    </StyledCard>
-                  </Grid>
-
-                  {/* Informations du gestionnaire */}
-                  <Grid item xs={12}>
-                    <StyledCard>
-                      <CardContent>
-                        <Typography variant="subtitle2" sx={{ mb: 3, color: '#1976D2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Badge />
-                          Informations du gestionnaire CA
-                        </Typography>
-                        <Grid container spacing={2}>
-                          <Grid item xs={12} md={4}>
-                            <TextField
-                              fullWidth
-                              label="Nom du gestionnaire *"
-                              name="nomGestionnaire"
-                              value={retraitDistanceData.nomGestionnaire}
-                              onChange={handleRetraitDistanceChange}
-                              placeholder="Nom"
-                              sx={{ minWidth: 250 }}
-                            />
-                          </Grid>
-                          <Grid item xs={12} md={4}>
-                            <TextField
-                              fullWidth
-                              label="Prénom du gestionnaire *"
-                              name="prenomGestionnaire"
-                              value={retraitDistanceData.prenomGestionnaire}
-                              onChange={handleRetraitDistanceChange}
-                              placeholder="Prénom"
-                              sx={{ minWidth: 250 }}
-                            />
-                          </Grid>
-                          <Grid item xs={12} md={4}>
-                            <TextField
-                              fullWidth
-                              label="Code du gestionnaire *"
-                              name="codeGestionnaire"
-                              value={retraitDistanceData.codeGestionnaire}
-                              onChange={handleRetraitDistanceChange}
-                              placeholder="Code d'identification"
-                              sx={{ minWidth: 250 }}
-                            />
-                          </Grid>
-                        </Grid>
-                        
-                        <Alert severity="warning" sx={{ mt: 3 }}>
-                          Le retrait à distance ne sera validé qu'après vérification et approbation par le CA
-                        </Alert>
-                      </CardContent>
-                    </StyledCard>
-                  </Grid>
-
-                  {/* Bouton de validation */}
-                  <Grid item xs={12}>
-                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                      <GradientButton
-                        variant="contained"
-                        onClick={validateRetraitDistance}
-                        startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <CheckCircle />}
-                        disabled={
-                          !retraitDistanceData.numeroCompte ||
-                          !retraitDistanceData.montant ||
-                          parseFloat(retraitDistanceData.montant) <= 0 ||
-                          !retraitDistanceData.procurationFile ||
-                          !retraitDistanceData.demandeRetraitFile ||
-                          !retraitDistanceData.nomGestionnaire ||
-                          !retraitDistanceData.prenomGestionnaire ||
-                          !retraitDistanceData.codeGestionnaire ||
-                          loading
-                        }
-                        sx={{ minWidth: 250, py: 1.5, px: 4 }}
-                      >
-                        {loading ? 'Validation en cours...' : 'Valider le retrait à distance'}
-                      </GradientButton>
-                    </Box>
-                  </Grid>
-                </Grid>
-              </TabPanel>
-
+                 
               {/* Boutons d'action */}
               {tabValue !== 4 && (
                 <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>

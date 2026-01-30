@@ -1,3 +1,4 @@
+// src/services/api/journalCaisseService.ts
 import ApiClient from './ApiClient';
 import { format } from 'date-fns';
 
@@ -17,7 +18,7 @@ export interface CaisseMovement {
 export interface CaisseJournalApiResponse {
   statut: string;
   solde_ouverture: number;
-  journal_groupe: CaisseMovement[];
+  mouvements: CaisseMovement[];
   total_debit: number;
   total_credit: number;
   solde_cloture: number;
@@ -48,11 +49,104 @@ class JournalCaisseService {
       const response = await ApiClient.get('/caisse/journal', { params });
       
       console.log('Réponse API journal caisse reçue:', response.data);
-      return response.data;
       
-    } catch (error) {
-      console.error('Erreur lors de la récupération du journal de caisse:', error);
-      throw error;
+      // ADAPTATION DE LA STRUCTURE - Option 1
+      const apiData = response.data;
+      
+      // DEBUG : Afficher la structure reçue
+      console.log('Structure API reçue:', {
+        statut: apiData.statut,
+        hasGroupes: !!apiData.groupes,
+        groupesCount: apiData.groupes ? apiData.groupes.length : 0,
+        hasMouvements: !!apiData.mouvements,
+        mouvementsCount: apiData.mouvements ? apiData.mouvements.length : 0,
+        data: apiData
+      });
+      
+      // Vérifier si on a déjà la structure mouvements
+      if (apiData.mouvements && Array.isArray(apiData.mouvements)) {
+        // Structure déjà correcte, retourner tel quel
+        console.log('✅ Structure mouvements déjà correcte');
+        return apiData as CaisseJournalApiResponse;
+      }
+      
+      // Sinon, transformer depuis la structure groupes
+      console.log('🔄 Transformation depuis structure groupes...');
+      const mouvements: CaisseMovement[] = [];
+      
+      if (apiData.groupes && Array.isArray(apiData.groupes)) {
+        console.log(`📊 ${apiData.groupes.length} groupes trouvés`);
+        
+        apiData.groupes.forEach((groupe: any, index: number) => {
+          console.log(`Groupe ${index + 1}:`, {
+            type: groupe.type,
+            operationsCount: groupe.operations ? groupe.operations.length : 0
+          });
+          
+          if (groupe.operations && Array.isArray(groupe.operations)) {
+            groupe.operations.forEach((operation: any, opIndex: number) => {
+              console.log(`Opération ${opIndex + 1}:`, operation);
+              
+              // Créer un mouvement pour chaque opération
+              const mouvement: CaisseMovement = {
+                numero_compte: operation.numero_compte || '',
+                tiers_nom: operation.tiers || operation.tiers_nom || '',
+                libelle_mouvement: operation.libelle || operation.libelle_mouvement || '',
+                reference_operation: operation.ref || operation.reference_operation || '',
+                montant_debit: parseFloat(operation.entree || operation.montant_debit) || 0,
+                montant_credit: parseFloat(operation.sortie || operation.montant_credit) || 0,
+                type_versement: groupe.type || operation.type_versement || 'ESPECE',
+                code_caisse: operation.code_caisse || '',
+                code_agence: filters.code_agence,
+                date_mouvement: operation.date || operation.date_mouvement || ''
+              };
+              
+              console.log(`Mouvement ${opIndex + 1} transformé:`, mouvement);
+              mouvements.push(mouvement);
+            });
+          }
+        });
+      }
+      
+      console.log(`✅ ${mouvements.length} mouvements transformés`);
+      
+      // Retourner la structure attendue par le frontend
+      const transformedData: CaisseJournalApiResponse = {
+        statut: apiData.statut || 'success',
+        solde_ouverture: parseFloat(apiData.solde_ouverture) || 0,
+        mouvements: mouvements,
+        total_debit: parseFloat(apiData.total_general_debit || apiData.total_debit) || 0,
+        total_credit: parseFloat(apiData.total_general_credit || apiData.total_credit) || 0,
+        solde_cloture: parseFloat(apiData.solde_cloture) || 0,
+        synthese: apiData.synthese || {}
+      };
+      
+      console.log('✅ Données transformées prêtes:', transformedData);
+      return transformedData;
+      
+    } catch (error: any) {
+      console.error('❌ Erreur lors de la récupération du journal de caisse:', error);
+      
+      // Log détaillé pour le debug
+      if (error.response) {
+        console.error('Détails de la réponse erreur:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          headers: error.response.headers
+        });
+      }
+      
+      // Retourner une structure vide pour éviter les crashs
+      return {
+        statut: 'error',
+        solde_ouverture: 0,
+        mouvements: [],
+        total_debit: 0,
+        total_credit: 0,
+        solde_cloture: 0,
+        synthese: {}
+      };
     }
   }
   
@@ -139,11 +233,22 @@ class JournalCaisseService {
           date_fin: format(new Date(), 'yyyy-MM-dd'),
           caisse_id: '1',
           code_agence: '001'
-        }
+        },
+        timeout: 5000 // Timeout de 5 secondes
       });
+      
+      console.log('Test backend - Réponse:', {
+        status: response.status,
+        data: response.data
+      });
+      
       return response.status === 200;
-    } catch (error) {
-      console.error('Test backend journal caisse échoué:', error);
+    } catch (error: any) {
+      console.error('Test backend journal caisse échoué:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       return false;
     }
   }

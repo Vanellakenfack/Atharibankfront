@@ -74,6 +74,8 @@ interface FormOptions {
   gestionnaire_nom?: string;
   gestionnaire_prenom?: string;
   gestionnaire_code?: string;
+    gestionnaire_id?: number | null;
+
 }
 
 interface Step2AccountTypeProps {
@@ -89,6 +91,8 @@ interface Step2AccountTypeProps {
 interface Gestionnaire {
   id: number;
   gestionnaire_code: string;
+  gestionnaire_id: string;
+
   gestionnaire_nom: string;
   gestionnaire_prenom: string;
   telephone: string | null;
@@ -143,7 +147,6 @@ const formatPourcentage = (value: string): string => {
 const categorizeParameters = (typeCompte: TypeCompte) => {
   const fraisKeys = [
     'frais_ouverture', 'frais_deblocage', 'frais_cloture_anticipe', 
-    'frais_carnet', 'frais_perte_carnet', 'frais_renouvellement_carnet'
   ];
   
   const commissionKeys = [
@@ -161,7 +164,8 @@ const categorizeParameters = (typeCompte: TypeCompte) => {
     'frais_ouverture_actif', 'frais_deblocage_actif', 'frais_cloture_actif',
     'frais_carnet_actif', 'commission_retrait_actif', 'commission_sms_actif',
     'penalite_actif', 'interets_actifs', 'minimum_compte_actif',
-    'frais_perte_actif', 'frais_renouvellement_actif', 'commission_mensuelle_actif'
+    'frais_perte_actif', 'frais_renouvellement_actif', 'commission_mensuelle_actif','frais_chequier_actif',
+    'penalite_retrait_anticipe_actif','frais_cheque_guichet_actif'
   ];
 
   const autresKeys = Object.keys(typeCompte).filter(key => 
@@ -216,6 +220,9 @@ const getLabelForKey = (key: string): string => {
     frais_carnet: 'Frais de carnet',
     frais_perte_carnet: 'Frais perte carnet',
     frais_renouvellement_carnet: 'Frais renouvellement carnet',
+    frais_chequier: 'Frais chéquier',
+    frais_cheque_guichet: 'Frais chèque guichet',
+
     
     // Commissions
     commission_retrait: 'Commission de retrait',
@@ -242,6 +249,8 @@ const getLabelForKey = (key: string): string => {
     frais_deblocage_actif: 'Frais déblocage actif',
     frais_cloture_actif: 'Frais clôture actif',
     frais_carnet_actif: 'Frais carnet actif',
+    frais_chequier_actif: 'Frais chéquier actif',
+    frais_cheque_guichet_actif: 'Frais chèque guichet actif',
     commission_retrait_actif: 'Commission retrait actif',
     commission_sms_actif: 'Commission SMS actif',
     penalite_actif: 'Pénalité actif',
@@ -426,6 +435,54 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  // AJOUT: Charger les gestionnaires
+  useEffect(() => {
+    const fetchGestionnaires = async () => {
+      try {
+        setLoadingGestionnaires(true);
+        // Récupérer tous les gestionnaires (vous pouvez ajuster la pagination si nécessaire)
+        const response = await gestionnaireService.getAllGestionnaires(1, 100);
+        if (response.success) {
+          setGestionnaires(response.data);
+        }
+      } catch (err) {
+        console.error('Erreur lors du chargement des gestionnaires:', err);
+        // Ne pas bloquer l'interface en cas d'erreur
+      } finally {
+        setLoadingGestionnaires(false);
+      }
+    };
+
+    fetchGestionnaires();
+  }, []);
+
+  // Mettre à jour la liste des chapitres filtrés
+  useEffect(() => {
+    const filterChapitres = async () => {
+      try {
+        setLoadingChapitres(true);
+        const data = await planComptableService.getChapitres();
+        const filtered = data.filter((chapitre: ChapitreComptable) => 
+          chapitre.libelle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          chapitre.code.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setChapitres(filtered);
+      } catch (err) {
+        console.error('Erreur lors du chargement des chapitres:', err);
+      } finally {
+        setLoadingChapitres(false);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      if (searchTerm) {
+        filterChapitres();
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // AJOUT: Gestion du changement de gestionnaire
   const handleGestionnaireChange = (event: SelectChangeEvent<number>) => {
     const gestionnaireId = event.target.value as number;
@@ -434,13 +491,16 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
     // Trouver le gestionnaire sélectionné
     const gestionnaire = gestionnaires.find(g => g.id === gestionnaireId);
     if (gestionnaire) {
-      // Remplir automatiquement les champs gestionnaire
-      onChange('options', {
+      // Remplir automatiquement les champs gestionnaire dans les options
+      const newOptions = {
         ...options,
+        gestionnaire_id: gestionnaire.id, // AJOUT: Inclure l'ID
         gestionnaire_nom: gestionnaire.gestionnaire_nom,
         gestionnaire_prenom: gestionnaire.gestionnaire_prenom,
         gestionnaire_code: gestionnaire.gestionnaire_code
-      });
+      };
+      
+      onChange('options', newOptions);
 
       // Also set top-level gestionnaire so prepareFormData can include gestionnaire_id
       onChange('gestionnaire', {
@@ -449,14 +509,24 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
         prenom: gestionnaire.gestionnaire_prenom,
         code: gestionnaire.gestionnaire_code
       });
+      
+      console.log('Gestionnaire sélectionné:', {
+        id: gestionnaire.id,
+        nom: gestionnaire.gestionnaire_nom,
+        prenom: gestionnaire.gestionnaire_prenom,
+        code: gestionnaire.gestionnaire_code
+      });
     } else {
       // Si aucun gestionnaire sélectionné, vider les champs
-      onChange('options', {
+      const newOptions = {
         ...options,
+        gestionnaire_id: null, // AJOUT: Réinitialiser l'ID
         gestionnaire_nom: '',
         gestionnaire_prenom: '',
         gestionnaire_code: ''
-      });
+      };
+      
+      onChange('options', newOptions);
 
       // Clear top-level gestionnaire as well
       onChange('gestionnaire', {
@@ -618,7 +688,7 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
         throw new Error('Veuillez sélectionner un gestionnaire');
       }
       
-      const etape2Data = {
+    const etape2Data = {
         account_type: selectedTypeDetails?.id || accountType,
         account_sub_type: selectedType || accountSubType,
         solde: Number(options.solde) || 0,
@@ -627,14 +697,20 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
         plan_comptable_id: selectedChapitre.plan_comptable_id || selectedChapitre.id,
         chapitre_comptable_id: selectedChapitre.id,
         categorie_id: selectedChapitre.categorie_id || '',
-        gestionnaire_id: selectedGestionnaireId || null,
+        // AJOUT: Inclure explicitement le gestionnaire_id depuis selectedGestionnaireId ou options.gestionnaire_id
+        gestionnaire_id: selectedGestionnaireId || options.gestionnaire_id || null,
         gestionnaire_nom: options.gestionnaire_nom || '',
         gestionnaire_prenom: options.gestionnaire_prenom || '',
         gestionnaire_code: options.gestionnaire_code || '',
         type_compte_libelle: selectedTypeDetails?.libelle || ''
       };
 
-      console.log('Données envoyées à l\'étape 2:', etape2Data);
+console.log('=== DONNÉES ÉTAPE 2 ENVOYÉES ===');
+      console.log('etape2Data:', etape2Data);
+      console.log('gestionnaire_id:', etape2Data.gestionnaire_id);
+      console.log('selectedGestionnaireId:', selectedGestionnaireId);
+      console.log('options.gestionnaire_id:', options.gestionnaire_id);
+      console.log('=== FIN DONNÉES ÉTAPE 2 ===');
       
       await onNext(etape2Data);
       
@@ -744,6 +820,7 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
         </Grid>
       </Grid>
 
+      
       {/* AJOUT: Section Sélection du gestionnaire */}
       <Card sx={{ mb: 4, p: 2, backgroundColor: '#f8f9fa' }}>
         <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main', display: 'flex', alignItems: 'center' }}>
@@ -756,7 +833,7 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
           <FormControl sx={{  minWidth: 200 }} variant="outlined" margin="normal">
             <InputLabel id="gestionnaire-select-label">Sélectionner un gestionnaire existant</InputLabel>
             <Select
-             sx={{  minWidth: 250 }}
+              sx={{  minWidth: 250 }}
               labelId="gestionnaire-select-label"
               id="gestionnaire-select"
               value={selectedGestionnaireId}
@@ -843,6 +920,15 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
           </Grid>
         </Grid>
         
+        {/* Affichage du gestionnaire_id sélectionné pour débogage */}
+        {selectedGestionnaireId && (
+          <Alert severity="info" sx={{ mt: 2 }}>
+            <Typography variant="body2">
+              Gestionnaire sélectionné: <strong>ID: {selectedGestionnaireId}</strong>
+            </Typography>
+          </Alert>
+        )}
+        
         {/* Bouton pour effacer la sélection */}
         {selectedGestionnaireId && (
           <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
@@ -851,11 +937,19 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
               size="small"
               onClick={() => {
                 setSelectedGestionnaireId('');
-                onChange('options', {
+                const newOptions = {
                   ...options,
+                  gestionnaire_id: null,
                   gestionnaire_nom: '',
                   gestionnaire_prenom: '',
                   gestionnaire_code: ''
+                };
+                
+                onChange('options', newOptions);
+                onChange('gestionnaire', {
+                  nom: '',
+                  prenom: '',
+                  code: ''
                 });
               }}
             >

@@ -1856,6 +1856,27 @@ export default function FormClientMorale() {
                         )} 
                       />
                     </Grid>
+
+                    <Grid item xs={12} md={6}>
+                      <FileUploadField
+                        label="Photocopie des Statuts (image) *"
+                        fieldName="statuts_image"
+                        preview={statutsPreview}
+                        setPreview={setStatutsPreview}
+                        required={true}
+                        description="Statuts de l'entreprise - max 2MB"
+                          />
+                    </Grid>                      
+                    <Grid item xs={12} md={4}>
+                      <FileUploadField
+                        label="Photocopie NUI (image) *"
+                        fieldName="niu_image"
+                        preview={niuPreview}
+                        setPreview={setNiuPreview}
+                        required={true}
+                        description="Photocopie du document NUI - max 2MB"
+                      />
+                    </Grid> 
                     
                     <Grid item xs={12}>
                       <Divider sx={{ my: 2 }} />
