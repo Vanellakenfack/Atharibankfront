@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../../assets/css/dash.css';
-import { 
-  BarChart3, 
-  Users, 
-  TrendingUp, 
-  Zap, 
-  Settings, 
-  LogOut, 
+import {
+  BarChart3,
+  Users,
+  TrendingUp,
+  Zap,
+  Settings,
+  LogOut,
   ShieldCheck,
   ChevronLeft,
   Menu,
@@ -27,7 +27,16 @@ import {
   Coins,
   DollarSign,
   FileCheck,
-  FileSpreadsheet
+  FileSpreadsheet,
+  PiggyBank, // Icône pour le crédit
+  FilePlus, // Icône pour nouvelle demande
+  Building, // Icône pour Chef d'Agence
+  Scale, // Icône pour Comité d'Agence
+  FileText as Description, // Icône pour Assistant Juridique
+  Building as BusinessIcon, // Alias for BusinessIcon
+  DollarSign as AccountBalanceIcon, // Icône pour Assistant Comptable
+  Gavel as GavelIcon, // Icône pour Comité d'Agence
+  Calculator // Icône pour Chef Comptable
 } from 'lucide-react';
 import { useAuth } from "../../context/AuthContext";
 
@@ -40,12 +49,13 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
   const [showPlanComptable, setShowPlanComptable] = useState(false);
   const [showTransactions, setShowTransactions] = useState(false);
   const [showFrontOffice, setShowFrontOffice] = useState(false);
+  const [showCreditMenu, setShowCreditMenu] = useState(false); // Nouvel état pour le menu Crédit
   const [showCaisseEspece, setShowCaisseEspece] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showReporting, setShowReporting] = useState(false);
   const [showVersementMenu, setShowVersementMenu] = useState(false);
 
-  // Définition des chemins pour chaque menu (chemins d'origine)
+  // Définition des chemins pour chaque menu (chemins d'origine) avec ajout du crédit
   const menuPaths = {
     overview: '/dashboard',
     users: '/users/management',
@@ -60,7 +70,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     compte: '/compte',
     listeComptes: '/liste-des-comptes',
     journalComptable: '/Journal-Comptable',
-    journalCaisse: '/Journal-Caisse', // Ajout du Journal de caisse
+    journalCaisse: '/Journal-Caisse',
     reporting2: '/reporting-2',
     agenceForm: '/agence/form',
     guichetForm: '/guichet/form',
@@ -80,7 +90,18 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     agence: '/agence',
     listeTypeCompte: '/Liste-type-de-compte',
     fraisApplications: '/frais/applications',
-    validerTransaction: '/validation-transaction'
+    validerTransaction: '/validation-transaction',
+    // Credit module routes
+    creditNouvelleDemande: '/credit/nouvelle-demande',
+    creditNouvelleDemandeFlash: '/credit/nouvelle-demande-flash',
+    creditMesDemandes: '/credit/MesDemandes',
+    // Workflow dashboards
+    creditAnalysteDashboard: '/credit/analyste-dashboard',
+    creditChefAgenceDashboard: '/credit/chef-agence-dashboard',
+    creditAssistantComptableDashboard: '/credit/assistant-comptable-dashboard',
+    creditChefComptableDashboard: '/credit/chef-comptable-dashboard',
+    creditComiteAgenceDashboard: '/credit/comite-agence-dashboard',
+    creditAssistantJuridiqueDashboard: '/credit/assistant-juridique-dashboard',
   };
 
   // Groupes de chemins pour les menus déroulants
@@ -88,7 +109,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     DAT: [menuPaths.datContracts, menuPaths.datTypes],
     PlanComptable: [menuPaths.planComptable, menuPaths.planComptableCategories],
     Account: [menuPaths.compte, menuPaths.listeComptes],
-    Reporting: [menuPaths.journalComptable, menuPaths.journalCaisse, menuPaths.reporting2], // Ajout du journalCaisse
+    Reporting: [menuPaths.journalComptable, menuPaths.journalCaisse, menuPaths.reporting2],
     TransactionsAdmin: [menuPaths.agenceForm, menuPaths.guichetForm, menuPaths.caisseForm, menuPaths.validerTransaction],
     FrontOffice: [
       menuPaths.dashboardCaissieres,
@@ -112,7 +133,16 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
       menuPaths.versement
     ],
     Versement: [menuPaths.versement, menuPaths.versementClient, menuPaths.versementAC],
-    Settings: [menuPaths.usersRoles, menuPaths.agence, menuPaths.listeTypeCompte, menuPaths.fraisApplications]
+    Settings: [menuPaths.usersRoles, menuPaths.agence, menuPaths.listeTypeCompte, menuPaths.fraisApplications],
+    // Ajout du groupe Crédit
+    Credit: [
+      menuPaths.creditNouvelleDemande,
+      menuPaths.creditNouvelleDemandeFlash,
+      menuPaths.creditMesDemandes,
+      // Ajouter d'autres chemins crédit ici plus tard
+      // menuPaths.creditListeDemandes,
+      // menuPaths.creditSuivi,
+    ]
   };
 
   // Fonction améliorée pour vérifier si un chemin est actif
@@ -186,6 +216,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     if (isGroupActive('CaisseEspece')) setShowCaisseEspece(true);
     if (isGroupActive('Versement')) setShowVersementMenu(true);
     if (isGroupActive('Settings') && !isActivePath(menuPaths.agenceForm)) setShowSettingsMenu(true);
+    if (isGroupActive('Credit')) setShowCreditMenu(true); // Ouvrir automatiquement le menu Crédit si actif
   };
 
   // Effet pour gérer l'ouverture automatique des menus
@@ -309,6 +340,195 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
             </Link>
           );
         })}
+
+        {/* MENU Crédit (ajouté après les items principaux) */}
+        <div className="mb-2">
+          <div 
+            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+              isGroupActive('Credit') ? 'text-white' : 'text-secondary hover-bg-light'
+            }`}
+            style={{ 
+              background: isGroupActive('Credit') ? activeGradient : 'transparent',
+              cursor: 'pointer',
+              justifyContent: sidebarOpen ? 'space-between' : 'center'
+            }}
+            onClick={() => {
+              if (sidebarOpen) setShowCreditMenu(!showCreditMenu);
+            }}
+            title={!sidebarOpen ? 'Crédit' : ''}
+          >
+            <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
+              <PiggyBank size={20} strokeWidth={isGroupActive('Credit') ? 3 : 2} />
+              {sidebarOpen && <span className="small fw-bold">Crédit</span>}
+            </div>
+            {sidebarOpen && showCreditMenu && (
+              <ChevronDown 
+                size={16} 
+                className={`transition-all ${showCreditMenu ? 'rotate-180' : ''}`}
+                style={{ transition: 'transform 0.2s ease' }}
+              />
+            )}
+          </div>
+          
+          {/* Sous-menu Crédit */}
+          {showCreditMenu && sidebarOpen && (
+            <div className="ms-4 mt-1">
+            {/* Dans la section du sous-menu Crédit */}
+<Link
+  to={menuPaths.creditNouvelleDemande}
+  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+    isActivePath(menuPaths.creditNouvelleDemande) 
+      ? 'text-white fw-bold' 
+      : 'text-secondary hover-bg-light'
+  }`}
+  style={{ 
+    background: isActivePath(menuPaths.creditNouvelleDemande) ? activeGradient : 'transparent',
+    transition: 'all 0.2s ease'
+  }}
+  onClick={(e) => e.stopPropagation()}
+>
+  <FilePlus size={16} strokeWidth={isActivePath(menuPaths.creditNouvelleDemande) ? 3 : 2} />
+  Nouvelle demande
+</Link>
+
+<Link
+                to={menuPaths.creditNouvelleDemandeFlash}
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  isActivePath(menuPaths.creditNouvelleDemandeFlash) 
+                    ? 'text-white fw-bold' 
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{ 
+                  background: isActivePath(menuPaths.creditNouvelleDemandeFlash) ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <List size={16} strokeWidth={isActivePath(menuPaths.creditNouvelleDemandeFlash) ? 3 : 2} />
+                Demande de credit flash
+              </Link>
+              <Link
+                to={menuPaths.creditMesDemandes}
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  isActivePath(menuPaths.creditMesDemandes)
+                    ? 'text-white fw-bold'
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{
+                  background: isActivePath(menuPaths.creditMesDemandes) ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <CreditCard size={16} strokeWidth={isActivePath(menuPaths.creditMesDemandes) ? 3 : 2} />
+                Mes demandes
+              </Link>
+
+              {/* Workflow Dashboards */}
+              <Link
+                to={menuPaths.creditAnalysteDashboard}
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  isActivePath(menuPaths.creditAnalysteDashboard)
+                    ? 'text-white fw-bold'
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{
+                  background: isActivePath(menuPaths.creditAnalysteDashboard) ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <BarChart3 size={16} strokeWidth={isActivePath(menuPaths.creditAnalysteDashboard) ? 3 : 2} />
+                Analyste de Crédit
+              </Link>
+
+              <Link
+                to={menuPaths.creditChefAgenceDashboard}
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  isActivePath(menuPaths.creditChefAgenceDashboard)
+                    ? 'text-white fw-bold'
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{
+                  background: isActivePath(menuPaths.creditChefAgenceDashboard) ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <BusinessIcon size={16} strokeWidth={isActivePath(menuPaths.creditChefAgenceDashboard) ? 3 : 2} />
+                Chef d'Agence
+              </Link>
+
+              <Link
+                to={menuPaths.creditAssistantComptableDashboard}
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  isActivePath(menuPaths.creditAssistantComptableDashboard)
+                    ? 'text-white fw-bold'
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{
+                  background: isActivePath(menuPaths.creditAssistantComptableDashboard) ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <AccountBalanceIcon size={16} strokeWidth={isActivePath(menuPaths.creditAssistantComptableDashboard) ? 3 : 2} />
+                Assistant Comptable
+              </Link>
+
+              <Link
+                to={menuPaths.creditChefComptableDashboard}
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  isActivePath(menuPaths.creditChefComptableDashboard)
+                    ? 'text-white fw-bold'
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{
+                  background: isActivePath(menuPaths.creditChefComptableDashboard) ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Calculator size={16} strokeWidth={isActivePath(menuPaths.creditChefComptableDashboard) ? 3 : 2} />
+                Chef Comptable
+              </Link>
+
+              <Link
+                to={menuPaths.creditComiteAgenceDashboard}
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                  isActivePath(menuPaths.creditComiteAgenceDashboard)
+                    ? 'text-white fw-bold'
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{
+                  background: isActivePath(menuPaths.creditComiteAgenceDashboard) ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <GavelIcon size={16} strokeWidth={isActivePath(menuPaths.creditComiteAgenceDashboard) ? 3 : 2} />
+                Comité d'Agence
+              </Link>
+
+              <Link
+                to={menuPaths.creditAssistantJuridiqueDashboard}
+                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                  isActivePath(menuPaths.creditAssistantJuridiqueDashboard)
+                    ? 'text-white fw-bold'
+                    : 'text-secondary hover-bg-light'
+                }`}
+                style={{
+                  background: isActivePath(menuPaths.creditAssistantJuridiqueDashboard) ? activeGradient : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Description size={16} strokeWidth={isActivePath(menuPaths.creditAssistantJuridiqueDashboard) ? 3 : 2} />
+                Assistant Juridique
+              </Link>
+            </div>
+          )}
+        </div>
 
         {/* MENU Plan-comptable */}
         <div className="mb-2">
@@ -916,40 +1136,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
                             <DollarSign size={12} strokeWidth={isActivePath(menuPaths.versement, true) ? 3 : 2} />
                             Versement espèce
                           </Link>
-                          {/* les different bordereau de versement 
-                          <Link
-                            to="/versement/client"
-                            className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                              isActivePath('/versement/client') 
-                                ? 'text-white fw-bold' 
-                                : 'text-secondary hover-bg-light'
-                            }`}
-                            style={{ 
-                              background: isActivePath('/versement/client') ? activeGradient : 'transparent',
-                              transition: 'all 0.2s ease'
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <FileCheck size={12} />
-                            Bordereau de Versement Client
-                          </Link>
-                          
-                          <Link
-                            to="/versement/ac"
-                            className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                              isActivePath('/versement/ac') 
-                                ? 'text-white fw-bold' 
-                                : 'text-secondary hover-bg-light'
-                            }`}
-                            style={{ 
-                              background: isActivePath('/versement/ac') ? activeGradient : 'transparent',
-                              transition: 'all 0.2s ease'
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <FileSpreadsheet size={12} />
-                            Bordereau de Versement AC
-                          </Link>*/}
                         </div>
                       )}
                     </div>

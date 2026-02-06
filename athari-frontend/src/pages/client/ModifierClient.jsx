@@ -172,7 +172,7 @@ export default function ModifierClient() {
                     <Grid container spacing={3}>
                         
                         {/* COLONNE GAUCHE - PHOTO & STATUS */}
-                        <Grid item xs={12} md={4}>
+                        <Grid item xs={12} size={{ md: 4 }}>
                             <Card sx={{ borderRadius: 5, mb: 3, boxShadow: '0 10px 30px rgba(0,0,0,0.04)' }}>
                                 <CardContent sx={{ textAlign: 'center', py: 4 }}>
                                     <Badge
@@ -233,18 +233,18 @@ export default function ModifierClient() {
                                 <Grid container spacing={2}>
                                     {isPhysique ? (
                                         <>
-                                            <Grid item xs={12} md={8}><TextField fullWidth label="Nom et Prénoms" name="nom_prenoms" value={formData.physique.nom_prenoms || ''} onChange={(e) => handleNestedChange('physique', e)} /></Grid>
-                                            <Grid item xs={12} md={4}><TextField select fullWidth label="Sexe" name="sexe" value={formData.physique.sexe || ''} onChange={(e) => handleNestedChange('physique', e)}><MenuItem value="M">Masculin</MenuItem><MenuItem value="F">Féminin</MenuItem></TextField></Grid>
-                                            <Grid item xs={12} md={6}><TextField fullWidth label="Nationalité" name="nationalite" value={formData.physique.nationalite || ''} onChange={(e) => handleNestedChange('physique', e)} /></Grid>
-                                            <Grid item xs={12} md={6}><TextField fullWidth type="date" InputLabelProps={{ shrink: true }} label="Date de Naissance" name="date_naissance" value={formData.physique.date_naissance || ''} onChange={(e) => handleNestedChange('physique', e)} /></Grid>
-                                            <Grid item xs={12} md={6}><TextField fullWidth label="Profession" name="profession" value={formData.physique.profession || ''} onChange={(e) => handleNestedChange('physique', e)} /></Grid>
-                                            <Grid item xs={12} md={6}><TextField fullWidth label="Employeur" name="employeur" value={formData.physique.employeur || ''} onChange={(e) => handleNestedChange('physique', e)} /></Grid>
+                                            <Grid item xs={12} size={{ md: 8 }}><TextField fullWidth label="Nom et Prénoms" name="nom_prenoms" value={formData.physique.nom_prenoms || ''} onChange={(e) => handleNestedChange('physique', e)} /></Grid>
+                                            <Grid item xs={12} size={{ md: 4 }}><TextField select fullWidth label="Sexe" name="sexe" value={formData.physique.sexe || ''} onChange={(e) => handleNestedChange('physique', e)}><MenuItem value="M">Masculin</MenuItem><MenuItem value="F">Féminin</MenuItem></TextField></Grid>
+                                            <Grid item xs={12} size={{ md: 6 }}><TextField fullWidth label="Nationalité" name="nationalite" value={formData.physique.nationalite || ''} onChange={(e) => handleNestedChange('physique', e)} /></Grid>
+                                            <Grid item xs={12} size={{ md: 6 }}><TextField fullWidth type="date" InputLabelProps={{ shrink: true }} label="Date de Naissance" name="date_naissance" value={formData.physique.date_naissance || ''} onChange={(e) => handleNestedChange('physique', e)} /></Grid>
+                                            <Grid item xs={12} size={{ md: 6 }}><TextField fullWidth label="Profession" name="profession" value={formData.physique.profession || ''} onChange={(e) => handleNestedChange('physique', e)} /></Grid>
+                                            <Grid item xs={12} size={{ md: 6 }}><TextField fullWidth label="Employeur" name="employeur" value={formData.physique.employeur || ''} onChange={(e) => handleNestedChange('physique', e)} /></Grid>
                                         </>
                                     ) : (
                                         <>
-                                            <Grid item xs={12} md={12}><TextField fullWidth label="Raison Sociale" name="raison_sociale" value={formData.morale.raison_sociale || ''} onChange={(e) => handleNestedChange('morale', e)} /></Grid>
-                                            <Grid item xs={12} md={6}><TextField fullWidth label="RCCM" name="rccm" value={formData.morale.rccm || ''} onChange={(e) => handleNestedChange('morale', e)} /></Grid>
-                                            <Grid item xs={12} md={6}><TextField fullWidth label="NIU" name="niu" value={formData.morale.niu || ''} onChange={(e) => handleNestedChange('morale', e)} /></Grid>
+                                            <Grid item xs={12} size={{ md: 12 }}><TextField fullWidth label="Raison Sociale" name="raison_sociale" value={formData.morale.raison_sociale || ''} onChange={(e) => handleNestedChange('morale', e)} /></Grid>
+                                            <Grid item xs={12} size={{ md: 6 }}><TextField fullWidth label="RCCM" name="rccm" value={formData.morale.rccm || ''} onChange={(e) => handleNestedChange('morale', e)} /></Grid>
+                                            <Grid item xs={12} size={{ md: 6 }}><TextField fullWidth label="NIU" name="niu" value={formData.morale.niu || ''} onChange={(e) => handleNestedChange('morale', e)} /></Grid>
                                         </>
                                     )}
                                 </Grid>
@@ -252,21 +252,21 @@ export default function ModifierClient() {
                                 <Typography variant="h6" fontWeight="800" sx={{ mt: 4, mb: 1 }}>Coordonnées & Localisation</Typography>
                                 <Divider sx={{ mb: 3 }} />
                                 <Grid container spacing={2}>
-                                    <Grid item xs={12} md={6}><TextField fullWidth label="Téléphone" name="telephone" value={formData.telephone || ''} onChange={handleInputChange} /></Grid>
-                                    <Grid item xs={12} md={6}><TextField fullWidth label="Email" name="email" value={formData.email || ''} onChange={handleInputChange} /></Grid>
-                                    <Grid item xs={12} md={4}><TextField fullWidth label="Ville" name="adresse_ville" value={formData.adresse_ville || ''} onChange={handleInputChange} /></Grid>
-                                    <Grid item xs={12} md={4}><TextField fullWidth label="Quartier" name="adresse_quartier" value={formData.adresse_quartier || ''} onChange={handleInputChange} /></Grid>
-                                    <Grid item xs={12} md={4}><TextField fullWidth label="Boite Postale" name="bp" value={formData.bp || ''} onChange={handleInputChange} /></Grid>
+                                    <Grid item xs={12} size={{ md: 6 }}><TextField fullWidth label="Téléphone" name="telephone" value={formData.telephone || ''} onChange={handleInputChange} /></Grid>
+                                    <Grid item xs={12} size={{ md: 6 }}><TextField fullWidth label="Email" name="email" value={formData.email || ''} onChange={handleInputChange} /></Grid>
+                                    <Grid item xs={12} size={{ md: 4 }}><TextField fullWidth label="Ville" name="adresse_ville" value={formData.adresse_ville || ''} onChange={handleInputChange} /></Grid>
+                                    <Grid item xs={12} size={{ md: 4 }}><TextField fullWidth label="Quartier" name="adresse_quartier" value={formData.adresse_quartier || ''} onChange={handleInputChange} /></Grid>
+                                    <Grid item xs={12} size={{ md: 4 }}><TextField fullWidth label="Boite Postale" name="bp" value={formData.bp || ''} onChange={handleInputChange} /></Grid>
                                 </Grid>
 
                                  <Typography variant="h6" fontWeight="800" sx={{ mt: 4, mb: 1 }}>information du conjoint </Typography>
                                 <Divider sx={{ mb: 3 }} />
                                 <Grid container spacing={2}>
-                                    <Grid item xs={12} md={6}><TextField fullWidth label="Nom conjoint" name="nom_conjoint" value={formData.nom_conjoint || ''} onChange={handleInputChange} /></Grid>
-                                    <Grid item xs={12} md={6}><TextField fullWidth type="date" name="date_naissance_conjoint"InputLabelProps={{ shrink: true }} value={formData.date_naissance_conjoint || ''} onChange={handleInputChange} /></Grid>
-                                    <Grid item xs={12} md={4}><TextField fullWidth label="cni conjoint" name="cni_conjoint" value={formData.cni_conjoint || ''} onChange={handleInputChange} /></Grid>
-                                    <Grid item xs={12} md={4}><TextField fullWidth label="salaire" name="salaire" value={formData.salaire|| ''} onChange={handleInputChange} /></Grid>
-                                    <Grid item xs={12} md={4}><TextField fullWidth label=" profession conjoint" name="profession_conjoint" value={formData.profession_conjoint || ''} onChange={handleInputChange} /></Grid>
+                                    <Grid item xs={12} size={{ md: 6 }}><TextField fullWidth label="Nom conjoint" name="nom_conjoint" value={formData.nom_conjoint || ''} onChange={handleInputChange} /></Grid>
+                                    <Grid item xs={12} size={{ md: 6 }}><TextField fullWidth type="date" name="date_naissance_conjoint"InputLabelProps={{ shrink: true }} value={formData.date_naissance_conjoint || ''} onChange={handleInputChange} /></Grid>
+                                    <Grid item xs={12} size={{ md: 4 }}><TextField fullWidth label="cni conjoint" name="cni_conjoint" value={formData.cni_conjoint || ''} onChange={handleInputChange} /></Grid>
+                                    <Grid item xs={12} size={{ md: 4 }}><TextField fullWidth label="salaire" name="salaire" value={formData.salaire|| ''} onChange={handleInputChange} /></Grid>
+                                    <Grid item xs={12} size={{ md: 4 }}><TextField fullWidth label=" profession conjoint" name="profession_conjoint" value={formData.profession_conjoint || ''} onChange={handleInputChange} /></Grid>
                                 </Grid>
                             </Paper>
                         </Grid>

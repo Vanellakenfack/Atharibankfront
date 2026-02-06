@@ -235,18 +235,18 @@ export default function PlanComptableList() {
         </DialogTitle>      
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} md={4}>
-              <TextField 
-                fullWidth label="Code" 
-                value={newAccount.code} 
-                onChange={(e) => setNewAccount({...newAccount, code: e.target.value})} 
+            <Grid item xs={12} size={{ md: 4 }}>
+              <TextField
+                fullWidth label="Code"
+                value={newAccount.code}
+                onChange={(e) => setNewAccount({...newAccount, code: e.target.value})}
               />
             </Grid>
-            <Grid item xs={12} md={8}>
-              <TextField 
-                fullWidth label="Intitulé" 
-                value={newAccount.libelle} 
-                onChange={(e) => setNewAccount({...newAccount, libelle: e.target.value})} 
+            <Grid item xs={12} size={{ md: 8 }}>
+              <TextField
+                fullWidth label="Intitulé"
+                value={newAccount.libelle}
+                onChange={(e) => setNewAccount({...newAccount, libelle: e.target.value})}
               />
             </Grid>
             <Grid item xs={12}>

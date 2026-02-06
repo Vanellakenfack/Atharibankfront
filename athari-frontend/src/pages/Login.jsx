@@ -15,7 +15,7 @@ import {
 import EmailIcon from "@mui/icons-material/Email";
 import LockIcon from "@mui/icons-material/Lock";
 import logo from "../assets/img/logo.png";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -34,7 +34,7 @@ export default function Login() {
     setError(null);
   };
 
-  // Logique de connexion 
+  // Logique de connexion
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -51,24 +51,26 @@ export default function Login() {
 
       console.log('Réponse API:', response.data); // DEBUG: vérifier la structure
 
-        // ADAPTEZ selon votre API :
-      const authToken = response.data.authToken || response.data.token;
+      // According to API documentation, response structure is:
+      // { token, token_type, refreshToken, user }
+      const authToken = response.data.token;
       const user = response.data.user;
-        
+      const refreshToken = response.data.refreshToken;
+
       if (!authToken || !user) {
           throw new Error('Token ou utilisateur manquant dans la réponse');
       }
-      
-      login(authToken, user);
+
+      login(authToken, user, refreshToken);
       navigate('/dashboard', { replace: true });
 
     } catch (err) {
       console.error('Erreur de connexion:', err);
-      
+
       const errorData = err.response?.data;
-      
+
       if (errorData?.errors?.email) {
-        setError(errorData.errors.email[0]); 
+        setError(errorData.errors.email[0]);
       } else if (errorData?.errors?.password) {
         setError(errorData.errors.password[0]);
       } else if (errorData?.message) {

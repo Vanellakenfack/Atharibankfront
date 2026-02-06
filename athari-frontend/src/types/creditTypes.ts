@@ -1,0 +1,59 @@
+export interface Application {
+  id: number;
+  numero_demande: string;
+  montant: number;
+  duree: number;
+  statut: string;
+  date_demande: string;
+  created_at: string;
+  credit_type_id: number;
+  client_info?: {
+    nom: string;
+    prenom: string;
+  };
+  compte_info?: {
+    numero_compte: string;
+    client_id: number;
+  };
+  credit_type_info?: {
+    description: string;
+    credit_characteristics?: string;
+    code?: string;
+  };
+  taux_interet: number;
+  interet_total: number;
+  frais_etude: number;
+  frais_dossier?: number;
+  montant_total: number;
+  penalite_par_jour?: number;
+  calcul_details?: any;
+  source_revenus?: string;
+  revenus_mensuels?: number;
+  autres_revenus?: number;
+  montant_dettes?: number;
+  description_dette?: string;
+  nom_banque?: string;
+  numero_banque?: string;
+  code_mise_en_place?: string;
+  note_credit?: string;
+  plan_epargne?: number;
+  photo_4x4?: string;
+  plan_localisation?: string;
+  facture_electricite?: string;
+  casier_judiciaire?: string;
+  historique_compte?: string;
+  geolocalisation_img?: string;
+  plan_localisation_activite_img?: string;
+  photo_activite_img?: string;
+  numero_personne_contact?: string;
+  demande_credit_img?: string;
+  observation?: string;
+  avis?: any[];
+  pv_generated?: boolean;
+  movement_executed?: boolean;
+  comptable_opinion_given?: boolean;
+  pv_data?: any;
+  movement_data?: any;
+  client?: any;
+  type_credit?: any;
+}

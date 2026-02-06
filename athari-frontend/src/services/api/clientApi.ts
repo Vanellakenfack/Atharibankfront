@@ -48,7 +48,7 @@ export const planComptableService = {
     try {
       const response = await api.get('/plan-comptable/categories');
       return response.data.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur lors de la récupération des catégories comptables:', error);
       throw error;
     }
@@ -58,21 +58,21 @@ export const planComptableService = {
   async getChapitres(categorieId: string | null = null, searchTerm: string = '') {
     try {
       const params: Record<string, any> = {};
-      
+
       // Ne pas ajouter categorie_id s'il est null ou undefined
       if (categorieId !== null && categorieId !== undefined) {
         params.categorie_id = categorieId;
       }
-      
+
       // Ajouter le terme de recherche s'il est fourni
       if (searchTerm) {
         params.search = searchTerm;
       }
-      
+
       console.log('Paramètres de la requête getChapitres:', params);
       const response = await api.get('/plan-comptable/comptes', { params });
       return response.data.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur lors de la récupération des chapitres:', error);
       if (error.response) {
         console.error('Détails de l\'erreur:', {
@@ -111,7 +111,7 @@ export const clientService = {
       const response = await api.get('/clients');
       console.log('Réponse reçue:', response.data);
       return response.data.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur détaillée lors de la récupération des clients:', {
         message: error.message,
         status: error.response?.status,
@@ -125,8 +125,15 @@ export const clientService = {
   async getClientById(id: number) {
     try {
       const response = await api.get(`/clients/${id}`);
-      return response.data.data;
-    } catch (error) {
+      return response.data.data || response.data;
+    } catch (error: any) {
+      if (error.response?.status === 403) {
+        console.warn(`Accès refusé (403) pour le client ${id}: Permissions insuffisantes`);
+        // Throw a specific error that can be caught by the component
+        const permissionError = new Error(`Accès refusé: Vous n'avez pas les permissions pour consulter les détails du client ${id}`) as any;
+        permissionError.status = 403;
+        throw permissionError;
+      }
       console.error(`Erreur lors de la récupération du client ${id}:`, error);
       throw error;
     }

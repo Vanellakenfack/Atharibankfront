@@ -1,8 +1,7 @@
-import React from 'react';
-import { Routes, Route, Navigate,Link } from "react-router-dom";
-import FormClient from '../pages/client/FormClient';
-import Login from '../pages/Login'; 
+import { Routes, Route, Link } from 'react-router-dom';
+import ComiteAgenceDashboard from "../pages/credit/ComiteAgenceDashboard";
 import Home from '../pages/Home';
+import Login from '../pages/Login';
 import ListeClient from '../pages/client/ListeClient';
 import RoleManagement from "../pages/users/RoleManagement";
 import UserManagement from "../pages/users/UserManagement";
@@ -13,6 +12,7 @@ import AuditLogView from '../pages/AuditLogView';
 import Agence from '../pages/agences/Agence';
 import FormClientMorale from '../pages/client/FormClientMorale';
 import ChoicePage from '../pages/client/ChoicePage';
+import FormClient from '../pages/client/FormClient';
 import DetailsClient from '../pages/client/DetailsClient';
 import ModifierClient from '../pages/client/ModifierClient';
 import TypeCompteForm from '../pages/compte/TypeCompteForm';
@@ -38,8 +38,14 @@ import DashboardCaissieres from '../pages/TransactionFrontOffice/DasbordCaisse/D
 import RetraitEspeces from '../pages/TransactionFrontOffice/TransactionCaisseEspece/RetraitEspeces.js';
 import ValidationTransaction from '../pages/TransactionsAdministratives/ValidationTransaction.js';
 import JournalCaissePage from '../pages/journal/JournalCaissePage.js';
-
-// Ajoute "Link" dans l'importation existante
+import NouvelleDemandeCredit from "../pages/credit/nouvelle-demande.jsx";
+import NouvelleDemandeFlash from "../pages/credit/nouvelle-demande-flash";
+import MesDemandes from "../pages/credit/MesDemandes.jsx";
+import CreditAnalystDashboard from "../pages/credit/CreditAnalystDashboard";
+import ChefAgenceDashboard from "../pages/credit/ChefAgenceDashboard";
+import AssistantComptableDashboard from "../pages/credit/AssistantComptableDashboard";
+import ChefComptableDashboard from "../pages/credit/ChefComptableDashboard";
+import AssistantJuridiqueDashboard from "../pages/credit/AssistantJuridiqueDashboard";
 
 const AppRoutes = () => {
   return (
@@ -117,10 +123,20 @@ const AppRoutes = () => {
       <Route path='/versement/ac' element={<BordereauVersementAC />} />
       <Route path='/entrees-sorties-caisse' element={<EntreesSortiesCaisse />} />
       <Route path='/Transfert-Inter-Caisse' element={<TransfertInterCaisse />} />
-      <Route path='/Dashboard-Caissieres' element={<DashboardCaissieres />} />            
+      <Route path='/Dashboard-Caissieres' element={<DashboardCaissieres />} />
       <Route path='/Retrait-Especes' element={<RetraitEspeces />} />
       <Route path='/validation-transaction' element={<ValidationTransaction />} />
 
+      {/* Credit routes */}
+      <Route path="/credit/nouvelle-demande" element={<NouvelleDemandeCredit />} />
+      <Route path="/credit/nouvelle-demande-flash" element={<NouvelleDemandeFlash />} />
+      <Route path="/credit/MesDemandes" element={<MesDemandes />} />
+      <Route path="/credit/analyste-dashboard" element={<CreditAnalystDashboard />} />
+      <Route path="/credit/chef-agence-dashboard" element={<ChefAgenceDashboard />} />
+      <Route path="/credit/assistant-comptable-dashboard" element={<AssistantComptableDashboard />} />
+      <Route path="/credit/chef-comptable-dashboard" element={<ChefComptableDashboard />} />
+      <Route path="/credit/comite-agence-dashboard" element={<ComiteAgenceDashboard />} />
+      <Route path="/credit/assistant-juridique-dashboard" element={<AssistantJuridiqueDashboard />} />
       </Route>
 
       {/* ==========================================
