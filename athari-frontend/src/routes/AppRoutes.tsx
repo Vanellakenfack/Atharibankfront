@@ -1,5 +1,4 @@
-import React from 'react';
-import { Routes, Route, Navigate,Link } from "react-router-dom";
+import { Routes, Route, Link } from "react-router-dom";
 import FormClient from '../pages/client/FormClient';
 import Login from '../pages/Login'; 
 import Home from '../pages/Home';
@@ -40,13 +39,22 @@ import ValidationTransaction from '../pages/TransactionsAdministratives/Validati
 import JournalCaissePage from '../pages/journal/JournalCaissePage.js';
 import AddGestionnaire from '../pages/gestionnaire/AddGestionnaire.js';
 import ListGestionnaire from '../pages/gestionnaire/ListGestionnaire.js';
-import EditGestionnaire from '../pages/gestionnaire/EditGestionnaire.js';
 import ValidationComptes from '../pages/validerCompte/ValidationComptes.js';
 import TraitementFinJournee from '../pages/TransactionsAdministratives/TraitementFinJournee.js';
 import RetraitDistance from '../pages/TransactionFrontOffice/TransactionCaisseEspece/RetraitDistance.jsx';
 import ValidationChefAgence from '../pages/validationca/ValidationChefAgence.jsx';
+
+import TransactionDigitale from '../pages/TransactionFrontOffice/TransactionCaisseEspece/TransactionDigitale.jsx';
 import ListeValidationRetrait from '../pages/TransactionFrontOffice/TransactionCaisseEspece/validationcaisse/ListeValidationRetrait.jsx';
-// Ajoute "Link" dans l'importation existante
+import CreationODGenerique from '../pages/od/CreationODGenerique.js';
+import CreationODCharge from '../pages/od/CreationODCharge.js';
+import ChoicePageOd from '../pages/od/ChoicePageOd';
+import ODJournal from '../pages/od/ODJournal.js';
+import ODGestionValidation from '../pages/od/ODGestionValidation.js';
+import CreatePageMataboost from '../pages/od/CreatePageMataboost';
+import CreatePageEpargneJournaliere from '../pages/od/CreatePageEpargneJournaliere';
+import CreerOdModelesPage from '../pages/od/CreerOdModelesPage'
+import NewModel from '../pages/od/NewModel'
 
 const AppRoutes = () => {
   return (
@@ -132,9 +140,10 @@ const AppRoutes = () => {
             <Route path='/Retrait-distance' element={<RetraitDistance/>} />
         <Route path='/validation_retraitd' element={<ValidationChefAgence/>} />
       <Route path='/validation-transaction' element={<ValidationTransaction />} />
-      <Route path='/listevalidationRD' element={<ListeValidationRetrait />}  />  
+      <Route path='/listevalidationRD' element={<ListeValidationRetrait />}  /> TransactionDigitale 
 
-    
+          <Route path='/transactiondigitale' element={<TransactionDigitale />}  />  
+
 
 
       <Route path='/AddGestionnaire' element={<AddGestionnaire />} />
@@ -142,6 +151,23 @@ const AppRoutes = () => {
       <Route path='/ValidationComptes' element={<ValidationComptes />} />
 
       </Route>
+
+
+
+
+       {/* ==========================================
+          GESTION DES OD
+          ========================================== */}
+      <Route path='/Creation-od-generique' element={<CreationODGenerique/>} />
+      <Route path='/Creation-od-charge' element={<CreationODCharge/>} />
+      <Route path='/ChoicePageOd/ODJournal' element={<ODJournal/>} />
+      <Route path='/ODGestionValidation' element={<ODGestionValidation/>} />
+      <Route path='/ChoicePageOd' element={<ChoicePageOd/>} />
+      <Route path='/CreatePageMataboost' element={<CreatePageMataboost/>} />
+      <Route path='/CreatePageEpargneJournaliere' element={<CreatePageEpargneJournaliere/>} />
+      <Route path='/CreerOdModelesPage' element={<CreerOdModelesPage />} />
+      <Route path='/Nouveau-Model' element={<NewModel />} />
+
 
       {/* ==========================================
           GESTION DES ERREURS

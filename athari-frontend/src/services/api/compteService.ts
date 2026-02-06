@@ -135,8 +135,49 @@ export const compteService = {
         solde_bloque: 0,
         devise: 'XOF',
         statut: 'inactif',
-        type_compte: { id: 0, libelle: 'Inconnu' },
-        client: { id: 0, nom: 'Inconnu', prenom: '' },
+        client_id: 0,
+        type_compte_id: 0,
+        chapitre_comptable_id: null,
+        plan_comptable_id: null,
+        gestionnaire_nom: '',
+        gestionnaire_prenom: '',
+        gestionnaire_code: '',
+        rubriques_mata: null,
+        duree_blocage_mois: null,
+        notice_acceptee: false,
+        date_acceptation_notice: null,
+        signature_path: null,
+        date_ouverture: new Date().toISOString(),
+        date_cloture: null,
+        observations: null,
+        deleted_at: null,
+        type_compte: { 
+          id: 0, 
+          code: '',
+          libelle: 'Inconnu',
+          description: '',
+          est_mata: false,
+          necessite_duree: false,
+          est_islamique: false,
+          actif: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        client: { 
+          id: 0, 
+          num_client: '',
+          type_client: '',
+          nom: 'Inconnu', 
+          prenom: '',
+          telephone: '',
+          email: null,
+          adresse_ville: '',
+          adresse_quartier: '',
+          bp: '',
+          pays_residence: '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -192,7 +233,7 @@ export const compteService = {
       // Validation de la durée de blocage
       let dureeFormatee: number | undefined = undefined;
       
-      if (duree_blocage_mois !== null && duree_blocage_mois !== undefined && duree_blocage_mois !== '') {
+      if (duree_blocage_mois !== null && duree_blocage_mois !== undefined && duree_blocage_mois !== ('' as any)) {
         // Convertir en nombre entier
         const dureeNum = typeof duree_blocage_mois === 'string' 
           ? parseInt(duree_blocage_mois, 10)

@@ -1,4 +1,5 @@
-import api from './api/axios';
+import ApiClient from './api/ApiClient';
+
 
 /**
  * Service pour la gestion des opérations MATA (Mouvement Autonome de Toutes les Activités)
@@ -8,7 +9,7 @@ export const mataService = {
    * Récupère l'historique des mouvements MATA d'un compte
    */
   async getMouvements(compteId: string, filters: any = {}) {
-    const response = await api.get(`/comptes/${compteId}/mouvements-mata`, { params: filters });
+    const response = await ApiClient.get(`/comptes/${compteId}/mouvements-mata`, { params: filters });
     return response.data;
   },
 
@@ -16,7 +17,7 @@ export const mataService = {
    * Récupère le récapitulatif des rubriques MATA d'un compte
    */
   async getRecapitulatif(compteId: string) {
-    const response = await api.get(`/comptes/${compteId}/mata/recapitulatif`);
+    const response = await ApiClient.get(`/comptes/${compteId}/mata/recapitulatif`);
     return response.data;
   },
 
@@ -24,7 +25,7 @@ export const mataService = {
    * Crée un nouveau mouvement MATA
    */
   async createMouvement(compteId: string, data: any) {
-    const response = await api.post(`/comptes/${compteId}/mouvements-mata`, data);
+    const response = await ApiClient.post(`/comptes/${compteId}/mouvements-mata`, data);
     return response.data;
   },
 
@@ -32,7 +33,7 @@ export const mataService = {
    * Annule un mouvement MATA
    */
   async annulerMouvement(mouvementId: string) {
-    const response = await api.post(`/mouvements-mata/${mouvementId}/annuler`);
+    const response = await ApiClient.post(`/mouvements-mata/${mouvementId}/annuler`);
     return response.data;
   },
 
@@ -40,7 +41,7 @@ export const mataService = {
    * Récupère les statistiques des mouvements MATA
    */
   async getStatistiques(compteId: string, params: any = {}) {
-    const response = await api.get(`/comptes/${compteId}/mata/statistiques`, { params });
+    const response = await ApiClient.get(`/comptes/${compteId}/mata/statistiques`, { params });
     return response.data;
   },
 
@@ -48,7 +49,7 @@ export const mataService = {
    * Exporte les mouvements MATA au format Excel
    */
   async exporterMouvements(compteId: string, filters: any = {}) {
-    const response = await api.get(`/comptes/${compteId}/mouvements-mata/export`, {
+    const response = await ApiClient.get(`/comptes/${compteId}/mouvements-mata/export`, {
       params: filters,
       responseType: 'blob'
     });

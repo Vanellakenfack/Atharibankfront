@@ -76,33 +76,48 @@ const GuichetForm: React.FC = () => {
 
   // Charger l'état de l'agence et les guichets
   useEffect(() => {
-    console.log('🔄 Initialisation GuichetForm...');
-    
     const init = async () => {
       try {
-        const sessionId = localStorage.getItem('session_agence_id');
+        // 1. Vérifier si on a une session agence active
+        const responseAgence = await sessionService.getAgenceActive();
         
-        if (sessionId) {
-          console.log('✅ Session agence trouvée:', sessionId);
-          setAgenceSessionId(sessionId);
+        if (responseAgence.statut === 'success' && responseAgence.session) {
+          const agenceSession = responseAgence.session;
+          setAgenceSessionId(agenceSession.id);
           
-          setFormDataOuverture(prev => ({
-            ...prev,
-            agence_session_id: sessionId
-          }));
-
-          // Charger les guichets disponibles
+          // 2. Vérifier si on a une session guichet active
+          const responseGuichet = await sessionService.getGuichetActive();
+          
+          if (responseGuichet.statut === 'success' && responseGuichet.session) {
+            const guichetSession = responseGuichet.session;
+            
+            setGuichetState({
+              isOpen: true,
+              sessionId: guichetSession.id,
+              guichetId: guichetSession.guichet_id,
+              codeGuichet: guichetSession.code
+            });
+            
+            setFormDataFermeture({
+              guichet_session_id: guichetSession.id.toString(),
+              guichet_id: guichetSession.guichet_id.toString(),
+              code_guichet: guichetSession.code
+            });
+            
+            setOperation('FE');
+            
+          } else {
+            setOperation('OU');
+          }
+          
+          // 3. Charger les guichets disponibles
           await loadGuichets();
           
-          // Vérifier si un guichet est déjà ouvert
-          await checkGuichetSession();
-          
         } else {
-          console.warn('⚠️ Aucune session agence trouvée');
           showSnackbar('Ouvrez d\'abord l\'agence', 'warning');
         }
-
-      } catch (error: any) {
+        
+      } catch (error) {
         console.error('❌ Erreur initialisation:', error);
       } finally {
         setLoadingGuichets(false);
@@ -111,7 +126,6 @@ const GuichetForm: React.FC = () => {
 
     init();
   }, []);
-
   // Fonction pour vérifier l'état du guichet
   const checkGuichetSession = async () => {
     try {
@@ -698,7 +712,7 @@ const GuichetForm: React.FC = () => {
                   </form>
                 )}
 
-                {/* Informations de session */}
+                {/* Informations de session 
                 <Grid item xs={12}>
                   <Alert severity="info" icon={false}>
                     <Typography variant="body2" fontWeight="bold">
@@ -716,7 +730,7 @@ const GuichetForm: React.FC = () => {
                       - Code guichet: {formDataOuverture.code_guichet || 'Aucun'}
                     </Typography>
                   </Alert>
-                </Grid>
+                </Grid>*/}
 
                 {/* Boutons */}
                 <Grid item xs={12}>

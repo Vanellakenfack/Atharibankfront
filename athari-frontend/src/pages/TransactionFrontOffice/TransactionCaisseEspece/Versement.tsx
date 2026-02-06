@@ -286,7 +286,8 @@ const Versement = () => {
     { valeur: 100, quantite: 0 },
   ]);
   
-  const [calculating, setCalculating] = useState(false);
+  const [billetageError, setBilletageError] = useState<string>('');
+  const [montantADiviser, setMontantADiviser] = useState<string>('0');
   
   const [formData, setFormData] = useState<VersementFormData>({
     // Onglet Versement Espèces
@@ -611,38 +612,46 @@ const Versement = () => {
     newBilletage[index] = { ...newBilletage[index], [field]: Math.max(0, value) };
     setBilletage(newBilletage);
     
-    const total = newBilletage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0);
+    // Réinitialiser l'erreur de billetage
+    setBilletageError('');
     
-    setFormData(prev => ({
-      ...prev,
-      montant: total.toString()
-    }));
+    // Calculer le total du billetage
+    const totalBilletage = newBilletage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0);
+    
+    // Mettre à jour le montant à diviser
+    setMontantADiviser(totalBilletage.toString());
+    
+    // Si le total du billetage correspond au montant saisi, désactiver le champ "Montant à diviser"
+    if (formData.montant && Math.abs(totalBilletage - parseFloat(formData.montant)) < 1) {
+      setMontantADiviser('0');
+    }
   };
 
-  // Calculer le billetage à partir du montant
-  const calculateBilletageFromAmount = (montantStr: string) => {
-    const montant = parseFloat(montantStr) || 0;
-    if (montant <= 0) return;
+  // Fonction pour vérifier si le billetage correspond au montant
+  const verifyBilletage = () => {
+    const totalBilletage = billetage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0);
+    const montantSaisi = parseFloat(formData.montant) || 0;
     
-    setCalculating(true);
+    if (montantSaisi <= 0) {
+      setBilletageError('Veuillez d\'abord saisir un montant valide');
+      return false;
+    }
     
-    setTimeout(() => {
-      let remaining = montant;
-      const coupures = [10000, 5000, 2000, 1000, 500, 200, 100];
-      const newBilletage = coupures.map(valeur => {
-        const quantite = Math.floor(remaining / valeur);
-        remaining = remaining % valeur;
-        return { valeur, quantite };
-      });
-      
-      setBilletage(newBilletage);
-      
-      if (remaining > 0) {
-        showSnackbar(`Attention: ${remaining} FCFA non alloués (montant non divisible)`, 'warning');
-      }
-      
-      setCalculating(false);
-    }, 300);
+    if (totalBilletage === 0) {
+      setBilletageError('Veuillez saisir le billetage (quantité de billets)');
+      return false;
+    }
+    
+    if (Math.abs(totalBilletage - montantSaisi) < 1) {
+      setBilletageError('');
+      setMontantADiviser('0'); // Désactiver le champ car le billetage est correct
+      showSnackbar('Billetage correct !', 'success');
+      return true;
+    } else {
+      setBilletageError(`Le billetage (${totalBilletage.toLocaleString()} FCFA) ne correspond pas au montant saisi (${montantSaisi.toLocaleString()} FCFA)`);
+      showSnackbar(`Billetage incorrect. Différence: ${Math.abs(totalBilletage - montantSaisi).toLocaleString()} FCFA`, 'error');
+      return false;
+    }
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -679,6 +688,12 @@ const Versement = () => {
         return;
       }
       
+      if (!formData.provenance_fonds) {
+        showSnackbar('Veuillez indiquer la provenance des fonds', 'error');
+        return;
+      }
+      
+      // Vérifier le billetage
       const billetageValide = billetage.filter(item => item.quantite > 0);
       if (billetageValide.length === 0) {
         showSnackbar('Veuillez saisir le billetage', 'error');
@@ -688,6 +703,12 @@ const Versement = () => {
       const totalBilletage = billetageValide.reduce((sum, item) => sum + (item.valeur * item.quantite), 0);
       if (Math.abs(totalBilletage - montant) > 1) {
         showSnackbar(`Le billetage (${totalBilletage} FCFA) ne correspond pas au montant (${montant} FCFA)`, 'error');
+        return;
+      }
+      
+      // Vérifier que le billetage a été validé
+      if (montantADiviser !== '0') {
+        showSnackbar('Veuillez vérifier le billetage avant de soumettre', 'error');
         return;
       }
       
@@ -780,17 +801,7 @@ const Versement = () => {
       console.log('Type versement envoyé:', versementData.type_versement);
       console.log('Provenance des fonds:', versementData.provenance_fonds);
       
-      try {
-        const plafondCheck = await caisseServices.verifierPlafond(selectedCaisse.id, montant);
-        if (!plafondCheck.success) {
-          showSnackbar(`Attention: ${plafondCheck.message}`, 'warning');
-          if (!window.confirm(`${plafondCheck.message}\n\nVoulez-vous continuer ?`)) {
-            return;
-          }
-        }
-      } catch (error) {
-        console.warn('Erreur lors de la vérification du plafond:', error);
-      }
+     
       
       const result = await caisseServices.effectuerVersement(versementData, billetageValide);
       
@@ -873,6 +884,8 @@ const Versement = () => {
     });
     
     setBilletage(billetage.map(item => ({ ...item, quantite: 0 })));
+    setMontantADiviser('0');
+    setBilletageError('');
     setCompteDetails(null);
     setGuichets([]);
     setCaisses([]);
@@ -954,7 +967,7 @@ const Versement = () => {
                         <Grid container spacing={1.5}>
                           <Grid item xs={6}>
                             <TextField
-                              fullWidth
+                              sx={{minWidth:250}}
                               size="small"
                               label="Code Agence"
                               name="agenceCode"
@@ -966,7 +979,7 @@ const Versement = () => {
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small">
+                            <FormControl  sx={{minWidth:250}} size="small">
                               <InputLabel>Agence *</InputLabel>
                               <Select
                                 name="selectedAgence"
@@ -987,7 +1000,7 @@ const Versement = () => {
                           </Grid>
 
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small">
+                            <FormControl  sx={{minWidth:250}} size="small">
                               <InputLabel>Guichet *</InputLabel>
                               <Select
                                 name="guichet"
@@ -1010,7 +1023,7 @@ const Versement = () => {
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small">
+                            <FormControl  sx={{minWidth:250}} size="small">
                               <InputLabel>Caisse *</InputLabel>
                               <Select
                                 name="caisse"
@@ -1033,7 +1046,7 @@ const Versement = () => {
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small">
+                            <FormControl  sx={{minWidth:250}} size="small">
                               <InputLabel>Type versement *</InputLabel>
                               <Select
                                 name="typeVersement"
@@ -1050,7 +1063,7 @@ const Versement = () => {
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <TextField
+                              {/**  <TextField
                               fullWidth
                               size="small"
                               label="Agence Compte"
@@ -1058,7 +1071,7 @@ const Versement = () => {
                               value={formData.agenceCompte}
                               onChange={handleChange}
                               placeholder="Code agence du compte"
-                            />
+                            />*/}
                           </Grid>
                         </Grid>
                       </CardContent>
@@ -1147,7 +1160,7 @@ const Versement = () => {
                                   variant="outlined"
                                   size="small"
                                   required
-                                  fullWidth
+                                  sx={{minWidth:250}}
                                   InputProps={{
                                     ...params.InputProps,
                                     endAdornment: (
@@ -1305,17 +1318,6 @@ const Versement = () => {
                                 />
                               )}
                             </Box>
-                            <FormControlLabel
-                              control={
-                                <Checkbox
-                                  size="small"
-                                  name="fraisEnCompte"
-                                  checked={formData.fraisEnCompte}
-                                  onChange={handleChange}
-                                />
-                              }
-                              label="Frais en compte"
-                            />
                           </Grid>
                           
                           <Grid item xs={12} md={8}>
@@ -1327,12 +1329,7 @@ const Versement = () => {
                                   label="Montant *"
                                   name="montant"
                                   value={formData.montant}
-                                  onChange={(e) => {
-                                    handleChange(e);
-                                    if (e.target.value) {
-                                      calculateBilletageFromAmount(e.target.value);
-                                    }
-                                  }}
+                                  onChange={handleChange}
                                   placeholder="0"
                                   type="number"
                                   required
@@ -1387,30 +1384,38 @@ const Versement = () => {
                           Billetage - Saisie des coupures *
                         </Typography>
                         
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                           <TextField
                             size="small"
                             label="Montant à diviser"
-                            value={formData.montant}
-                            onChange={(e) => {
-                              setFormData(prev => ({ ...prev, montant: e.target.value }));
-                              calculateBilletageFromAmount(e.target.value);
+                            value={montantADiviser}
+                            disabled={montantADiviser === '0'}
+                            InputProps={{
+                              readOnly: montantADiviser === '0',
                             }}
                             type="number"
                             sx={{ width: 200 }}
+                            helperText={montantADiviser === '0' ? "Billetage correct !" : "Total du billetage saisi"}
                           />
+                          
                           <Button
                             variant="outlined"
-                            startIcon={calculating ? <CircularProgress size={20} /> : <CalculateIcon />}
-                            onClick={() => calculateBilletageFromAmount(formData.montant)}
-                            disabled={calculating || !formData.montant || parseFloat(formData.montant) <= 0}
+                            startIcon={<CalculateIcon />}
+                            onClick={verifyBilletage}
+                            disabled={!formData.montant || parseFloat(formData.montant) <= 0}
                           >
-                            Calculer billetage
+                            Vérifier le billetage
                           </Button>
                           <Typography variant="caption" color="text.secondary">
-                            Total: {billetage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0).toLocaleString()} FCFA
+                            Montant saisi: {formatCurrency(formData.montant)} FCFA
                           </Typography>
                         </Box>
+                        
+                        {billetageError && (
+                          <Alert severity="error" sx={{ mb: 2 }}>
+                            {billetageError}
+                          </Alert>
+                        )}
                         
                         <TableContainer component={Paper} variant="outlined">
                           <Table size="small">
@@ -1481,7 +1486,7 @@ const Versement = () => {
                         </TableContainer>
                         
                         <Alert severity="info" sx={{ mt: 2 }}>
-                          Le total du billetage doit correspondre au montant du versement
+                          Saisissez les quantités de billets pour chaque coupure, puis cliquez sur "Vérifier le billetage"
                         </Alert>
                       </CardContent>
                     </StyledCard>
@@ -1740,7 +1745,8 @@ const Versement = () => {
                     billetage.every(item => item.quantite === 0) ||
                     !formData.selectedAgence ||
                     !formData.guichet ||
-                    !formData.caisse
+                    !formData.caisse ||
+                    montantADiviser !== '0' // Le billetage doit être vérifié et correct
                   }
                 >
                   Valider le versement

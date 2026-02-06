@@ -62,3 +62,55 @@ export interface Document {
   file: File | string;
   uploadedAt: string;
 }
+
+// Type pour Compte (alias d'Account)
+export type Compte = Account;
+
+export interface TypeDeCompte {
+  id: number;
+  code: string;
+  libelle: string;
+  description: string;
+  est_mata: boolean;
+  necessite_duree: boolean;
+  est_islamique: boolean;
+  actif: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreationCompte {
+  client_id: number;
+  type_compte_id: number;
+  numero: string;
+  statut?: string;
+  duree_blocage_mois?: number | null;
+}
+
+export interface ModificationCompte extends CreationCompte {
+  id: number;
+}
+
+export interface FlitrageCompte {
+  search?: string;
+  type_compte_id?: number;
+  statut?: string;
+  page?: number;
+  per_page?: number;
+}
+
+export interface PaginationCompte {
+  current_page: number;
+  from: number;
+  last_page: number;
+  per_page: number;
+  to: number;
+  total: number;
+}
+
+export interface StatistiquesCompte {
+  total_comptes: number;
+  comptes_actifs: number;
+  comptes_bloques: number;
+  comptes_fermes: number;
+}

@@ -269,7 +269,6 @@ interface RetraitFormData {
   guichet: string;
   caisse: string;
   typeRetrait: string;
-  //agenceCompte: string;
   compte: string;
   compte_id: number | null;
   chapitre: string;
@@ -601,6 +600,8 @@ const RetraitEspeces: React.FC = () => {
   ]);
   
   const [calculating, setCalculating] = useState<boolean>(false);
+  const [billetageError, setBilletageError] = useState<string>('');
+  const [montantADiviser, setMontantADiviser] = useState<string>('0');
   
   // États pour la validation
   const [validationCode, setValidationCode] = useState<string>('');
@@ -627,7 +628,6 @@ const RetraitEspeces: React.FC = () => {
 
   // État pour le retrait à distance
 
-
   // États pour la validation du CNI
   const [clientRealCni, setClientRealCni] = useState<string>('');
   const [cniValidationError, setCniValidationError] = useState<string>('');
@@ -640,7 +640,6 @@ const RetraitEspeces: React.FC = () => {
     guichet: '',
     caisse: '',
     typeRetrait: '01',
-   // agenceCompte: '',
     compte: '',
     compte_id: null,
     chapitre: '',
@@ -677,208 +676,206 @@ const RetraitEspeces: React.FC = () => {
     netADebiter: '0',
   });
 
-  
-
-// Fonction pour générer et télécharger le reçu PDF simplifié
-const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
-  try {
-    setDownloading(true);
-    
-    // Créer un élément temporaire pour le reçu
-    const receiptElement = document.createElement('div');
-    receiptElement.style.position = 'absolute';
-    receiptElement.style.left = '-9999px';
-    receiptElement.style.top = '0';
-    receiptElement.style.width = '210mm'; // A4 width
-    receiptElement.style.minHeight = '150mm'; // Hauteur réduite
-    receiptElement.style.backgroundColor = 'white';
-    receiptElement.style.padding = '10mm';
-    receiptElement.style.fontFamily = "'Arial', sans-serif";
-    receiptElement.style.color = '#000';
-    receiptElement.style.fontSize = '12px';
-    receiptElement.style.lineHeight = '1.3';
-    
-    // Convertir le montant en lettres
-    const montantNumerique = parseFloat(receiptData.montant.replace(/\s/g, '')) || 0;
-    const montantEnLettres = numberToFrenchWords(montantNumerique).toUpperCase();
-    
-    // Contenu HTML du reçu simplifié
-    receiptElement.innerHTML = `
-      <div style="text-align: center; margin-bottom: 15px; border-bottom: 2px solid #1976d2; padding-bottom: 10px;">
-        <div style="display: inline-block; width: 60px; height: 60px; margin-right: 10px; vertical-align: middle;">
-          <img src="${logo}" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;" />
-        </div>
-        <div style="display: inline-block; vertical-align: middle; text-align: left;">
-          <div style="font-size: 16px; font-weight: bold; color: #1976d2; margin-bottom: 2px;">
-            ATHARI FINANCIAL COOP-CA
+  // Fonction pour générer et télécharger le reçu PDF simplifié
+  const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
+    try {
+      setDownloading(true);
+      
+      // Créer un élément temporaire pour le reçu
+      const receiptElement = document.createElement('div');
+      receiptElement.style.position = 'absolute';
+      receiptElement.style.left = '-9999px';
+      receiptElement.style.top = '0';
+      receiptElement.style.width = '210mm'; // A4 width
+      receiptElement.style.minHeight = '150mm'; // Hauteur réduite
+      receiptElement.style.backgroundColor = 'white';
+      receiptElement.style.padding = '10mm';
+      receiptElement.style.fontFamily = "'Arial', sans-serif";
+      receiptElement.style.color = '#000';
+      receiptElement.style.fontSize = '12px';
+      receiptElement.style.lineHeight = '1.3';
+      
+      // Convertir le montant en lettres
+      const montantNumerique = parseFloat(receiptData.montant.replace(/\s/g, '')) || 0;
+      const montantEnLettres = numberToFrenchWords(montantNumerique).toUpperCase();
+      
+      // Contenu HTML du reçu simplifié
+      receiptElement.innerHTML = `
+        <div style="text-align: center; margin-bottom: 15px; border-bottom: 2px solid #1976d2; padding-bottom: 10px;">
+          <div style="display: inline-block; width: 60px; height: 60px; margin-right: 10px; vertical-align: middle;">
+            <img src="${logo}" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;" />
           </div>
-          <div style="font-size: 11px; color: #666;">
-            Coopérative d'Épargne et de Crédit
-          </div>
-        </div>
-      </div>
-      
-      <div style="text-align: center; margin-bottom: 20px;">
-        <div style="font-size: 14px; font-weight: bold; color: #d32f2f; margin-bottom: 5px;">
-          REÇU DE RETRAIT D'ESPÈCES
-        </div>
-        <div style="font-size: 11px; color: #666;">
-          Référence: <strong>${receiptData.reference}</strong>
-        </div>
-        <div style="font-size: 11px; color: #666;">
-          Date: ${receiptData.date}
-        </div>
-      </div>
-      
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px;">
-        <tr>
-          <td style="width: 35%; padding: 5px 0; font-weight: bold;">Compte:</td>
-          <td style="padding: 5px 0;">${receiptData.compte}</td>
-        </tr>
-        <tr>
-          <td style="width: 35%; padding: 5px 0; font-weight: bold;">Titulaire:</td>
-          <td style="padding: 5px 0;">${receiptData.titulaire}</td>
-        </tr>
-        <tr>
-          <td style="width: 35%; padding: 5px 0; font-weight: bold;">Porteur:</td>
-          <td style="padding: 5px 0;">${receiptData.porteur}</td>
-        </tr>
-        <tr>
-          <td style="width: 35%; padding: 5px 0; font-weight: bold;">Pièce d'identité:</td>
-          <td style="padding: 5px 0;">${receiptData.pieceId}</td>
-        </tr>
-        ${receiptData.agence ? `
-        <tr>
-          <td style="width: 35%; padding: 5px 0; font-weight: bold;">Agence:</td>
-          <td style="padding: 5px 0;">${receiptData.agence}</td>
-        </tr>
-        ` : ''}
-      </table>
-      
-      <div style="border: 2px solid #1976d2; border-radius: 4px; padding: 10px; margin-bottom: 15px; background-color: #f8f9fa;">
-        <div style="text-align: center; font-weight: bold; color: #1976d2; margin-bottom: 10px; font-size: 12px;">
-          DÉTAILS DU MONTANT
-        </div>
-        <div style="text-align: center;">
-          <div style="font-size: 18px; font-weight: bold; color: #d32f2f; margin-bottom: 5px;">
-            ${formatCurrency(receiptData.montant)} FCFA
-          </div>
-          <div style="font-size: 11px; font-style: italic; color: #666; margin-bottom: 10px;">
-            ${montantEnLettres} FRANCS CFA
-          </div>
-        </div>
-      </div>
-      
-      <!-- Tableau billetage compact -->
-      ${receiptData.billetage && receiptData.billetage.some(item => item.quantite > 0) ? `
-      <div style="margin-bottom: 15px;">
-        <div style="font-weight: bold; color: #1976d2; margin-bottom: 5px; font-size: 11px; text-align: center;">
-          COMPOSITION DU BILLETAGE
-        </div>
-        <table style="width: 100%; border-collapse: collapse; font-size: 10px; border: 1px solid #ddd;">
-          <thead>
-            <tr style="background-color: #f5f5f5;">
-              <th style="padding: 4px; text-align: left; border-bottom: 1px solid #ddd;">Coupure</th>
-              <th style="padding: 4px; text-align: center; border-bottom: 1px solid #ddd;">Qté</th>
-              <th style="padding: 4px; text-align: right; border-bottom: 1px solid #ddd;">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${receiptData.billetage
-              .filter(item => item.quantite > 0)
-              .map(item => `
-                <tr>
-                  <td style="padding: 4px; border-bottom: 1px solid #eee;">${item.valeur.toLocaleString()} FCFA</td>
-                  <td style="padding: 4px; text-align: center; border-bottom: 1px solid #eee;">${item.quantite}</td>
-                  <td style="padding: 4px; text-align: right; border-bottom: 1px solid #eee; font-weight: 500;">${(item.valeur * item.quantite).toLocaleString()} FCFA</td>
-                </tr>
-              `).join('')}
-            <tr style="background-color: #f9f9f9; font-weight: bold;">
-              <td style="padding: 4px; border-top: 2px solid #ddd;" colspan="2">TOTAL:</td>
-              <td style="padding: 4px; text-align: right; border-top: 2px solid #ddd; color: #1976d2;">
-                ${receiptData.billetage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0).toLocaleString()} FCFA
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      ` : ''}
-      
-      <!-- Signatures -->
-      <div style="margin-top: 25px; padding-top: 10px; border-top: 1px solid #ddd;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-          <div style="text-align: center; flex: 1;">
-            <div style="height: 40px; margin-bottom: 5px; border-bottom: 1px solid #999; position: relative;">
-              <div style="position: absolute; bottom: 5px; left: 0; right: 0; height: 1px; background-color: #999;"></div>
+          <div style="display: inline-block; vertical-align: middle; text-align: left;">
+            <div style="font-size: 16px; font-weight: bold; color: #1976d2; margin-bottom: 2px;">
+              ATHARI FINANCIAL COOP-CA
             </div>
-            <div style="font-size: 10px; font-weight: bold; color: #333;">Signature du porteur</div>
-          </div>
-          <div style="width: 30px;"></div>
-          <div style="text-align: center; flex: 1;">
-            <div style="height: 40px; margin-bottom: 5px; border-bottom: 1px solid #999; position: relative;">
-              <div style="position: absolute; bottom: 5px; left: 0; right: 0; height: 1px; background-color: #999;"></div>
+            <div style="font-size: 11px; color: #666;">
+              Coopérative d'Épargne et de Crédit
             </div>
-            <div style="font-size: 10px; font-weight: bold; color: #333;">Signature & cachet</div>
           </div>
         </div>
         
-        <div style="text-align: center; font-size: 10px; color: #666; margin-top: 10px;">
-          <div>Caissier: ${receiptData.caissierId}</div>
-          <div style="margin-top: 5px; font-size: 9px;">
-            Document généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+        <div style="text-align: center; margin-bottom: 20px;">
+          <div style="font-size: 14px; font-weight: bold; color: #d32f2f; margin-bottom: 5px;">
+            REÇU DE RETRAIT D'ESPÈCES
+          </div>
+          <div style="font-size: 11px; color: #666;">
+            Référence: <strong>${receiptData.reference}</strong>
+          </div>
+          <div style="font-size: 11px; color: #666;">
+            Date: ${receiptData.date}
           </div>
         </div>
-      </div>
+        
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px;">
+          <tr>
+            <td style="width: 35%; padding: 5px 0; font-weight: bold;">Compte:</td>
+            <td style="padding: 5px 0;">${receiptData.compte}</td>
+          </tr>
+          <tr>
+            <td style="width: 35%; padding: 5px 0; font-weight: bold;">Titulaire:</td>
+            <td style="padding: 5px 0;">${receiptData.titulaire}</td>
+          </tr>
+          <tr>
+            <td style="width: 35%; padding: 5px 0; font-weight: bold;">Porteur:</td>
+            <td style="padding: 5px 0;">${receiptData.porteur}</td>
+          </tr>
+          <tr>
+            <td style="width: 35%; padding: 5px 0; font-weight: bold;">Pièce d'identité:</td>
+            <td style="padding: 5px 0;">${receiptData.pieceId}</td>
+          </tr>
+          ${receiptData.agence ? `
+          <tr>
+            <td style="width: 35%; padding: 5px 0; font-weight: bold;">Agence:</td>
+            <td style="padding: 5px 0;">${receiptData.agence}</td>
+          </tr>
+          ` : ''}
+        </table>
+        
+        <div style="border: 2px solid #1976d2; border-radius: 4px; padding: 10px; margin-bottom: 15px; background-color: #f8f9fa;">
+          <div style="text-align: center; font-weight: bold; color: #1976d2; margin-bottom: 10px; font-size: 12px;">
+            DÉTAILS DU MONTANT
+          </div>
+          <div style="text-align: center;">
+            <div style="font-size: 18px; font-weight: bold; color: #d32f2f; margin-bottom: 5px;">
+              ${formatCurrency(receiptData.montant)} FCFA
+            </div>
+            <div style="font-size: 11px; font-style: italic; color: #666; margin-bottom: 10px;">
+              ${montantEnLettres} FRANCS CFA
+            </div>
+          </div>
+        </div>
+        
+        <!-- Tableau billetage compact -->
+        ${receiptData.billetage && receiptData.billetage.some(item => item.quantite > 0) ? `
+        <div style="margin-bottom: 15px;">
+          <div style="font-weight: bold; color: #1976d2; margin-bottom: 5px; font-size: 11px; text-align: center;">
+            COMPOSITION DU BILLETAGE
+          </div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 10px; border: 1px solid #ddd;">
+            <thead>
+              <tr style="background-color: #f5f5f5;">
+                <th style="padding: 4px; text-align: left; border-bottom: 1px solid #ddd;">Coupure</th>
+                <th style="padding: 4px; text-align: center; border-bottom: 1px solid #ddd;">Qté</th>
+                <th style="padding: 4px; text-align: right; border-bottom: 1px solid #ddd;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${receiptData.billetage
+                .filter(item => item.quantite > 0)
+                .map(item => `
+                  <tr>
+                    <td style="padding: 4px; border-bottom: 1px solid #eee;">${item.valeur.toLocaleString()} FCFA</td>
+                    <td style="padding: 4px; text-align: center; border-bottom: 1px solid #eee;">${item.quantite}</td>
+                    <td style="padding: 4px; text-align: right; border-bottom: 1px solid #eee; font-weight: 500;">${(item.valeur * item.quantite).toLocaleString()} FCFA</td>
+                  </tr>
+                `).join('')}
+              <tr style="background-color: #f9f9f9; font-weight: bold;">
+                <td style="padding: 4px; border-top: 2px solid #ddd;" colspan="2">TOTAL:</td>
+                <td style="padding: 4px; text-align: right; border-top: 2px solid #ddd; color: #1976d2;">
+                  ${receiptData.billetage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0).toLocaleString()} FCFA
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        ` : ''}
+        
+        <!-- Signatures -->
+        <div style="margin-top: 25px; padding-top: 10px; border-top: 1px solid #ddd;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+            <div style="text-align: center; flex: 1;">
+              <div style="height: 40px; margin-bottom: 5px; border-bottom: 1px solid #999; position: relative;">
+                <div style="position: absolute; bottom: 5px; left: 0; right: 0; height: 1px; background-color: #999;"></div>
+              </div>
+              <div style="font-size: 10px; font-weight: bold; color: #333;">Signature du porteur</div>
+            </div>
+            <div style="width: 30px;"></div>
+            <div style="text-align: center; flex: 1;">
+              <div style="height: 40px; margin-bottom: 5px; border-bottom: 1px solid #999; position: relative;">
+                <div style="position: absolute; bottom: 5px; left: 0; right: 0; height: 1px; background-color: #999;"></div>
+              </div>
+              <div style="font-size: 10px; font-weight: bold; color: #333;">Signature & cachet</div>
+            </div>
+          </div>
+          
+          <div style="text-align: center; font-size: 10px; color: #666; margin-top: 10px;">
+            <div>Caissier: ${receiptData.caissierId}</div>
+            <div style="margin-top: 5px; font-size: 9px;">
+              Document généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          </div>
+        </div>
+        
+        <!-- Note -->
+        <div style="margin-top: 15px; padding: 8px; background-color: #f5f5f5; border-radius: 3px; border-left: 3px solid #1976d2; font-size: 9px; color: #666;">
+          <strong>NOTE:</strong> Ce reçu fait foi de transaction. Conservez-le précieusement.
+        </div>
+      `;
       
-      <!-- Note -->
-      <div style="margin-top: 15px; padding: 8px; background-color: #f5f5f5; border-radius: 3px; border-left: 3px solid #1976d2; font-size: 9px; color: #666;">
-        <strong>NOTE:</strong> Ce reçu fait foi de transaction. Conservez-le précieusement.
-      </div>
-    `;
-    
-    // Ajouter l'élément au DOM
-    document.body.appendChild(receiptElement);
-    
-    // Générer le PDF
-    const canvas = await html2canvas(receiptElement, {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-      backgroundColor: '#FFFFFF',
-    });
-    
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4',
-    });
-    
-    const imgWidth = 190; // Largeur réduite pour marges
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    
-    // Positionner l'image au centre de la page
-    const xPos = (210 - imgWidth) / 2; // Centrer horizontalement
-    const yPos = 10; // Marge supérieure réduite
-    
-    pdf.addImage(imgData, 'PNG', xPos, yPos, imgWidth, imgHeight);
-    
-    // Télécharger le PDF
-    const fileName = `Retrait-${receiptData.reference}.pdf`;
-    pdf.save(fileName);
-    
-    // Nettoyer
-    document.body.removeChild(receiptElement);
-    
-    showSnackbar('Reçu PDF généré avec succès', 'success');
-    
-  } catch (error) {
-    console.error('Erreur lors de la génération du reçu:', error);
-    showSnackbar('Erreur lors de la génération du reçu', 'error');
-  } finally {
-    setDownloading(false);
-  }
-};
+      // Ajouter l'élément au DOM
+      document.body.appendChild(receiptElement);
+      
+      // Générer le PDF
+      const canvas = await html2canvas(receiptElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#FFFFFF',
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+      
+      const imgWidth = 190; // Largeur réduite pour marges
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      // Positionner l'image au centre de la page
+      const xPos = (210 - imgWidth) / 2; // Centrer horizontalement
+      const yPos = 10; // Marge supérieure réduite
+      
+      pdf.addImage(imgData, 'PNG', xPos, yPos, imgWidth, imgHeight);
+      
+      // Télécharger le PDF
+      const fileName = `Retrait-${receiptData.reference}.pdf`;
+      pdf.save(fileName);
+      
+      // Nettoyer
+      document.body.removeChild(receiptElement);
+      
+      showSnackbar('Reçu PDF généré avec succès', 'success');
+      
+    } catch (error) {
+      console.error('Erreur lors de la génération du reçu:', error);
+      showSnackbar('Erreur lors de la génération du reçu', 'error');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   // Fonction pour télécharger le reçu
   const downloadReceipt = async (receiptData: ReceiptData) => {
@@ -1412,38 +1409,46 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
     newBilletage[index] = { ...newBilletage[index], [field]: Math.max(0, value) };
     setBilletage(newBilletage);
     
-    const total = newBilletage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0);
+    // Réinitialiser l'erreur de billetage
+    setBilletageError('');
     
-    setFormData(prev => ({
-      ...prev,
-      montant: total.toString()
-    }));
+    // Calculer le total du billetage
+    const totalBilletage = newBilletage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0);
+    
+    // Mettre à jour le montant à diviser
+    setMontantADiviser(totalBilletage.toString());
+    
+    // Si le total du billetage correspond au montant saisi, désactiver le champ "Montant à diviser"
+    if (formData.montant && Math.abs(totalBilletage - parseFloat(formData.montant)) < 1) {
+      setMontantADiviser('0');
+    }
   };
 
-  // Calculer le billetage à partir du montant
-  const calculateBilletageFromAmount = (montantStr: string) => {
-    const montant = parseFloat(montantStr) || 0;
-    if (montant <= 0) return;
+  // Fonction pour vérifier si le billetage correspond au montant
+  const verifyBilletage = () => {
+    const totalBilletage = billetage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0);
+    const montantSaisi = parseFloat(formData.montant) || 0;
     
-    setCalculating(true);
+    if (montantSaisi <= 0) {
+      setBilletageError('Veuillez d\'abord saisir un montant valide');
+      return false;
+    }
     
-    setTimeout(() => {
-      let remaining = montant;
-      const coupures = [10000, 5000, 2000, 1000, 500, 200, 100];
-      const newBilletage = coupures.map(valeur => {
-        const quantite = Math.floor(remaining / valeur);
-        remaining = remaining % valeur;
-        return { valeur, quantite };
-      });
-      
-      setBilletage(newBilletage);
-      
-      if (remaining > 0) {
-        showSnackbar(`Attention: ${remaining} FCFA non alloués (montant non divisible)`, 'warning');
-      }
-      
-      setCalculating(false);
-    }, 300);
+    if (totalBilletage === 0) {
+      setBilletageError('Veuillez saisir le billetage (quantité de billets)');
+      return false;
+    }
+    
+    if (Math.abs(totalBilletage - montantSaisi) < 1) {
+      setBilletageError('');
+      setMontantADiviser('0'); // Désactiver le champ car le billetage est correct
+      showSnackbar('Billetage correct !', 'success');
+      return true;
+    } else {
+      setBilletageError(`Le billetage (${totalBilletage.toLocaleString()} FCFA) ne correspond pas au montant saisi (${montantSaisi.toLocaleString()} FCFA)`);
+      showSnackbar(`Billetage incorrect. Différence: ${Math.abs(totalBilletage - montantSaisi).toLocaleString()} FCFA`, 'error');
+      return false;
+    }
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -1711,7 +1716,6 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
       guichet: '',
       caisse: '',
       typeRetrait: '01',
-      //agenceCompte: '',
       compte: '',
       compte_id: null,
       chapitre: '',
@@ -1743,6 +1747,8 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
     });
     
     setBilletage(billetage.map(item => ({ ...item, quantite: 0 })));
+    setMontantADiviser('0');
+    setBilletageError('');
     setCompteDetails(null);
     setGuichets([]);
     setCaisses([]);
@@ -1848,7 +1854,7 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h4" sx={{ fontWeight: 700, color: '#1a237e' }}>
-              Retrait a distanvce
+              Retrait a distance
             </Typography>
             
             <Button
@@ -1891,11 +1897,11 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
                   icon={<Photo fontSize="small" />} 
                   iconPosition="start"
                 />
-                <Tab 
+               {/* <Tab 
                   label="Retrait à distance" 
                   icon={<CloudDownload fontSize="small" />} 
                   iconPosition="start"
-                />
+                />*/}
               </StyledTabs>
             </Box>
 
@@ -1948,7 +1954,7 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
                           </Grid>
 
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
+                            <FormControl  sx={{minWidth:250}} size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Guichet *</InputLabel>
                               <Select
                                 name="guichet"
@@ -1971,7 +1977,7 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
+                            <FormControl  sx={{minWidth:250}} size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Caisse *</InputLabel>
                               <Select
                                 name="caisse"
@@ -1994,7 +2000,7 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
+                            <FormControl  sx={{minWidth:250}} size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Type retrait *</InputLabel>
                               <Select
                                 name="typeRetrait"
@@ -2006,19 +2012,6 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
                               </Select>
                             </FormControl>
                           </Grid>
-                          
-                          {/*<Grid item xs={6}>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              label="Agence Compte"
-                              name="agenceCompte"
-                              value={formData.agenceCompte}
-                              onChange={handleChange}
-                              placeholder="Code agence du compte"
-                              sx={{ minWidth: 250 }}
-                            />
-                          </Grid>*/}
                         </Grid>
                       </CardContent>
                     </StyledCard>
@@ -2245,17 +2238,6 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
                                 />
                               )}
                             </Box>
-                            {/*<FormControlLabel
-                              control={
-                                <Checkbox
-                                  size="small"
-                                    name="fraisEnCompte"
-                                    checked={formData.fraisEnCompte}
-                                    onChange={handleChange}
-                                />
-                              }
-                              label="Frais en compte"
-                            />*/}
                           </Grid>
                           
                           <Grid item xs={12} md={8}>
@@ -2267,12 +2249,7 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
                                   label="Montant *"
                                   name="montant"
                                   value={formData.montant}
-                                  onChange={(e) => {
-                                    handleChange(e);
-                                    if (e.target.value) {
-                                      calculateBilletageFromAmount(e.target.value);
-                                    }
-                                  }}
+                                  onChange={handleChange}
                                   placeholder="0"
                                   type="number"
                                   required
@@ -2336,27 +2313,35 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
                           <TextField
                             size="small"
                             label="Montant à diviser"
-                            value={formData.montant}
-                            onChange={(e) => {
-                              setFormData(prev => ({ ...prev, montant: e.target.value }));
-                              calculateBilletageFromAmount(e.target.value);
+                            value={montantADiviser}
+                            disabled={montantADiviser === '0'}
+                            InputProps={{
+                              readOnly: montantADiviser === '0',
                             }}
                             type="number"
                             sx={{ minWidth: 250 }}
+                            helperText={montantADiviser === '0' ? "Billetage correct !" : "Total du billetage saisi"}
                           />
+                          
                           <Button
                             variant="outlined"
-                            startIcon={calculating ? <CircularProgress size={20} /> : <CalculateIcon />}
-                            onClick={() => calculateBilletageFromAmount(formData.montant)}
-                            disabled={calculating || !formData.montant || parseFloat(formData.montant) <= 0}
+                            startIcon={<CalculateIcon />}
+                            onClick={verifyBilletage}
+                            disabled={!formData.montant || parseFloat(formData.montant) <= 0}
                             sx={{ minWidth: 250 }}
                           >
-                            Calculer billetage
+                            Vérifier le billetage
                           </Button>
                           <Typography variant="caption" color="text.secondary">
-                            Total: {billetage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0).toLocaleString()} FCFA
+                            Montant saisi: {formatCurrency(formData.montant)} FCFA
                           </Typography>
                         </Box>
+                        
+                        {billetageError && (
+                          <Alert severity="error" sx={{ mb: 2 }}>
+                            {billetageError}
+                          </Alert>
+                        )}
                         
                         <TableContainer component={Paper} variant="outlined">
                           <Table size="small">
@@ -2427,7 +2412,7 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
                         </TableContainer>
                         
                         <Alert severity="info" sx={{ mt: 2 }}>
-                          Le total du billetage doit correspondre au montant du retrait
+                          Saisissez les quantités de billets pour chaque coupure, puis cliquez sur "Vérifier le billetage"
                         </Alert>
                       </CardContent>
                     </StyledCard>
@@ -2589,7 +2574,7 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
                                   </Box>
                                 } 
                                 disabled={!compteDetails?.mandataires || compteDetails.mandataires.length === 0}
-                              />
+                              />{/** 
                               <FormControlLabel 
                                 value="autre" 
                                 control={<Radio />} 
@@ -2599,7 +2584,7 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
                                     <Typography>Autre (remplir manuellement)</Typography>
                                   </Box>
                                 } 
-                              />
+                              />  */}
                             </RadioGroup>
                           </FormControl>
                         </Box>
@@ -2993,10 +2978,6 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
                 </Grid>
               </TabPanel>
 
-
-                
-
-                 
               {/* Boutons d'action */}
               {tabValue !== 4 && (
                 <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
@@ -3017,7 +2998,8 @@ const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
                       !formData.selectedAgence ||
                       !formData.guichet ||
                       !formData.caisse ||
-                      (showValidationInput && !isCodeValid) // Si validation requise, doit avoir un code valide
+                      (showValidationInput && !isCodeValid) || // Si validation requise, doit avoir un code valide
+                      montantADiviser !== '0' // Le billetage doit être vérifié et correct
                     }
                     sx={{ minWidth: 250 }}
                   >

@@ -178,8 +178,7 @@ useEffect(() => {
                     <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
                         Initialisation d'un dossier de retrait pour validation hiérarchique
                     </Typography>
-                </Box>
-                <Button
+                    <Button
                     variant="outlined"
                     startIcon={<History />}
                     onClick={() => navigate('/listevalidationRD')} // Changez l'URL ici
@@ -196,7 +195,9 @@ useEffect(() => {
                     }}
                     >
                         VOIR ETAT DES RETRAITS A DISTANCES EN ATTENTE
-                    </Button>
+                </Button>
+
+                </Box>
 
                <Grid container spacing={2} sx={{ mb: 4 }}>
                     {[

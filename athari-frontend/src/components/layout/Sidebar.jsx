@@ -48,6 +48,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
   const [showReporting, setShowReporting] = useState(false);
   const [showVersementMenu, setShowVersementMenu] = useState(false);
   const [showGestionnaireMenu, setShowGestionnaireMenu] = useState(false);
+  const [showOperationsDiverses, setShowOperationsDiverses] = useState(false);
 
   // Définition des chemins pour chaque menu (chemins d'origine)
   const menuPaths = {
@@ -74,6 +75,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     dashboardCaissieres: '/Dashboard-Caissieres',
     entreesSortiesCaisse: '/entrees-sorties-caisse',
     retraitEspeces: '/Retrait-Especes',
+    transactiondg: '/transactiondigitale',
     transfertInterCaisse: '/Transfert-Inter-Caisse',
     transfertInterEnvoi: '/front-office/caisse-espece/transfert-inter-envoi',
     transfertInterReception: '/front-office/caisse-espece/transfert-inter-reception',
@@ -87,9 +89,10 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     listeTypeCompte: '/Liste-type-de-compte',
     fraisApplications: '/frais/applications',
     validerTransaction: '/validation-transaction',
+    validerRD: '/validation_retraitd',
     addGestionnaire: '/AddGestionnaire',
     listGestionnaire: '/ListGestionnaire',
-    validerRD:'/validation_retraitd'
+    operationsDiverses: '/ChoicePageOd'
   };
 
   // Groupes de chemins pour les menus déroulants
@@ -99,11 +102,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     Account: [menuPaths.compte, menuPaths.listeComptes, menuPaths.validationComptes],
     Gestionnaire: [menuPaths.addGestionnaire, menuPaths.listGestionnaire],
     Reporting: [menuPaths.journalComptable, menuPaths.journalCaisse, menuPaths.reporting2],
-    TransactionsAdmin: [menuPaths.agenceForm, menuPaths.guichetForm, menuPaths.caisseForm, menuPaths.validerTransaction, menuPaths.tfc],
+    TransactionsAdmin: [menuPaths.agenceForm, menuPaths.guichetForm, menuPaths.caisseForm, menuPaths.validerTransaction, menuPaths.tfc, menuPaths.validerRD],
     FrontOffice: [
       menuPaths.dashboardCaissieres,
       menuPaths.entreesSortiesCaisse,
       menuPaths.retraitEspeces,
+      menuPaths.transactiondg,
       menuPaths.transfertInterCaisse,
       menuPaths.transfertInterEnvoi,
       menuPaths.transfertInterReception,
@@ -116,13 +120,161 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     CaisseEspece: [
       menuPaths.entreesSortiesCaisse,
       menuPaths.retraitEspeces,
+      menuPaths.transactiondg,
       menuPaths.transfertInterCaisse,
       menuPaths.transfertInterEnvoi,
       menuPaths.transfertInterReception,
       menuPaths.versement
     ],
     Versement: [menuPaths.versement, menuPaths.versementClient, menuPaths.versementAC],
-    Settings: [menuPaths.usersRoles, menuPaths.agence, menuPaths.listeTypeCompte, menuPaths.fraisApplications]
+    Settings: [menuPaths.usersRoles, menuPaths.agence, menuPaths.listeTypeCompte, menuPaths.fraisApplications],
+    OperationsDiverses: [menuPaths.operationsDiverses]
+  };
+
+  // Récupération du rôle de l'utilisateur
+  const userRole = user?.role || '';
+
+  // Fonctions de vérification des permissions par rôle
+  const canSeeMenu = (menuKey) => {
+    const role = userRole;
+    
+    switch(menuKey) {
+      case 'overview':
+        return ['DG', 'Admin', 'Chef Comptable'].includes(role);
+      
+      case 'users':
+        return ['DG', 'Admin'].includes(role);
+      
+      case 'clients':
+        return ['DG', 'Admin', 'Chef Comptable', 'Assistant Comptable (AC)', 'Caissière', 'Chef d\'Agence (CA)'].includes(role);
+      
+      case 'logs':
+        return ['DG', 'Admin'].includes(role);
+      
+      case 'analytics':
+        // Menu à commenter
+        return false;
+      
+      case 'performance':
+        // Menu à commenter
+        return false;
+      
+      case 'planComptable':
+        return ['DG', 'Admin', 'Chef Comptable', 'Assistant Comptable (AC)'].includes(role);
+      
+      case 'DAT':
+        return ['DG', 'Admin', 'Chef Comptable', 'Assistant Comptable (AC)'].includes(role);
+      
+      case 'account':
+        if (['DG', 'Admin', 'Chef Comptable', 'Assistant Comptable (AC)', 'Assistant Juridique (AJ)'].includes(role)) {
+          return true;
+        }
+        // Chef d'Agence peut voir seulement certains sous-menus
+        if (role === 'Chef d\'Agence (CA)') {
+          return true;
+        }
+        return false;
+      
+      case 'accountSousMenu':
+        // Gestion des sous-menus spécifiques pour Chef d'Agence et Assistant Juridique
+        return (pathname) => {
+          if (role === 'Chef d\'Agence (CA)') {
+            return pathname === menuPaths.listeComptes || pathname === menuPaths.validationComptes;
+          }
+          if (role === 'Assistant Juridique (AJ)') {
+            // AJ ne peut voir que la validation des comptes
+            return pathname === menuPaths.validationComptes;
+          }
+          return true;
+        };
+      
+      case 'reporting':
+        return ['DG', 'Admin', 'Chef Comptable', 'Assistant Comptable (AC)'].includes(role);
+      
+      case 'transactionsAdmin':
+        if (role === 'Caissière') return true;
+        if (role === 'Chef d\'Agence (CA)') return true;
+        if (role === 'DG') return true;
+        if (role === 'Chef Comptable') return true;
+        if (role === 'Assistant Comptable (AC)') return true;
+        return false;
+      
+      case 'transactionsAdminSousMenu':
+        return (pathname) => {
+          if (role === 'Caissière') {
+            // Caissière ne peut pas voir "Valider une transaction"
+            return pathname !== menuPaths.validerTransaction;
+          }
+          if (role === 'DG' || role === 'Chef Comptable' || role === 'Assistant Comptable (AC)' ) {
+            // DG et Chef Comptable ne voient que "Valider une transaction"
+            return pathname === menuPaths.validerTransaction;
+          }
+          // Chef d'Agence voit tout
+          return true;
+        };
+      
+      case 'frontOffice':
+        return role === 'Caissière';
+      
+      case 'dashboardCaissieres':
+        // Dashboard caissieres - seulement DG et Admin
+        return ['DG', 'Admin'].includes(role);
+      
+      case 'usersRoles':
+        return role === 'DG';
+      
+      case 'listeTypeCompte':
+        return ['DG', 'Admin', 'Assistant Juridique (AJ)'].includes(role);
+      
+      case 'agence':
+        return ['DG', 'Admin'].includes(role);
+      
+      case 'fraisApplications':
+        // Menu à commenter
+        return false;
+      
+      case 'caisseDevise':
+        // Menu à commenter
+        return false;
+      
+      case 'transfertFond':
+        // Menu à commenter
+        return false;
+      
+      case 'transfertInterEnvoi':
+        // Menu à commenter
+        return false;
+      
+      case 'transfertInterReception':
+        // Menu à commenter
+        return false;
+      
+      case 'reporting2':
+        // Menu à commenter
+        return false;
+      
+      case 'operationsDiverses':
+        return true; // À ajuster selon les besoins réels
+      
+      case 'tfc':
+        // Traitement de fin de journée - Chef d'Agence (CA)
+        return role === 'Chef d\'Agence (CA)';
+      
+      case 'transactiondg':
+        // Transaction digitales - Caissière
+        return role === 'Caissière';
+      
+      case 'validerRD':
+        // Valider retrait distance - Chef d'Agence (CA)
+        return role === 'Chef d\'Agence (CA)';
+      
+      case 'gestionnaire':
+        // Gestionnaire - DG, Admin
+        return ['DG', 'Admin'].includes(role);
+      
+      default:
+        return false;
+    }
   };
 
   // Fonction améliorée pour vérifier si un chemin est actif
@@ -168,6 +320,9 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
         // Vérifier que c'est bien /agence et non /agence/form
         return isActivePath(menuPaths.agence) && !isActivePath(menuPaths.agenceForm);
       }
+      if (groupKey === 'OperationsDiverses') {
+        return isActivePath(menuPaths.operationsDiverses);
+      }
       return isActivePath(path, false);
     });
   };
@@ -197,6 +352,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     if (isGroupActive('CaisseEspece')) setShowCaisseEspece(true);
     if (isGroupActive('Versement')) setShowVersementMenu(true);
     if (isGroupActive('Settings') && !isActivePath(menuPaths.agenceForm)) setShowSettingsMenu(true);
+    if (isGroupActive('OperationsDiverses')) setShowOperationsDiverses(true);
   };
 
   // Effet pour gérer l'ouverture automatique des menus
@@ -204,13 +360,14 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     autoOpenMenus();
   }, [location.pathname]);
 
+  // Items du menu principal avec vérification des permissions
   const items = [
-    { id: 'overview', icon: BarChart3, label: 'Tableau de bord', path: menuPaths.overview },
-    { id: 'users', icon: Users, label: 'Utilisateurs', path: menuPaths.users },
-    { id: 'clients', icon: Users, label: 'Clients', path: menuPaths.clients },
-    { id: 'logs', icon: ShieldCheck, label: 'Logs d\'audit', path: menuPaths.logs },
-    { id: 'analytics', icon: TrendingUp, label: 'Analyses', path: menuPaths.analytics },
-    { id: 'performance', icon: Zap, label: 'Performance', path: menuPaths.performance },
+    { id: 'overview', icon: BarChart3, label: 'Tableau de bord', path: menuPaths.overview, canSee: canSeeMenu('overview') },
+    { id: 'users', icon: Users, label: 'Utilisateurs', path: menuPaths.users, canSee: canSeeMenu('users') },
+    { id: 'clients', icon: Users, label: 'Clients', path: menuPaths.clients, canSee: canSeeMenu('clients') },
+    { id: 'logs', icon: ShieldCheck, label: 'Logs d\'audit', path: menuPaths.logs, canSee: canSeeMenu('logs') },
+    { id: 'analytics', icon: TrendingUp, label: 'Analyses', path: menuPaths.analytics, canSee: canSeeMenu('analytics') },
+    { id: 'performance', icon: Zap, label: 'Performance', path: menuPaths.performance, canSee: canSeeMenu('performance') },
   ];
 
   const activeGradient = 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)';
@@ -283,7 +440,9 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
             </div>
             <div className="overflow-hidden">
               <div className="text-dark fw-bold small text-truncate">{user.name}</div>
-              <div className="text-muted fw-bold" style={{ fontSize: '0.7rem' }}>ADMINISTRATEUR</div>
+              <div className="text-muted fw-bold" style={{ fontSize: '0.7rem' }}>
+                {userRole.toUpperCase()}
+              </div>
             </div>
           </div>
         </div>
@@ -299,7 +458,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
           {sidebarOpen ? 'Menu Principal' : '•••'}
         </small>
         
-        {items.map((item) => {
+        {items.filter(item => item.canSee).map((item) => {
           const isActive = isActivePath(item.path, true);
           return (
             <Link
@@ -322,810 +481,895 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
         })}
 
         {/* MENU Plan-comptable */}
-        <div className="mb-2">
-          <div 
-            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
-              isGroupActive('PlanComptable') ? 'text-white' : 'text-secondary hover-bg-light'
-            }`}
-            style={{ 
-              background: isGroupActive('PlanComptable') ? activeGradient : 'transparent',
-              cursor: 'pointer',
-              justifyContent: sidebarOpen ? 'space-between' : 'center'
-            }}
-            onClick={() => {
-              if (sidebarOpen) setShowPlanComptable(!showPlanComptable);
-            }}
-            title={!sidebarOpen ? 'Plan comptable' : ''}
-          >
-            <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
-              <FileChartLine size={20} strokeWidth={isGroupActive('PlanComptable') ? 3 : 2} />
-              {sidebarOpen && <span className="small fw-bold">Plan comptable</span>}
+        {canSeeMenu('planComptable') && (
+          <div className="mb-2">
+            <div 
+              className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+                isGroupActive('PlanComptable') ? 'text-white' : 'text-secondary hover-bg-light'
+              }`}
+              style={{ 
+                background: isGroupActive('PlanComptable') ? activeGradient : 'transparent',
+                cursor: 'pointer',
+                justifyContent: sidebarOpen ? 'space-between' : 'center'
+              }}
+              onClick={() => {
+                if (sidebarOpen) setShowPlanComptable(!showPlanComptable);
+              }}
+              title={!sidebarOpen ? 'Plan comptable' : ''}
+            >
+              <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
+                <FileChartLine size={20} strokeWidth={isGroupActive('PlanComptable') ? 3 : 2} />
+                {sidebarOpen && <span className="small fw-bold">Plan comptable</span>}
+              </div>
+              {sidebarOpen && showPlanComptable && (
+                <ChevronDown 
+                  size={16} 
+                  className={`transition-all ${showPlanComptable ? 'rotate-180' : ''}`}
+                  style={{ transition: 'transform 0.2s ease' }}
+                />
+              )}
             </div>
-            {sidebarOpen && showPlanComptable && (
-              <ChevronDown 
-                size={16} 
-                className={`transition-all ${showPlanComptable ? 'rotate-180' : ''}`}
-                style={{ transition: 'transform 0.2s ease' }}
-              />
-            )}
-          </div>
-          
-          {/* Sous-menu plan-comptable */}
-          {showPlanComptable && sidebarOpen && (
-            <div className="ms-4 mt-1">
-              <Link
-                to={menuPaths.planComptable}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  isActivePath(menuPaths.planComptable, true) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.planComptable, true) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FileText size={16} strokeWidth={isActivePath(menuPaths.planComptable, true) ? 3 : 2} />
-                Plan comptable
-              </Link>
-                      
-              <Link
-                to={menuPaths.planComptableCategories}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  isActivePath(menuPaths.planComptableCategories) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.planComptableCategories) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FileType size={16} strokeWidth={isActivePath(menuPaths.planComptableCategories) ? 3 : 2} />
-                Categories Plan comptable
-              </Link>
-            </div>
-          )}
-        </div>
-        
-        {/* MENU DAT */}
-        <div className="mb-2">
-          <div 
-            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
-              isGroupActive('DAT') ? 'text-white' : 'text-secondary hover-bg-light'
-            }`}
-            style={{ 
-              background: isGroupActive('DAT') ? activeGradient : 'transparent',
-              cursor: 'pointer',
-              justifyContent: sidebarOpen ? 'space-between' : 'center'
-            }}
-            onClick={() => {
-              if (sidebarOpen) setShowDATMenu(!showDATMenu);
-            }}
-            title={!sidebarOpen ? 'DAT' : ''}
-          >
-            <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
-              <FileChartLine size={20} strokeWidth={isGroupActive('DAT') ? 3 : 2} />
-              {sidebarOpen && <span className="small fw-bold">DAT</span>}
-            </div>
-            {sidebarOpen && showDATMenu && (
-              <ChevronDown 
-                size={16} 
-                className={`transition-all ${showDATMenu ? 'rotate-180' : ''}`}
-                style={{ transition: 'transform 0.2s ease' }}
-              />
-            )}
-          </div>
-          
-          {/* Sous-menu DAT */}
-          {showDATMenu && sidebarOpen && (
-            <div className="ms-4 mt-1">
-              <Link
-                to={menuPaths.datContracts}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  isActivePath(menuPaths.datContracts) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.datContracts) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FileText size={16} strokeWidth={isActivePath(menuPaths.datContracts) ? 3 : 2} />
-                Saisie DAT
-              </Link>
-              
-              <Link
-                to={menuPaths.datTypes}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  isActivePath(menuPaths.datTypes) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.datTypes) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FileType size={16} strokeWidth={isActivePath(menuPaths.datTypes) ? 3 : 2} />
-                Types DAT
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* MENU COMPTE */}
-        <div className="mb-2">
-          <div 
-            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
-              isGroupActive('Account') ? 'text-white' : 'text-secondary hover-bg-light'
-            }`}
-            style={{ 
-              background: isGroupActive('Account') ? activeGradient : 'transparent',
-              cursor: 'pointer',
-              justifyContent: sidebarOpen ? 'space-between' : 'center'
-            }}
-            onClick={() => {
-              if (sidebarOpen) setShowAccountMenu(!showAccountMenu);
-            }}
-            title={!sidebarOpen ? 'Compte' : ''}
-          >
-            <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
-              <BookOpen size={20} strokeWidth={isGroupActive('Account') ? 3 : 2} />
-              {sidebarOpen && <span className="small fw-bold">Compte</span>}
-            </div>
-            {sidebarOpen && showAccountMenu && (
-              <ChevronDown 
-                size={16} 
-                className={`transition-all ${showAccountMenu ? 'rotate-180' : ''}`}
-                style={{ transition: 'transform 0.2s ease' }}
-              />
-            )}
-          </div>
-          
-          {/* Sous-menu Compte */}
-          {showAccountMenu && sidebarOpen && (
-            <div className="ms-4 mt-1">
-              <Link
-                to={menuPaths.compte}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  isActivePath(menuPaths.compte, true) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.compte, true) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <BookOpen size={16} strokeWidth={isActivePath(menuPaths.compte, true) ? 3 : 2} />
-                Ouvrir un compte
-              </Link>
-              
-              <Link
-                to={menuPaths.listeComptes}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  isActivePath(menuPaths.listeComptes) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.listeComptes) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <List size={16} strokeWidth={isActivePath(menuPaths.listeComptes) ? 3 : 2} />
-                Liste des comptes
-              </Link>
-
-              <Link
-                to={menuPaths.validationComptes}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  isActivePath(menuPaths.validationComptes) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.validationComptes) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <UserCheck size={16} strokeWidth={isActivePath(menuPaths.validationComptes) ? 3 : 2} />
-                Validation des comptes
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* MENU Gestionnaire */}
-        <div className="mb-2">
-          <div 
-            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
-              isGroupActive('Gestionnaire') ? 'text-white' : 'text-secondary hover-bg-light'
-            }`}
-            style={{ 
-              background: isGroupActive('Gestionnaire') ? activeGradient : 'transparent',
-              cursor: 'pointer',
-              justifyContent: sidebarOpen ? 'space-between' : 'center'
-            }}
-            onClick={() => {
-              if (sidebarOpen) setShowGestionnaireMenu(!showGestionnaireMenu);
-            }}
-            title={!sidebarOpen ? 'Gestionnaire' : ''}
-          >
-            <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
-              <UserCog size={20} strokeWidth={isGroupActive('Gestionnaire') ? 3 : 2} />
-              {sidebarOpen && <span className="small fw-bold">Gestionnaire</span>}
-            </div>
-            {sidebarOpen && showGestionnaireMenu && (
-              <ChevronDown 
-                size={16} 
-                className={`transition-all ${showGestionnaireMenu ? 'rotate-180' : ''}`}
-                style={{ transition: 'transform 0.2s ease' }}
-              />
-            )}
-          </div>
-          
-          {/* Sous-menu Gestionnaire */}
-          {showGestionnaireMenu && sidebarOpen && (
-            <div className="ms-4 mt-1">
-              <Link
-                to={menuPaths.addGestionnaire}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  isActivePath(menuPaths.addGestionnaire) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.addGestionnaire) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <UserPlus size={16} strokeWidth={isActivePath(menuPaths.addGestionnaire) ? 3 : 2} />
-                Ajouter un gestionnaire
-              </Link>
-              
-              <Link
-                to={menuPaths.listGestionnaire}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  isActivePath(menuPaths.listGestionnaire) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.listGestionnaire) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <List size={16} strokeWidth={isActivePath(menuPaths.listGestionnaire) ? 3 : 2} />
-                Liste des gestionnaires
-              </Link>
-            </div>
-          )}
-        </div>
-        
-        {/* MENU reporting */}
-        <div className="mb-2">
-          <div 
-            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
-              isGroupActive('Reporting') ? 'text-white' : 'text-secondary hover-bg-light'
-            }`}
-            style={{ 
-              background: isGroupActive('Reporting') ? activeGradient : 'transparent',
-              cursor: 'pointer',
-              justifyContent: sidebarOpen ? 'space-between' : 'center'
-            }}
-            onClick={() => {
-              if (sidebarOpen) setShowReporting(!showReporting);
-            }}
-            title={!sidebarOpen ? 'Reporting' : ''}
-          >
-            <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
-              <BookOpen size={20} strokeWidth={isGroupActive('Reporting') ? 3 : 2} />
-              {sidebarOpen && <span className="small fw-bold">Reporting</span>}
-            </div>
-            {sidebarOpen && showReporting && (
-              <ChevronDown 
-                size={16} 
-                className={`transition-all ${showReporting ? 'rotate-180' : ''}`}
-                style={{ transition: 'transform 0.2s ease' }}
-              />
-            )}
-          </div>
-          
-          {/* Sous-menu Reporting */}
-          {showReporting && sidebarOpen && (
-            <div className="ms-4 mt-1">
-              <Link
-                to={menuPaths.journalComptable}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  isActivePath(menuPaths.journalComptable) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.journalComptable) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <BookOpen size={16} strokeWidth={isActivePath(menuPaths.journalComptable) ? 3 : 2} />
-                Journal Comptable
-              </Link>
-              
-              {/* Ajout du Journal de caisse */}
-              <Link
-                to={menuPaths.journalCaisse}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  isActivePath(menuPaths.journalCaisse) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.journalCaisse) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FileText size={16} strokeWidth={isActivePath(menuPaths.journalCaisse) ? 3 : 2} />
-                Journal de caisse
-              </Link>
-              
-              <Link
-                to={menuPaths.reporting2}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  isActivePath(menuPaths.reporting2) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.reporting2) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <List size={16} strokeWidth={isActivePath(menuPaths.reporting2) ? 3 : 2} />
-                Reporting 2
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* MENU Transactions administratives */}
-        <div className="mb-2">
-          <div 
-            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
-              isGroupActive('TransactionsAdmin') ? 'text-white' : 'text-secondary hover-bg-light'
-            }`}
-            style={{ 
-              background: isGroupActive('TransactionsAdmin') ? activeGradient : 'transparent',
-              cursor: 'pointer',
-              justifyContent: sidebarOpen ? 'space-between' : 'center'
-            }}
-            onClick={() => {
-              if (sidebarOpen) setShowTransactions(!showTransactions);
-            }}
-            title={!sidebarOpen ? 'Transactions administratives' : ''}
-          >
-            <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
-              <FileChartLine size={20} strokeWidth={isGroupActive('TransactionsAdmin') ? 3 : 2} />
-              {sidebarOpen && <span className="small fw-bold">Transactions administratives</span>}
-            </div>
-            {sidebarOpen && showTransactions && (
-              <ChevronDown 
-                size={16} 
-                className={`transition-all ${showTransactions ? 'rotate-180' : ''}`}
-                style={{ transition: 'transform 0.2s ease' }}
-              />
-            )}
-          </div>
-          
-          {/* Sous-menu Transactions administratives */}
-          {showTransactions && sidebarOpen && (
-            <div className="ms-4 mt-1">
-              <Link
-                to={menuPaths.agenceForm}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  isActivePath(menuPaths.agenceForm) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.agenceForm) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FileText size={16} strokeWidth={isActivePath(menuPaths.agenceForm) ? 3 : 2} />
-                Ouverture/fermeture Agence
-              </Link>
-              
-              <Link
-                to={menuPaths.guichetForm}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  isActivePath(menuPaths.guichetForm) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.guichetForm) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FileType size={16} strokeWidth={isActivePath(menuPaths.guichetForm) ? 3 : 2} />
-                Ouverture/Fermeture du guichet
-              </Link>
-
-              <Link
-                to={menuPaths.caisseForm}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  isActivePath(menuPaths.caisseForm) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.caisseForm) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FileType size={16} strokeWidth={isActivePath(menuPaths.caisseForm) ? 3 : 2} />
-                Ouverture/Fermeture de la caisse
-              </Link>
-
-               <Link
-                to={menuPaths.tfc}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  isActivePath(menuPaths.tfc) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.tfc) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FileType size={16} strokeWidth={isActivePath(menuPaths.tfc) ? 3 : 2} />
-              Traitement de fin de journée
-              </Link>
-
-              <Link
-                to={menuPaths.validerTransaction}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  isActivePath(menuPaths.validerTransaction) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.validerTransaction) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FileType size={16} strokeWidth={isActivePath(menuPaths.validerTransaction) ? 3 : 2} />
-                Valider une transaction
-              </Link>
-
-              <Link
-                to={menuPaths.validerRD}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  isActivePath(menuPaths.validerRD) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.validerRD) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FileType size={16} strokeWidth={isActivePath(menuPaths.validerRD) ? 3 : 2} />
-                Valider retrait distance
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* MENU Transaction Front Office */}
-        <div className="mb-2">
-          <div 
-            className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
-              isGroupActive('FrontOffice') ? 'text-white' : 'text-secondary hover-bg-light'
-            }`}
-            style={{ 
-              background: isGroupActive('FrontOffice') ? activeGradient : 'transparent',
-              cursor: 'pointer',
-              justifyContent: sidebarOpen ? 'space-between' : 'center'
-            }}
-            onClick={() => {
-              if (sidebarOpen) setShowFrontOffice(!showFrontOffice);
-            }}
-            title={!sidebarOpen ? 'Transaction Front Office' : ''}
-          >
-            <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
-              <CreditCard size={20} strokeWidth={isGroupActive('FrontOffice') ? 3 : 2} />
-              {sidebarOpen && <span className="small fw-bold">Transaction Front Office</span>}
-            </div>
-            {sidebarOpen && showFrontOffice && (
-              <ChevronDown 
-                size={16} 
-                className={`transition-all ${showFrontOffice ? 'rotate-180' : ''}`}
-                style={{ transition: 'transform 0.2s ease' }}
-              />
-            )}
-          </div>
-          
-          {/* Sous-menu Transaction Front Office */}
-          {showFrontOffice && sidebarOpen && (
-            <div className="ms-4 mt-1">
-              {/* Dashboard caissieres */}
-              <Link
-                to={menuPaths.dashboardCaissieres}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  isActivePath(menuPaths.dashboardCaissieres) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.dashboardCaissieres) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <BarChart3 size={16} strokeWidth={isActivePath(menuPaths.dashboardCaissieres) ? 3 : 2} />
-                Dashboard caissieres
-              </Link>
-
-              {/* Transaction Caisse Espèce */}
-              <div className="mb-1">
-                <div 
-                  className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
-                    isGroupActive('CaisseEspece') ? 'text-white' : 'text-secondary hover-bg-light'
+            
+            {/* Sous-menu plan-comptable */}
+            {showPlanComptable && sidebarOpen && (
+              <div className="ms-4 mt-1">
+                <Link
+                  to={menuPaths.planComptable}
+                  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                    isActivePath(menuPaths.planComptable, true) 
+                      ? 'text-white fw-bold' 
+                      : 'text-secondary hover-bg-light'
                   }`}
                   style={{ 
-                    background: isGroupActive('CaisseEspece') ? activeGradient : 'transparent',
-                    cursor: 'pointer'
+                    background: isActivePath(menuPaths.planComptable, true) ? activeGradient : 'transparent',
+                    transition: 'all 0.2s ease'
                   }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowCaisseEspece(!showCaisseEspece);
-                  }}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="d-flex align-items-center gap-2" style={{ flex: 1 }}>
-                    <Wallet size={16} strokeWidth={isGroupActive('CaisseEspece') ? 3 : 2} />
-                    <span className="small">Transaction caisse espèce</span>
-                  </div>
-                  <ChevronDown 
-                    size={14} 
-                    className={`transition-all ${showCaisseEspece ? 'rotate-180' : ''}`}
-                    style={{ transition: 'transform 0.2s ease' }}
-                  />
-                </div>
+                  <FileText size={16} strokeWidth={isActivePath(menuPaths.planComptable, true) ? 3 : 2} />
+                  Plan comptable
+                </Link>
+                        
+                <Link
+                  to={menuPaths.planComptableCategories}
+                  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                    isActivePath(menuPaths.planComptableCategories) 
+                      ? 'text-white fw-bold' 
+                      : 'text-secondary hover-bg-light'
+                  }`}
+                  style={{ 
+                    background: isActivePath(menuPaths.planComptableCategories) ? activeGradient : 'transparent',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileType size={16} strokeWidth={isActivePath(menuPaths.planComptableCategories) ? 3 : 2} />
+                  Categories Plan comptable
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* MENU DAT */}
+        {canSeeMenu('DAT') && (
+          <div className="mb-2">
+            <div 
+              className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+                isGroupActive('DAT') ? 'text-white' : 'text-secondary hover-bg-light'
+              }`}
+              style={{ 
+                background: isGroupActive('DAT') ? activeGradient : 'transparent',
+                cursor: 'pointer',
+                justifyContent: sidebarOpen ? 'space-between' : 'center'
+              }}
+              onClick={() => {
+                if (sidebarOpen) setShowDATMenu(!showDATMenu);
+              }}
+              title={!sidebarOpen ? 'DAT' : ''}
+            >
+              <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
+                <FileChartLine size={20} strokeWidth={isGroupActive('DAT') ? 3 : 2} />
+                {sidebarOpen && <span className="small fw-bold">DAT</span>}
+              </div>
+              {sidebarOpen && showDATMenu && (
+                <ChevronDown 
+                  size={16} 
+                  className={`transition-all ${showDATMenu ? 'rotate-180' : ''}`}
+                  style={{ transition: 'transform 0.2s ease' }}
+                />
+              )}
+            </div>
+            
+            {/* Sous-menu DAT */}
+            {showDATMenu && sidebarOpen && (
+              <div className="ms-4 mt-1">
+                <Link
+                  to={menuPaths.datContracts}
+                  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                    isActivePath(menuPaths.datContracts) 
+                      ? 'text-white fw-bold' 
+                      : 'text-secondary hover-bg-light'
+                  }`}
+                  style={{ 
+                    background: isActivePath(menuPaths.datContracts) ? activeGradient : 'transparent',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileText size={16} strokeWidth={isActivePath(menuPaths.datContracts) ? 3 : 2} />
+                  Saisie DAT
+                </Link>
                 
-                {/* Sous-sous-menu Transaction Caisse Espèce */}
-                {showCaisseEspece && (
-                  <div className="ms-3 mt-1">
-                    <Link
-                      to={menuPaths.entreesSortiesCaisse}
-                      className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                        isActivePath(menuPaths.entreesSortiesCaisse) 
-                          ? 'text-white fw-bold' 
-                          : 'text-secondary hover-bg-light'
-                      }`}
-                      style={{ 
-                        background: isActivePath(menuPaths.entreesSortiesCaisse) ? activeGradient : 'transparent',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <ArrowDownUp size={14} strokeWidth={isActivePath(menuPaths.entreesSortiesCaisse) ? 3 : 2} />
-                      Entrer/sortie caisse
-                    </Link>
+                <Link
+                  to={menuPaths.datTypes}
+                  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                    isActivePath(menuPaths.datTypes) 
+                      ? 'text-white fw-bold' 
+                      : 'text-secondary hover-bg-light'
+                  }`}
+                  style={{ 
+                    background: isActivePath(menuPaths.datTypes) ? activeGradient : 'transparent',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileType size={16} strokeWidth={isActivePath(menuPaths.datTypes) ? 3 : 2} />
+                  Types DAT
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
 
-                    <Link
-                      to={menuPaths.retraitEspeces}
-                      className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                        isActivePath(menuPaths.retraitEspeces) 
-                          ? 'text-white fw-bold' 
-                          : 'text-secondary hover-bg-light'
-                      }`}
-                      style={{ 
-                        background: isActivePath(menuPaths.retraitEspeces) ? activeGradient : 'transparent',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <ArrowDownUp size={14} strokeWidth={isActivePath(menuPaths.retraitEspeces) ? 3 : 2} />
-                      Retrait Especes
-                    </Link>
+        {/* MENU COMPTE */}
+        {canSeeMenu('account') && (
+          <div className="mb-2">
+            <div 
+              className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+                isGroupActive('Account') ? 'text-white' : 'text-secondary hover-bg-light'
+              }`}
+              style={{ 
+                background: isGroupActive('Account') ? activeGradient : 'transparent',
+                cursor: 'pointer',
+                justifyContent: sidebarOpen ? 'space-between' : 'center'
+              }}
+              onClick={() => {
+                if (sidebarOpen) setShowAccountMenu(!showAccountMenu);
+              }}
+              title={!sidebarOpen ? 'Compte' : ''}
+            >
+              <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
+                <BookOpen size={20} strokeWidth={isGroupActive('Account') ? 3 : 2} />
+                {sidebarOpen && <span className="small fw-bold">Compte</span>}
+              </div>
+              {sidebarOpen && showAccountMenu && (
+                <ChevronDown 
+                  size={16} 
+                  className={`transition-all ${showAccountMenu ? 'rotate-180' : ''}`}
+                  style={{ transition: 'transform 0.2s ease' }}
+                />
+              )}
+            </div>
+            
+            {/* Sous-menu Compte */}
+            {showAccountMenu && sidebarOpen && (
+              <div className="ms-4 mt-1">
+                {/* Ouvrir un compte - seulement pour certains rôles */}
+                {(userRole !== 'Chef d\'Agence (CA)' && userRole !== 'Assistant Juridique (AJ)') && (
+                  <Link
+                    to={menuPaths.compte}
+                    className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                      isActivePath(menuPaths.compte, true) 
+                        ? 'text-white fw-bold' 
+                        : 'text-secondary hover-bg-light'
+                    }`}
+                    style={{ 
+                      background: isActivePath(menuPaths.compte, true) ? activeGradient : 'transparent',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <BookOpen size={16} strokeWidth={isActivePath(menuPaths.compte, true) ? 3 : 2} />
+                    Ouvrir un compte
+                  </Link>
+                )}
+                
+                {/* Liste des comptes - selon les permissions */}
+                {(userRole !== 'Assistant Juridique (AJ)') && (
+                  <Link
+                    to={menuPaths.listeComptes}
+                    className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                      isActivePath(menuPaths.listeComptes) 
+                        ? 'text-white fw-bold' 
+                        : 'text-secondary hover-bg-light'
+                    }`}
+                    style={{ 
+                      background: isActivePath(menuPaths.listeComptes) ? activeGradient : 'transparent',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <List size={16} strokeWidth={isActivePath(menuPaths.listeComptes) ? 3 : 2} />
+                    Liste des comptes
+                  </Link>
+                )}
 
-                    <Link
-                      to={menuPaths.transfertInterCaisse}
-                      className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                        isActivePath(menuPaths.transfertInterCaisse) 
-                          ? 'text-white fw-bold' 
-                          : 'text-secondary hover-bg-light'
-                      }`}
-                      style={{ 
-                        background: isActivePath(menuPaths.transfertInterCaisse) ? activeGradient : 'transparent',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Repeat size={14} strokeWidth={isActivePath(menuPaths.transfertInterCaisse) ? 3 : 2} />
-                      Transfert caisse
-                    </Link>
-                    
-                    <Link
-                      to={menuPaths.transfertInterEnvoi}
-                      className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                        isActivePath(menuPaths.transfertInterEnvoi) 
-                          ? 'text-white fw-bold' 
-                          : 'text-secondary hover-bg-light'
-                      }`}
-                      style={{ 
-                        background: isActivePath(menuPaths.transfertInterEnvoi) ? activeGradient : 'transparent',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Receipt size={14} strokeWidth={isActivePath(menuPaths.transfertInterEnvoi) ? 3 : 2} />
-                      Transfert inter caisse envoi
-                    </Link>
-                    
-                    <Link
-                      to={menuPaths.transfertInterReception}
-                      className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                        isActivePath(menuPaths.transfertInterReception) 
-                          ? 'text-white fw-bold' 
-                          : 'text-secondary hover-bg-light'
-                      }`}
-                      style={{ 
-                        background: isActivePath(menuPaths.transfertInterReception) ? activeGradient : 'transparent',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Receipt size={14} strokeWidth={isActivePath(menuPaths.transfertInterReception) ? 3 : 2} />
-                      Transfert inter caisse réception
-                    </Link>
+                {/* Validation des comptes - pour tous les rôles autorisés */}
+                <Link
+                  to={menuPaths.validationComptes}
+                  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                    isActivePath(menuPaths.validationComptes) 
+                      ? 'text-white fw-bold' 
+                      : 'text-secondary hover-bg-light'
+                  }`}
+                  style={{ 
+                    background: isActivePath(menuPaths.validationComptes) ? activeGradient : 'transparent',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <UserCheck size={16} strokeWidth={isActivePath(menuPaths.validationComptes) ? 3 : 2} />
+                  Validation des comptes
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
 
-                    {/* MENU Versement avec sous-menus */}
-                    <div className="mb-1">
-                      <div 
-                        className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
-                          isGroupActive('Versement') ? 'text-white' : 'text-secondary hover-bg-light'
-                        }`}
-                        style={{ 
-                          background: isGroupActive('Versement') ? activeGradient : 'transparent',
-                          cursor: 'pointer'
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowVersementMenu(!showVersementMenu);
-                        }}
-                      >
-                        <div className="d-flex align-items-center gap-2" style={{ flex: 1 }}>
-                          <DollarSign size={14} strokeWidth={isGroupActive('Versement') ? 3 : 2} />
-                          <span className="small">Gestion des Versement</span>
-                        </div>
-                        <ChevronDown 
-                          size={12} 
-                          className={`transition-all ${showVersementMenu ? 'rotate-180' : ''}`}
-                          style={{ transition: 'transform 0.2s ease' }}
-                        />
-                      </div>
-                      
-                      {/* Sous-sous-menu Versement */}
-                      {showVersementMenu && (
-                        <div className="ms-3 mt-1">
-                          <Link
-                            to={menuPaths.versement}
-                            className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                              isActivePath(menuPaths.versement, true) 
-                                ? 'text-white fw-bold' 
-                                : 'text-secondary hover-bg-light'
-                            }`}
-                            style={{ 
-                              background: isActivePath(menuPaths.versement, true) ? activeGradient : 'transparent',
-                              transition: 'all 0.2s ease'
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <DollarSign size={12} strokeWidth={isActivePath(menuPaths.versement, true) ? 3 : 2} />
-                            Versement espèce
-                          </Link>
-                          {/* les different bordereau de versement 
-                          <Link
-                            to="/versement/client"
-                            className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                              isActivePath('/versement/client') 
-                                ? 'text-white fw-bold' 
-                                : 'text-secondary hover-bg-light'
-                            }`}
-                            style={{ 
-                              background: isActivePath('/versement/client') ? activeGradient : 'transparent',
-                              transition: 'all 0.2s ease'
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <FileCheck size={12} />
-                            Bordereau de Versement Client
-                          </Link>
-                          
-                          <Link
-                            to="/versement/ac"
-                            className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                              isActivePath('/versement/ac') 
-                                ? 'text-white fw-bold' 
-                                : 'text-secondary hover-bg-light'
-                            }`}
-                            style={{ 
-                              background: isActivePath('/versement/ac') ? activeGradient : 'transparent',
-                              transition: 'all 0.2s ease'
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <FileSpreadsheet size={12} />
-                            Bordereau de Versement AC
-                          </Link>*/}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+        {/* MENU Opérations Diverses */}
+        {canSeeMenu('operationsDiverses') && (
+          <div className="mb-2">
+            <Link
+              to={menuPaths.operationsDiverses}
+              className={`d-flex align-items-center gap-3 p-2 rounded-3 mb-2 text-decoration-none transition-all ${
+                isActivePath(menuPaths.operationsDiverses, true) ? 'text-white shadow' : 'text-secondary hover-bg-light'
+              }`}
+              style={{ 
+                background: isActivePath(menuPaths.operationsDiverses, true) ? activeGradient : 'transparent',
+                transition: '0.2s ease',
+                justifyContent: sidebarOpen ? 'flex-start' : 'center'
+              }}
+              title={!sidebarOpen ? 'Opérations Diverses' : ''}
+            >
+              <FileText size={20} strokeWidth={isActivePath(menuPaths.operationsDiverses, true) ? 3 : 2} />
+              {sidebarOpen && <span className="fw-bold small">Opérations Diverses</span>}
+            </Link>
+          </div>
+        )}
+
+        {/* MENU Gestionnaire - seulement pour DG et Admin */}
+        {canSeeMenu('gestionnaire') && (
+          <div className="mb-2">
+            <div 
+              className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+                isGroupActive('Gestionnaire') ? 'text-white' : 'text-secondary hover-bg-light'
+              }`}
+              style={{ 
+                background: isGroupActive('Gestionnaire') ? activeGradient : 'transparent',
+                cursor: 'pointer',
+                justifyContent: sidebarOpen ? 'space-between' : 'center'
+              }}
+              onClick={() => {
+                if (sidebarOpen) setShowGestionnaireMenu(!showGestionnaireMenu);
+              }}
+              title={!sidebarOpen ? 'Gestionnaire' : ''}
+            >
+              <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
+                <UserCog size={20} strokeWidth={isGroupActive('Gestionnaire') ? 3 : 2} />
+                {sidebarOpen && <span className="small fw-bold">Gestionnaire</span>}
+              </div>
+              {sidebarOpen && showGestionnaireMenu && (
+                <ChevronDown 
+                  size={16} 
+                  className={`transition-all ${showGestionnaireMenu ? 'rotate-180' : ''}`}
+                  style={{ transition: 'transform 0.2s ease' }}
+                />
+              )}
+            </div>
+            
+            {/* Sous-menu Gestionnaire */}
+            {showGestionnaireMenu && sidebarOpen && (
+              <div className="ms-4 mt-1">
+                <Link
+                  to={menuPaths.addGestionnaire}
+                  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                    isActivePath(menuPaths.addGestionnaire) 
+                      ? 'text-white fw-bold' 
+                      : 'text-secondary hover-bg-light'
+                  }`}
+                  style={{ 
+                    background: isActivePath(menuPaths.addGestionnaire) ? activeGradient : 'transparent',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <UserPlus size={16} strokeWidth={isActivePath(menuPaths.addGestionnaire) ? 3 : 2} />
+                  Ajouter un gestionnaire
+                </Link>
+                
+                <Link
+                  to={menuPaths.listGestionnaire}
+                  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                    isActivePath(menuPaths.listGestionnaire) 
+                      ? 'text-white fw-bold' 
+                      : 'text-secondary hover-bg-light'
+                  }`}
+                  style={{ 
+                    background: isActivePath(menuPaths.listGestionnaire) ? activeGradient : 'transparent',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <List size={16} strokeWidth={isActivePath(menuPaths.listGestionnaire) ? 3 : 2} />
+                  Liste des gestionnaires
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* MENU reporting */}
+        {canSeeMenu('reporting') && (
+          <div className="mb-2">
+            <div 
+              className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+                isGroupActive('Reporting') ? 'text-white' : 'text-secondary hover-bg-light'
+              }`}
+              style={{ 
+                background: isGroupActive('Reporting') ? activeGradient : 'transparent',
+                cursor: 'pointer',
+                justifyContent: sidebarOpen ? 'space-between' : 'center'
+              }}
+              onClick={() => {
+                if (sidebarOpen) setShowReporting(!showReporting);
+              }}
+              title={!sidebarOpen ? 'Reporting' : ''}
+            >
+              <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
+                <BookOpen size={20} strokeWidth={isGroupActive('Reporting') ? 3 : 2} />
+                {sidebarOpen && <span className="small fw-bold">Reporting</span>}
+              </div>
+              {sidebarOpen && showReporting && (
+                <ChevronDown 
+                  size={16} 
+                  className={`transition-all ${showReporting ? 'rotate-180' : ''}`}
+                  style={{ transition: 'transform 0.2s ease' }}
+                />
+              )}
+            </div>
+            
+            {/* Sous-menu Reporting */}
+            {showReporting && sidebarOpen && (
+              <div className="ms-4 mt-1">
+                <Link
+                  to={menuPaths.journalComptable}
+                  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                    isActivePath(menuPaths.journalComptable) 
+                      ? 'text-white fw-bold' 
+                      : 'text-secondary hover-bg-light'
+                  }`}
+                  style={{ 
+                    background: isActivePath(menuPaths.journalComptable) ? activeGradient : 'transparent',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <BookOpen size={16} strokeWidth={isActivePath(menuPaths.journalComptable) ? 3 : 2} />
+                  Journal Comptable
+                </Link>
+                
+                {/* Ajout du Journal de caisse */}
+                <Link
+                  to={menuPaths.journalCaisse}
+                  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                    isActivePath(menuPaths.journalCaisse) 
+                      ? 'text-white fw-bold' 
+                      : 'text-secondary hover-bg-light'
+                  }`}
+                  style={{ 
+                    background: isActivePath(menuPaths.journalCaisse) ? activeGradient : 'transparent',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileText size={16} strokeWidth={isActivePath(menuPaths.journalCaisse) ? 3 : 2} />
+                  Journal de caisse
+                </Link>
+                
+                {/* Reporting 2 - Menu à commenter */}
+                {/* <Link
+                  to={menuPaths.reporting2}
+                  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                    isActivePath(menuPaths.reporting2) 
+                      ? 'text-white fw-bold' 
+                      : 'text-secondary hover-bg-light'
+                  }`}
+                  style={{ 
+                    background: isActivePath(menuPaths.reporting2) ? activeGradient : 'transparent',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <List size={16} strokeWidth={isActivePath(menuPaths.reporting2) ? 3 : 2} />
+                  Reporting 2
+                </Link> */}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* MENU Transactions administratives */}
+        {canSeeMenu('transactionsAdmin') && (
+          <div className="mb-2">
+            <div 
+              className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+                isGroupActive('TransactionsAdmin') ? 'text-white' : 'text-secondary hover-bg-light'
+              }`}
+              style={{ 
+                background: isGroupActive('TransactionsAdmin') ? activeGradient : 'transparent',
+                cursor: 'pointer',
+                justifyContent: sidebarOpen ? 'space-between' : 'center'
+              }}
+              onClick={() => {
+                if (sidebarOpen) setShowTransactions(!showTransactions);
+              }}
+              title={!sidebarOpen ? 'Transactions administratives' : ''}
+            >
+              <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
+                <FileChartLine size={20} strokeWidth={isGroupActive('TransactionsAdmin') ? 3 : 2} />
+                {sidebarOpen && <span className="small fw-bold">Transactions administratives</span>}
+              </div>
+              {sidebarOpen && showTransactions && (
+                <ChevronDown 
+                  size={16} 
+                  className={`transition-all ${showTransactions ? 'rotate-180' : ''}`}
+                  style={{ transition: 'transform 0.2s ease' }}
+                />
+              )}
+            </div>
+            
+            {/* Sous-menu Transactions administratives */}
+            {showTransactions && sidebarOpen && (
+              <div className="ms-4 mt-1">
+                {/* Ouverture/fermeture Agence - seulement pour Caissière et Chef d'Agence */}
+                {(userRole === 'Caissière' || userRole === 'Chef d\'Agence (CA)') && (
+                  <Link
+                    to={menuPaths.agenceForm}
+                    className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                      isActivePath(menuPaths.agenceForm) 
+                        ? 'text-white fw-bold' 
+                        : 'text-secondary hover-bg-light'
+                    }`}
+                    style={{ 
+                      background: isActivePath(menuPaths.agenceForm) ? activeGradient : 'transparent',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <FileText size={16} strokeWidth={isActivePath(menuPaths.agenceForm) ? 3 : 2} />
+                    Ouverture/fermeture Agence
+                  </Link>
+                )}
+                
+                {/* Ouverture/Fermeture du guichet - seulement pour Caissière et Chef d'Agence */}
+                {(userRole === 'Caissière' || userRole === 'Chef d\'Agence (CA)') && (
+                  <Link
+                    to={menuPaths.guichetForm}
+                    className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                      isActivePath(menuPaths.guichetForm) 
+                        ? 'text-white fw-bold' 
+                        : 'text-secondary hover-bg-light'
+                    }`}
+                    style={{ 
+                      background: isActivePath(menuPaths.guichetForm) ? activeGradient : 'transparent',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <FileType size={16} strokeWidth={isActivePath(menuPaths.guichetForm) ? 3 : 2} />
+                    Ouverture/Fermeture du guichet
+                  </Link>
+                )}
+
+                {/* Ouverture/Fermeture de la caisse - seulement pour Caissière et Chef d'Agence */}
+                {(userRole === 'Caissière' || userRole === 'Chef d\'Agence (CA)') && (
+                  <Link
+                    to={menuPaths.caisseForm}
+                    className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                      isActivePath(menuPaths.caisseForm) 
+                        ? 'text-white fw-bold' 
+                        : 'text-secondary hover-bg-light'
+                    }`}
+                    style={{ 
+                      background: isActivePath(menuPaths.caisseForm) ? activeGradient : 'transparent',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <FileType size={16} strokeWidth={isActivePath(menuPaths.caisseForm) ? 3 : 2} />
+                    Ouverture/Fermeture de la caisse
+                  </Link>
+                )}
+
+                {/* Traitement de fin de journée - Chef d'Agence (CA) */}
+                {canSeeMenu('tfc') && (
+                  <Link
+                    to={menuPaths.tfc}
+                    className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                      isActivePath(menuPaths.tfc) 
+                        ? 'text-white fw-bold' 
+                        : 'text-secondary hover-bg-light'
+                    }`}
+                    style={{ 
+                      background: isActivePath(menuPaths.tfc) ? activeGradient : 'transparent',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <FileType size={16} strokeWidth={isActivePath(menuPaths.tfc) ? 3 : 2} />
+                    Traitement de fin de journée
+                  </Link>
+                )}
+
+                {/* Valider une transaction - selon les rôles spécifiques */}
+                {(userRole === 'DG' || userRole === 'Chef Comptable' || userRole === 'Chef d\'Agence (CA)' || userRole === 'Assistant Comptable (AC)') && (
+                  <Link
+                    to={menuPaths.validerTransaction}
+                    className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                      isActivePath(menuPaths.validerTransaction) 
+                        ? 'text-white fw-bold' 
+                        : 'text-secondary hover-bg-light'
+                    }`}
+                    style={{ 
+                      background: isActivePath(menuPaths.validerTransaction) ? activeGradient : 'transparent',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <FileType size={16} strokeWidth={isActivePath(menuPaths.validerTransaction) ? 3 : 2} />
+                    Valider une transaction
+                  </Link>
+                )}
+
+                {/* Valider retrait distance - Chef d'Agence (CA) */}
+                {canSeeMenu('validerRD') && (
+                  <Link
+                    to={menuPaths.validerRD}
+                    className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                      isActivePath(menuPaths.validerRD) 
+                        ? 'text-white fw-bold' 
+                        : 'text-secondary hover-bg-light'
+                    }`}
+                    style={{ 
+                      background: isActivePath(menuPaths.validerRD) ? activeGradient : 'transparent',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <FileType size={16} strokeWidth={isActivePath(menuPaths.validerRD) ? 3 : 2} />
+                    Valider retrait distance
+                  </Link>
                 )}
               </div>
-              
-              {/* Transaction Caisse Devise */}
-              <Link
-                to={menuPaths.caisseDevise}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  isActivePath(menuPaths.caisseDevise) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.caisseDevise) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Coins size={16} strokeWidth={isActivePath(menuPaths.caisseDevise) ? 3 : 2} />
-                Transaction caisse devise
-              </Link>
-              
-              {/* Transfert de fond */}
-              <Link
-                to={menuPaths.transfertFond}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  isActivePath(menuPaths.transfertFond) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.transfertFond) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Repeat size={16} strokeWidth={isActivePath(menuPaths.transfertFond) ? 3 : 2} />
-                Transfert de fond
-              </Link>
+            )}
+          </div>
+        )}
+
+        {/* MENU Transaction Front Office */}
+        {canSeeMenu('frontOffice') && (
+          <div className="mb-2">
+            <div 
+              className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+                isGroupActive('FrontOffice') ? 'text-white' : 'text-secondary hover-bg-light'
+              }`}
+              style={{ 
+                background: isGroupActive('FrontOffice') ? activeGradient : 'transparent',
+                cursor: 'pointer',
+                justifyContent: sidebarOpen ? 'space-between' : 'center'
+              }}
+              onClick={() => {
+                if (sidebarOpen) setShowFrontOffice(!showFrontOffice);
+              }}
+              title={!sidebarOpen ? 'Transaction Front Office' : ''}
+            >
+              <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
+                <CreditCard size={20} strokeWidth={isGroupActive('FrontOffice') ? 3 : 2} />
+                {sidebarOpen && <span className="small fw-bold">Transaction Front Office</span>}
+              </div>
+              {sidebarOpen && showFrontOffice && (
+                <ChevronDown 
+                  size={16} 
+                  className={`transition-all ${showFrontOffice ? 'rotate-180' : ''}`}
+                  style={{ transition: 'transform 0.2s ease' }}
+                />
+              )}
             </div>
-          )}
-        </div>
+            
+            {/* Sous-menu Transaction Front Office */}
+            {showFrontOffice && sidebarOpen && (
+              <div className="ms-4 mt-1">
+                {/* Dashboard caissieres - seulement DG et Admin */}
+                {canSeeMenu('dashboardCaissieres') && (
+                  <Link
+                    to={menuPaths.dashboardCaissieres}
+                    className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                      isActivePath(menuPaths.dashboardCaissieres) 
+                        ? 'text-white fw-bold' 
+                        : 'text-secondary hover-bg-light'
+                    }`}
+                    style={{ 
+                      background: isActivePath(menuPaths.dashboardCaissieres) ? activeGradient : 'transparent',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <BarChart3 size={16} strokeWidth={isActivePath(menuPaths.dashboardCaissieres) ? 3 : 2} />
+                    Dashboard caissieres
+                  </Link>
+                )}
+
+                {/* Transaction Caisse Espèce */}
+                <div className="mb-1">
+                  <div 
+                    className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+                      isGroupActive('CaisseEspece') ? 'text-white' : 'text-secondary hover-bg-light'
+                    }`}
+                    style={{ 
+                      background: isGroupActive('CaisseEspece') ? activeGradient : 'transparent',
+                      cursor: 'pointer'
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowCaisseEspece(!showCaisseEspece);
+                    }}
+                  >
+                    <div className="d-flex align-items-center gap-2" style={{ flex: 1 }}>
+                      <Wallet size={16} strokeWidth={isGroupActive('CaisseEspece') ? 3 : 2} />
+                      <span className="small">Transaction caisse espèce</span>
+                    </div>
+                    <ChevronDown 
+                      size={14} 
+                      className={`transition-all ${showCaisseEspece ? 'rotate-180' : ''}`}
+                      style={{ transition: 'transform 0.2s ease' }}
+                    />
+                  </div>
+                  
+                  {/* Sous-sous-menu Transaction Caisse Espèce */}
+                  {showCaisseEspece && (
+                    <div className="ms-3 mt-1">
+                      <Link
+                        to={menuPaths.entreesSortiesCaisse}
+                        className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                          isActivePath(menuPaths.entreesSortiesCaisse) 
+                            ? 'text-white fw-bold' 
+                            : 'text-secondary hover-bg-light'
+                        }`}
+                        style={{ 
+                          background: isActivePath(menuPaths.entreesSortiesCaisse) ? activeGradient : 'transparent',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ArrowDownUp size={14} strokeWidth={isActivePath(menuPaths.entreesSortiesCaisse) ? 3 : 2} />
+                        Entrer/sortie caisse
+                      </Link>
+
+                      <Link
+                        to={menuPaths.retraitEspeces}
+                        className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                          isActivePath(menuPaths.retraitEspeces) 
+                            ? 'text-white fw-bold' 
+                            : 'text-secondary hover-bg-light'
+                        }`}
+                        style={{ 
+                          background: isActivePath(menuPaths.retraitEspeces) ? activeGradient : 'transparent',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ArrowDownUp size={14} strokeWidth={isActivePath(menuPaths.retraitEspeces) ? 3 : 2} />
+                        Retrait Especes
+                      </Link>
+
+                      {/* Transaction digitales - Caissière */}
+                      {canSeeMenu('transactiondg') && (
+                        <Link
+                          to={menuPaths.transactiondg}
+                          className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                            isActivePath(menuPaths.transactiondg) 
+                              ? 'text-white fw-bold' 
+                              : 'text-secondary hover-bg-light'
+                          }`}
+                          style={{ 
+                            background: isActivePath(menuPaths.transactiondg) ? activeGradient : 'transparent',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Repeat size={14} strokeWidth={isActivePath(menuPaths.transactiondg) ? 3 : 2} />
+                          Transaction digitales
+                        </Link>
+                      )}
+
+                      <Link
+                        to={menuPaths.transfertInterCaisse}
+                        className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                          isActivePath(menuPaths.transfertInterCaisse) 
+                            ? 'text-white fw-bold' 
+                            : 'text-secondary hover-bg-light'
+                        }`}
+                        style={{ 
+                          background: isActivePath(menuPaths.transfertInterCaisse) ? activeGradient : 'transparent',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Repeat size={14} strokeWidth={isActivePath(menuPaths.transfertInterCaisse) ? 3 : 2} />
+                        Transfert caisse
+                      </Link>
+                      
+                      {/* Transfert inter caisse envoi - Menu à commenter */}
+                      {/* <Link
+                        to={menuPaths.transfertInterEnvoi}
+                        className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                          isActivePath(menuPaths.transfertInterEnvoi) 
+                            ? 'text-white fw-bold' 
+                            : 'text-secondary hover-bg-light'
+                        }`}
+                        style={{ 
+                          background: isActivePath(menuPaths.transfertInterEnvoi) ? activeGradient : 'transparent',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Receipt size={14} strokeWidth={isActivePath(menuPaths.transfertInterEnvoi) ? 3 : 2} />
+                        Transfert inter caisse envoi
+                      </Link> */}
+                      
+                      {/* Transfert inter caisse réception - Menu à commenter */}
+                      {/* <Link
+                        to={menuPaths.transfertInterReception}
+                        className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                          isActivePath(menuPaths.transfertInterReception) 
+                            ? 'text-white fw-bold' 
+                            : 'text-secondary hover-bg-light'
+                        }`}
+                        style={{ 
+                          background: isActivePath(menuPaths.transfertInterReception) ? activeGradient : 'transparent',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Receipt size={14} strokeWidth={isActivePath(menuPaths.transfertInterReception) ? 3 : 2} />
+                        Transfert inter caisse réception
+                      </Link> */}
+
+                      {/* MENU Versement avec sous-menus */}
+                      <div className="mb-1">
+                        <div 
+                          className={`d-flex align-items-center justify-content-between p-2 rounded-3 cursor-pointer ${
+                            isGroupActive('Versement') ? 'text-white' : 'text-secondary hover-bg-light'
+                          }`}
+                          style={{ 
+                            background: isGroupActive('Versement') ? activeGradient : 'transparent',
+                            cursor: 'pointer'
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowVersementMenu(!showVersementMenu);
+                          }}
+                        >
+                          <div className="d-flex align-items-center gap-2" style={{ flex: 1 }}>
+                            <DollarSign size={14} strokeWidth={isGroupActive('Versement') ? 3 : 2} />
+                            <span className="small">Gestion des Versement</span>
+                          </div>
+                          <ChevronDown 
+                            size={12} 
+                            className={`transition-all ${showVersementMenu ? 'rotate-180' : ''}`}
+                            style={{ transition: 'transform 0.2s ease' }}
+                          />
+                        </div>
+                        
+                        {/* Sous-sous-menu Versement */}
+                        {showVersementMenu && (
+                          <div className="ms-3 mt-1">
+                            <Link
+                              to={menuPaths.versement}
+                              className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                                isActivePath(menuPaths.versement, true) 
+                                  ? 'text-white fw-bold' 
+                                  : 'text-secondary hover-bg-light'
+                              }`}
+                              style={{ 
+                                background: isActivePath(menuPaths.versement, true) ? activeGradient : 'transparent',
+                                transition: 'all 0.2s ease'
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <DollarSign size={12} strokeWidth={isActivePath(menuPaths.versement, true) ? 3 : 2} />
+                              Versement espèce
+                            </Link>
+                            {/* les different bordereau de versement 
+                            <Link
+                              to="/versement/client"
+                              className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                                isActivePath('/versement/client') 
+                                  ? 'text-white fw-bold' 
+                                  : 'text-secondary hover-bg-light'
+                              }`}
+                              style={{ 
+                                background: isActivePath('/versement/client') ? activeGradient : 'transparent',
+                                transition: 'all 0.2s ease'
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <FileCheck size={12} />
+                              Bordereau de Versement Client
+                            </Link>
+                            
+                            <Link
+                              to="/versement/ac"
+                              className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                                isActivePath('/versement/ac') 
+                                  ? 'text-white fw-bold' 
+                                  : 'text-secondary hover-bg-light'
+                              }`}
+                              style={{ 
+                                background: isActivePath('/versement/ac') ? activeGradient : 'transparent',
+                                transition: 'all 0.2s ease'
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <FileSpreadsheet size={12} />
+                              Bordereau de Versement AC
+                            </Link>*/}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Transaction caisse devise - Menu à commenter */}
+                {/* <Link
+                  to={menuPaths.caisseDevise}
+                  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                    isActivePath(menuPaths.caisseDevise) 
+                      ? 'text-white fw-bold' 
+                      : 'text-secondary hover-bg-light'
+                  }`}
+                  style={{ 
+                    background: isActivePath(menuPaths.caisseDevise) ? activeGradient : 'transparent',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Coins size={16} strokeWidth={isActivePath(menuPaths.caisseDevise) ? 3 : 2} />
+                  Transaction caisse devise
+                </Link> */}
+                
+                {/* Transfert de fond - Menu à commenter */}
+                {/* <Link
+                  to={menuPaths.transfertFond}
+                  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
+                    isActivePath(menuPaths.transfertFond) 
+                      ? 'text-white fw-bold' 
+                      : 'text-secondary hover-bg-light'
+                  }`}
+                  style={{ 
+                    background: isActivePath(menuPaths.transfertFond) ? activeGradient : 'transparent',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Repeat size={16} strokeWidth={isActivePath(menuPaths.transfertFond) ? 3 : 2} />
+                  Transfert de fond
+                </Link> */}
+              </div>
+            )}
+          </div>
+        )}
       </nav>
 
       {/* FOOTER */}
@@ -1160,60 +1404,68 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
           {/* Sous-menu Paramètres */}
           {showSettingsMenu && sidebarOpen && (
             <div className="ms-4 mt-1">
-              <Link
-                to={menuPaths.usersRoles}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
-                  isActivePath(menuPaths.usersRoles) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.usersRoles) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FileText size={16} strokeWidth={isActivePath(menuPaths.usersRoles) ? 3 : 2} />
-                Roles des utilisateurs
-              </Link>
+              {/* Roles des utilisateurs - seulement pour DG */}
+              {canSeeMenu('usersRoles') && (
+                <Link
+                  to={menuPaths.usersRoles}
+                  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                    isActivePath(menuPaths.usersRoles) 
+                      ? 'text-white fw-bold' 
+                      : 'text-secondary hover-bg-light'
+                  }`}
+                  style={{ 
+                    background: isActivePath(menuPaths.usersRoles) ? activeGradient : 'transparent',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileText size={16} strokeWidth={isActivePath(menuPaths.usersRoles) ? 3 : 2} />
+                  Roles des utilisateurs
+                </Link>
+              )}
 
-              {/* Agence */}
-              <Link
-                to={menuPaths.agence}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  isActivePath(menuPaths.agence) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.agence) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <House size={16} strokeWidth={isActivePath(menuPaths.agence) ? 3 : 2} />
-                Agences
-              </Link>
+              {/* Agence - seulement pour DG et Admin */}
+              {canSeeMenu('agence') && (
+                <Link
+                  to={menuPaths.agence}
+                  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                    isActivePath(menuPaths.agence) 
+                      ? 'text-white fw-bold' 
+                      : 'text-secondary hover-bg-light'
+                  }`}
+                  style={{ 
+                    background: isActivePath(menuPaths.agence) ? activeGradient : 'transparent',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <House size={16} strokeWidth={isActivePath(menuPaths.agence) ? 3 : 2} />
+                  Agences
+                </Link>
+              )}
 
-              {/* Liste des Type de comptes */}
-              <Link
-                to={menuPaths.listeTypeCompte}
-                className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
-                  isActivePath(menuPaths.listeTypeCompte) 
-                    ? 'text-white fw-bold' 
-                    : 'text-secondary hover-bg-light'
-                }`}
-                style={{ 
-                  background: isActivePath(menuPaths.listeTypeCompte) ? activeGradient : 'transparent',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <List size={16} strokeWidth={isActivePath(menuPaths.listeTypeCompte) ? 3 : 2} />
-                Liste des Type de comptes
-              </Link>
+              {/* Liste des Type de comptes - seulement pour DG, Admin et AJ */}
+              {canSeeMenu('listeTypeCompte') && (
+                <Link
+                  to={menuPaths.listeTypeCompte}
+                  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                    isActivePath(menuPaths.listeTypeCompte) 
+                      ? 'text-white fw-bold' 
+                      : 'text-secondary hover-bg-light'
+                  }`}
+                  style={{ 
+                    background: isActivePath(menuPaths.listeTypeCompte) ? activeGradient : 'transparent',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <List size={16} strokeWidth={isActivePath(menuPaths.listeTypeCompte) ? 3 : 2} />
+                  Liste des Type de comptes
+                </Link>
+              )}
               
-              <Link
+              {/* Frais et applications - Menu à commenter */}
+              {/* <Link
                 to={menuPaths.fraisApplications}
                 className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 ${
                   isActivePath(menuPaths.fraisApplications) 
@@ -1228,7 +1480,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               >
                 <FileText size={16} strokeWidth={isActivePath(menuPaths.fraisApplications) ? 3 : 2} />
                 Frais et applications
-              </Link>
+              </Link> */}
             </div>
           )}
         </div>

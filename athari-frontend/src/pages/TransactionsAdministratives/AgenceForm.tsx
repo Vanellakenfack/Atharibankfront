@@ -93,49 +93,59 @@ const AgenceForm: React.FC = () => {
   }, []);
 
   // Vérifier l'état de l'agence
-  useEffect(() => {
-    const checkAgenceState = async () => {
-      try {
-        const storedSessionId = localStorage.getItem('session_agence_id');
-        const storedJourneeId = localStorage.getItem('jour_comptable_id');
-        const storedDateComptable = localStorage.getItem('date_comptable');
+// useEffect initial - Remplacer la vérification de l'état de l'agence
+useEffect(() => {
+  const init = async () => {
+    try {
+      // 1. Récupérer directement la session agence active
+      const response = await sessionService.getAgenceActive();
+      
+      if (response.statut === 'success' && response.session) {
+        const session = response.session;
         
-        if (storedSessionId && storedJourneeId) {
-          console.log('✅ Agence ouverte trouvée dans localStorage');
-          console.log('📋 Détails:', {
-            session_agence_id: storedSessionId,
-            jour_comptable_id: storedJourneeId,
-            date_comptable: storedDateComptable
-          });
-          
-          setAgenceState({
-            isOpen: true,
-            sessionId: parseInt(storedSessionId),
-            journeeId: parseInt(storedJourneeId),
-            dateComptable: storedDateComptable || undefined
-          });
-          
-          setFormDataFermeture({
-            agence_session_id: storedSessionId,
-            jour_comptable_id: storedJourneeId
-          });
-          
-          setOperation('FE');
-        } else {
-          console.log('❌ Aucune agence ouverte trouvée');
-          setAgenceState({ isOpen: false });
-          setOperation('OU');
-        }
-      } catch (err: any) {
-        console.error('❌ Erreur vérification état agence:', err);
+        console.log('✅ Session agence active trouvée:', session);
+        
+        // Mettre à jour l'état
+        setAgenceState({
+          isOpen: true,
+          sessionId: session.id,
+          journeeId: session.jour_comptable_id,
+          dateComptable: session.date_comptable
+        });
+        
+        setFormDataFermeture({
+          agence_session_id: session.id.toString(),
+          jour_comptable_id: session.jour_comptable_id.toString()
+        });
+        
+        setOperation('FE');
+        
+        // Stocker dans localStorage (optionnel)
+        localStorage.setItem('session_agence_id', session.id);
+        localStorage.setItem('agence_id', session.agence_id);
+        localStorage.setItem('date_comptable', session.date_comptable);
+        localStorage.setItem('jour_comptable_id', session.jour_comptable_id);
+        
+      } else {
+        console.log('ℹ️ Aucune session agence active');
         setAgenceState({ isOpen: false });
         setOperation('OU');
       }
-    };
+      
+      // 2. Charger la liste des agences
+      const data = await agenceService.getAgences();
+      setAgences(data);
+      
+    } catch (err) {
+      console.error('❌ Erreur initialisation:', err);
+      setError('Erreur lors du chargement des données');
+    } finally {
+      setLoadingAgences(false);
+    }
+  };
 
-    checkAgenceState();
-  }, []);
-
+  init();
+}, []);
   const handleOperationChange = (e: React.ChangeEvent<{ value: unknown }>) => {
     const value = e.target.value as 'OU' | 'FE';
     setOperation(value);
@@ -544,7 +554,7 @@ const AgenceForm: React.FC = () => {
                     </form>
                   )}
 
-                  {/* Informations de session stockées */}
+                  {/* Informations de session stockées 
                   <Grid item xs={12}>
                     <Alert severity="info" icon={false}>
                       <Typography variant="body2" fontWeight="bold">
@@ -557,7 +567,7 @@ const AgenceForm: React.FC = () => {
                         agence_id: {localStorage.getItem('agence_id') || 'null'}
                       </Typography>
                     </Alert>
-                  </Grid>
+                  </Grid>*/}
 
                   {/* Boutons */}
                   <Grid item xs={12}>

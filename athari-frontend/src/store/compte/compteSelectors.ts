@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from '../..//store';
-import type { Compte, TypeDeCompte } from '../../types/comptes';
+import type { RootState } from '../../store';
+import type { Compte } from '../../types/comptes';
 
 // Selecteurs de base
 export const selectAccounts = (state: RootState) => state.account.accounts;
@@ -16,41 +16,18 @@ export const selectStatistics = (state: RootState) => state.account.statistics;
 export const selectFilteredAccounts = createSelector(
   [selectAccounts, selectFilters],
   (accounts, filters) => {
-    return accounts.filter(account => {
-      // Filtre par type
-      if (filters.type?.length && !filters.type.includes(account.type)) {
-        return false;
-      }
-      
+    return accounts.filter((account: any) => {
       // Filtre par statut
-      if (filters.status?.length && !filters.status.includes(account.status)) {
+      if (filters.statut && account.statut !== filters.statut) {
         return false;
       }
       
-      // Filtre par agence
-      if (filters.branchId && account.branchId !== filters.branchId) {
-        return false;
-      }
-      
-      // Filtre par solde minimum
-      if (filters.minBalance && account.balance < filters.minBalance) {
-        return false;
-      }
-      
-      // Filtre par solde maximum
-      if (filters.maxBalance && account.balance > filters.maxBalance) {
-        return false;
-      }
-      
-      // Filtre par recherche
-      if (filters.searchTerm) {
-        const searchTerm = filters.searchTerm.toLowerCase();
-        const matchesSearch = 
-          account.accountNumber.toLowerCase().includes(searchTerm) ||
-          account.clientName.toLowerCase().includes(searchTerm) ||
-          account.clientId.toLowerCase().includes(searchTerm);
+      // Filtre par recherche sur le numéro de compte
+      if (filters.search) {
+        const searchTerm = filters.search.toLowerCase();
+        const matches = (account.numero_compte || '').toLowerCase().includes(searchTerm);
         
-        if (!matchesSearch) return false;
+        if (!matches) return false;
       }
       
       return true;
@@ -58,30 +35,10 @@ export const selectFilteredAccounts = createSelector(
   }
 );
 
-export const selectAccountsByType = createSelector(
-  [selectAccounts],
-  (accounts) => {
-    return accounts.reduce((acc, account) => {
-      if (!acc[account.type]) {
-        acc[account.type] = [];
-      }
-      acc[account.type].push(account);
-      return acc;
-    }, {} as Record<TypeDeCompte, Compte[]>);
-  }
-);
-
-export const selectTotalBalance = createSelector(
-  [selectAccounts],
-  (accounts) => {
-    return accounts.reduce((total, account) => total + account.balance, 0);
-  }
-);
-
 export const selectActiveAccounts = createSelector(
   [selectAccounts],
   (accounts) => {
-    return accounts.filter(account => account.status === 'active');
+    return accounts.filter((account: any) => account.statut === 'actif');
   }
 );
 
@@ -89,16 +46,13 @@ export const selectAccountsSummary = createSelector(
   [selectAccounts],
   (accounts) => {
     const total = accounts.length;
-    const active = accounts.filter(acc => acc.status === 'active').length;
-    const blocked = accounts.filter(acc => acc.status === 'blocked').length;
-    const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+    const actifs = accounts.filter((acc: any) => acc.statut === 'actif').length;
+    const inactifs = accounts.filter((acc: any) => acc.statut === 'inactif').length;
     
     return {
       total,
-      active,
-      blocked,
-      totalBalance,
-      averageBalance: total > 0 ? totalBalance / total : 0,
+      actifs,
+      inactifs,
     };
   }
 );

@@ -2,7 +2,7 @@ import axios from 'axios';
 import { enqueueSnackbar } from 'notistack';
 
 // Configuration API
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
 // Instance Axios configurée
 const api = axios.create({
@@ -18,6 +18,7 @@ const api = axios.create({
 // Intercepteur pour ajouter le token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('authToken');
+  
   console.log('[Axios] Token from localStorage:', token ? 'Present' : 'Missing');
   
   if (token) {

@@ -165,7 +165,7 @@ const categorizeParameters = (typeCompte: TypeCompte) => {
     'frais_carnet_actif', 'commission_retrait_actif', 'commission_sms_actif',
     'penalite_actif', 'interets_actifs', 'minimum_compte_actif',
     'frais_perte_actif', 'frais_renouvellement_actif', 'commission_mensuelle_actif','frais_chequier_actif',
-    'penalite_retrait_anticipe_actif','frais_cheque_guichet_actif'
+    'penalite_retrait_anticipe_actif','frais_cheque_guichet_actif','frais_deblocage_actif'
   ];
 
   const autresKeys = Object.keys(typeCompte).filter(key => 
@@ -1183,7 +1183,9 @@ console.log('=== DONNÉES ÉTAPE 2 ENVOYÉES ===');
                                   <TableCell align="right">
                                     <Chip 
                                       label={
-                                        key.includes('seuil') ? 
+                                        key.includes('taux') ? 
+                                        formatPourcentage(value) :
+                                        key.includes('seuil') ?
                                         formatsolde(value) : 
                                         formatsolde(value)
                                       } 

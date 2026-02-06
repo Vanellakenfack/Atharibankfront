@@ -1,4 +1,4 @@
-import api from './api/axios';
+import ApiClient from './api/ApiClient';
 
 /**
  * Service simple pour la gestion des chapitres comptables
@@ -20,7 +20,7 @@ export const chapitreService = {
         try {
           console.log(`Chargement page ${page}...`);
           
-          const response = await api.get('plan-comptable/comptes', {
+          const response = await ApiClient.get('plan-comptable/comptes', {
             params: { page, per_page: perPage }
           });
 
@@ -70,7 +70,7 @@ export const chapitreService = {
    */
   async getChapitre(id: number) {
     try {
-      const response = await api.get(`plan-comptable/comptes/${id}`);
+      const response = await ApiClient.get(`plan-comptable/comptes/${id}`);
       return response.data;
     } catch (error) {
       console.error(`Erreur lors de la récupération du chapitre ${id}:`, error);
@@ -83,7 +83,7 @@ export const chapitreService = {
    */
   async searchChapitres(searchTerm: string) {
     try {
-      const response = await api.get('plan-comptable/comptes/search', {
+      const response = await ApiClient.get('plan-comptable/comptes/search', {
         params: { q: searchTerm }
       });
       return response.data;

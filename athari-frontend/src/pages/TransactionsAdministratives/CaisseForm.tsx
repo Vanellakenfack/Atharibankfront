@@ -129,76 +129,54 @@ const CaisseForm = () => {
 
   // Initialisation
   useEffect(() => {
-    console.log('🔄 Initialisation CaisseForm...');
-    
     const init = async () => {
       try {
-        const guichetSessionId = localStorage.getItem('guichet_session_id');
-        const guichetId = localStorage.getItem('guichet_id');
-        const codeGuichet = localStorage.getItem('code_guichet');
-        const caisseSessionId = localStorage.getItem('caisse_session_id');
-        const caisseId = localStorage.getItem('caisse_id');
-        const codeCaisse = localStorage.getItem('code_caisse');
-        const soldeCaisse = localStorage.getItem('solde_caisse');
+        // 1. Vérifier si on a une session guichet active
+        const responseGuichet = await sessionService.getGuichetActive();
         
-        console.log('📋 localStorage CaisseForm:', {
-          guichet_session_id: guichetSessionId,
-          guichet_id: guichetId,
-          code_guichet: codeGuichet,
-          caisse_session_id: caisseSessionId,
-          caisse_id: caisseId,
-          code_caisse: codeCaisse,
-          solde_caisse: soldeCaisse
-        });
-        
-        if (guichetSessionId && guichetId) {
-          setGuichetSessionId(guichetSessionId);
-          setGuichetId(guichetId);
-          setCodeGuichet(codeGuichet || '');
+        if (responseGuichet.statut === 'success' && responseGuichet.session) {
+          const guichetSession = responseGuichet.session;
           
-          setFormDataOuverture(prev => ({
-            ...prev,
-            guichet_session_id: guichetSessionId
-          }));
+          setGuichetSessionId(guichetSession.id);
+          setGuichetId(guichetSession.guichet_id);
+          setCodeGuichet(guichetSession.code);
           
-          // Charger les caisses du guichet
-          await loadCaisses(parseInt(guichetId));
+          // 2. Vérifier si on a une session caisse active
+          const responseCaisse = await sessionService.getCaisseActive();
           
-          // Si une caisse est déjà ouverte
-          if (caisseSessionId && caisseId && codeCaisse) {
-            console.log('✅ Caisse déjà ouverte:', { caisseSessionId, caisseId, codeCaisse });
+          if (responseCaisse.statut === 'success' && responseCaisse.session) {
+            const caisseSession = responseCaisse.session;
             
             setCaisseState({
               isOpen: true,
-              sessionId: parseInt(caisseSessionId),
-              caisseId: parseInt(caisseId),
-              codeCaisse: codeCaisse,
-              soldeOuverture: soldeCaisse ? parseFloat(soldeCaisse) : undefined
+              sessionId: caisseSession.id,
+              caisseId: caisseSession.caisse_id,
+              codeCaisse: caisseSession.code,
+              soldeOuverture: caisseSession.solde_ouverture
             });
             
             setFormDataFermeture({
-              caisse_session_id: caisseSessionId,
-              caisse_id: caisseId,
-              code_caisse: codeCaisse,
-              solde_fermeture: soldeCaisse ? parseFloat(soldeCaisse) : 0,
-              solde_ouverture: soldeCaisse ? parseFloat(soldeCaisse) : 0
+              caisse_session_id: caisseSession.id.toString(),
+              caisse_id: caisseSession.caisse_id.toString(),
+              code_caisse: caisseSession.code,
+              solde_fermeture: caisseSession.solde_ouverture,
+              solde_ouverture: caisseSession.solde_ouverture
             });
             
-            // Charger automatiquement le code caisse dans le champ ouverture
-            setFormDataOuverture(prev => ({
-              ...prev,
-              code_caisse: codeCaisse
-            }));
-            
             setOperation('FE');
+            
           } else {
             setOperation('OU');
           }
+          
+          // 3. Charger les caisses disponibles
+          await loadCaisses(guichetSession.guichet_id);
+          
         } else {
           showSnackbar('Aucun guichet ouvert. Ouvrez d\'abord un guichet.', 'warning');
         }
-
-      } catch (error: any) {
+        
+      } catch (error) {
         console.error('❌ Erreur initialisation:', error);
       } finally {
         setLoadingCaisses(false);
@@ -1058,7 +1036,7 @@ const CaisseForm = () => {
                   <form onSubmit={handleSubmitOuverture} style={{ width: '100%' }}>
                     <Grid container spacing={3}>
                       <Grid item xs={12}>
-                        <FormControl fullWidth size="small" required>
+                        <FormControl sx={{minWidth:250}} size="small" required>
                           <InputLabel>Caisse *</InputLabel>
                           <Select
                             name="caisse_id"
@@ -1073,7 +1051,6 @@ const CaisseForm = () => {
                               caisses.map((caisse) => (
                                 <MenuItem key={caisse.id} value={caisse.id}>
                                   {caisse.libelle || caisse.code_caisse} ({caisse.code_caisse})
-                                  {caisse.solde_actuel > 0 && ` - Solde: ${formatCurrency(caisse.solde_actuel)} FCFA`}
                                 </MenuItem>
                               ))
                             ) : (
@@ -1185,7 +1162,7 @@ const CaisseForm = () => {
                         </Box>
                       </Grid>
 
-                      {/* État du billetage (uniquement pour ouverture) */}
+                      {/* État du billetage (uniquement pour ouverture)
                       <Grid item xs={12}>
                         <Alert 
                           severity={Math.abs(difference) <= 1 ? "success" : "warning"}
@@ -1229,7 +1206,7 @@ const CaisseForm = () => {
                             </Button>
                           </Box>
                         </Alert>
-                      </Grid>
+                      </Grid> */}
                     </Grid>
                   </form>
                 ) : (
@@ -1264,7 +1241,7 @@ const CaisseForm = () => {
                           helperText="Code de la caisse"
                         />
                       </Grid>
-
+{/**
                       <Grid item xs={12}>
                         <Alert severity="info" icon={<InfoIcon />}>
                           <Typography variant="body2" fontWeight="bold">
@@ -1285,7 +1262,7 @@ const CaisseForm = () => {
                           </Button>
                         </Alert>
                       </Grid>
-
+ */}
                       <Grid item xs={12}>
                         <TextField
                           fullWidth
@@ -1307,7 +1284,7 @@ const CaisseForm = () => {
                           helperText="Solde constaté après comptage à la fermeture"
                         />
                       </Grid>
-
+{/*
                       <Grid item xs={12}>
                         <Alert severity="info">
                           <Typography variant="body2">
@@ -1331,12 +1308,12 @@ const CaisseForm = () => {
                             </Button>
                           </Box>
                         </Alert>
-                      </Grid>
+                      </Grid> */}
                     </Grid>
                   </form>
                 )}
 
-                {/* Informations techniques */}
+                {/* Informations techniques
                 <Grid item xs={12}>
                   <Alert severity="info" icon={false}>
                     <Typography variant="body2" fontWeight="bold">
@@ -1354,7 +1331,7 @@ const CaisseForm = () => {
                       <strong>Note:</strong> Le Caisse Session ID reste dans le localStorage après fermeture pour être utilisé dans la fermeture du guichet.
                     </Typography>
                   </Alert>
-                </Grid>
+                </Grid> */}
 
                 {/* Boutons */}
                 <Grid item xs={12}>
@@ -1637,7 +1614,7 @@ const CaisseForm = () => {
         <DialogActions sx={{ px: 3, py: 2, bgcolor: '#f8fafc', borderTop: '1px solid #e0e0e0' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
             <Box>
-              <Button 
+              {/** <Button 
                 onClick={suggestBilletage} 
                 variant="outlined" 
                 startIcon={<AutoFixHighIcon />}
@@ -1658,7 +1635,7 @@ const CaisseForm = () => {
                 size="medium"
               >
                 Réinitialiser
-              </Button>
+              </Button> */}
             </Box>
             <Box>
               <Button 

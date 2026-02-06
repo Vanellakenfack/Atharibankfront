@@ -1,5 +1,6 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import type { Compte, FlitrageCompte, PaginationCompte, StatistiquesCompte } from '../../types/comptes';
+import { createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import type { Compte, FlitrageCompte, StatistiquesCompte } from '../../types/comptes';
 
 interface AccountState {
   accounts: Compte[];
@@ -81,14 +82,14 @@ const accountSlice = createSlice({
     },
     
     updateAccountOptimistic: (state, action: PayloadAction<Compte>) => {
-      const index = state.accounts.findIndex(acc => acc.id === action.payload.id);
+      const index = state.accounts.findIndex((acc: any) => acc.id === action.payload.id);
       if (index !== -1) {
         state.accounts[index] = action.payload;
       }
     },
     
-    deleteAccountOptimistic: (state, action: PayloadAction<string>) => {
-      state.accounts = state.accounts.filter(acc => acc.id !== action.payload);
+    deleteAccountOptimistic: (state, action: PayloadAction<number>) => {
+      state.accounts = state.accounts.filter((acc: any) => acc.id !== action.payload);
     },
     
     // Réinitialisation

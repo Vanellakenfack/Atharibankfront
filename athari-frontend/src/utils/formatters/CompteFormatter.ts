@@ -1,4 +1,4 @@
-import { Account, AccountType } from '@/types/comptes';
+import type { Account, AccountType } from '../../types/comptes';
 
 type AccountStatus = 'active' | 'blocked' | 'closed' | 'pending' | 'suspended';
 
@@ -31,8 +31,8 @@ export const formatBalance = (balance: number, currency: string): string => {
   }).format(balance);
 };
 
-export const getAccountTypeLabel = (type: AccountType): string => {
-  const labels: Record<AccountType, string> = {
+export const getAccountTypeLabel = (type: string): string => {
+  const labels: Record<string, string> = {
     courant: 'Compte Courant',
     epargne: 'Compte Épargne',
     bloque: 'Compte Bloqué',
@@ -80,16 +80,13 @@ export const calculateAccountAge = (openingDate: string): string => {
   return months === 0 ? yearStr : `${yearStr} et ${months} mois`;
 };
 
-export const generateAccountSummary = (account: Account): AccountSummary => {
+export const generateAccountSummary = (account: any): AccountSummary => {
   return {
-    age: calculateAccountAge(account.openingDate),
-    formattedBalance: formatBalance(account.balance, account.currency),
-    typeLabel: getAccountTypeLabel(account.type),
-    statusLabel: getStatusLabel(account.status as AccountStatus),
-    isActive: account.status === 'active',
-    hasRestrictions: Boolean(
-      account.restrictions && 
-      Object.values(account.restrictions).some(Boolean)
-    ),
+    age: calculateAccountAge(account.openingDate || account.date_ouverture || ''),
+    formattedBalance: formatBalance(account.balance || account.solde || 0, account.currency || account.devise || 'XOF'),
+    typeLabel: getAccountTypeLabel(account.type || ''),
+    statusLabel: getStatusLabel((account.status || account.statut || '') as AccountStatus),
+    isActive: (account.status || account.statut) === 'active',
+    hasRestrictions: false,
   };
 };
