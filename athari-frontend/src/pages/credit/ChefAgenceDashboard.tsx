@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -25,7 +26,18 @@ import {
   CircularProgress,
   TextField,
   Tabs,
-  Tab
+  Tab,
+  CardMedia,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Modal,
+  Backdrop,
+  Fade
 } from '@mui/material';
 import {
   Visibility as VisibilityIcon,
@@ -40,15 +52,89 @@ import {
   AttachMoney as AttachMoneyIcon,
   Schedule as ScheduleIcon,
   Notes as NotesIcon,
-  Calculate as CalculateIcon
+  Calculate as CalculateIcon,
+  ExpandMore as ExpandMoreIcon,
+  Home as HomeIcon,
+  Work as WorkIcon,
+  AccountBalance as AccountBalanceIcon,
+  MonetizationOn as MonetizationOnIcon,
+  PictureAsPdf as PictureAsPdfIcon,
+  Photo as PhotoIcon,
+  LocationOn as LocationOnIcon,
+  Description as DescriptionIcon2,
+  Receipt as ReceiptIcon,
+  Security as SecurityIcon,
+  History as HistoryIcon,
+  ContactPhone as ContactPhoneIcon,
+  Speed as SpeedIcon,
+  Warning as WarningIcon,
+  Info as InfoIcon,
+  Apartment as ApartmentIcon,
+  CreditCard as CreditCardIcon,
+  Assignment as AssignmentIcon,
+  LocalAtm as LocalAtmIcon,
+  Close as CloseIcon,
+  ZoomIn as ZoomInIcon,
+  Download as DownloadIcon,
+  Folder as FolderIcon,
+  Image as ImageIcon,
+  InsertDriveFile as FileIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
-import creditService from '../../services/creditService';
-import { useAuth } from '../../context/AuthContext';
 
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
   marginBottom: theme.spacing(3),
+  borderRadius: theme.spacing(2),
+}));
+
+const StyledDialog = styled(Dialog)(({ theme }) => ({
+  '& .MuiDialog-paper': {
+    borderRadius: theme.spacing(2),
+    maxWidth: '1200px',
+  },
+}));
+
+const ImageModal = styled(Modal)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+}));
+
+const ModalContent = styled('div')(({ theme }) => ({
+  backgroundColor: theme.palette.background.paper,
+  border: 'none',
+  boxShadow: theme.shadows[24],
+  padding: theme.spacing(2),
+  borderRadius: theme.spacing(1),
+  outline: 'none',
+  maxWidth: '90vw',
+  maxHeight: '90vh',
+  position: 'relative',
+}));
+
+const CloseButton = styled(IconButton)(({ theme }) => ({
+  position: 'absolute',
+  right: theme.spacing(1),
+  top: theme.spacing(1),
+  zIndex: 10,
+  backgroundColor: 'rgba(0,0,0,0.5)',
+  color: 'white',
+  '&:hover': {
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+}));
+
+const DownloadButton = styled(IconButton)(({ theme }) => ({
+  position: 'absolute',
+  right: theme.spacing(6),
+  top: theme.spacing(1),
+  zIndex: 10,
+  backgroundColor: 'rgba(0,0,0,0.5)',
+  color: 'white',
+  '&:hover': {
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
 }));
 
 interface StatusChipProps {
@@ -64,14 +150,6 @@ const StatusChip: React.FC<StatusChipProps> = ({ statut }) => {
       case 'COMITE': return 'secondary';
       case 'APPROUVE': return 'success';
       case 'REJETE': return 'error';
-      // Legacy statuses
-      case 'en_attente': return 'warning';
-      case 'approuve': return 'success';
-      case 'rejette': return 'error';
-      case 'EN_COURS': return 'info';
-      case 'ACCEPTE': return 'success';
-      case 'REFUSE': return 'error';
-      case 'ANNULE': return 'default';
       default: return 'default';
     }
   };
@@ -84,14 +162,6 @@ const StatusChip: React.FC<StatusChipProps> = ({ statut }) => {
       'COMITE': '🔄 Comité en cours',
       'APPROUVE': '✅ Approuvé',
       'REJETE': '❌ Rejeté',
-      // Legacy statuses
-      'en_attente': 'En attente',
-      'approuve': 'Approuvé',
-      'rejette': 'Rejeté',
-      'EN_COURS': 'En cours',
-      'ACCEPTE': 'Accepté',
-      'REFUSE': 'Refusé',
-      'ANNULE': 'Annulé'
     };
     return labels[statut] || statut;
   };
@@ -106,57 +176,85 @@ const StatusChip: React.FC<StatusChipProps> = ({ statut }) => {
   );
 };
 
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  date_of_birth: string;
+  gender: string;
+  marital_status: string;
+  profession: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Client {
+  id: number;
+  client_code: string;
+  full_name: string;
+  cin: string;
+  phone: string;
+  email: string;
+  address: string;
+  date_of_birth: string;
+  gender: string;
+  marital_status: string;
+  profession: string;
+  monthly_income: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Document {
+  id: number;
+  name: string;
+  file_path: string;
+  document_type: string;
+  created_at: string;
+  url?: string;
+}
+
 interface Application {
   id: number;
   numero_demande: string;
-  montant: number;
-  duree: number;
-  statut: string;
-  date_demande: string;
-  created_at: string;
-  credit_type_id: number;
-  client_info?: {
-    nom: string;
-    prenom: string;
-  };
-  compte_info?: {
-    numero_compte: string;
-    client_id: number;
-  };
-  credit_type_info?: {
-    description: string;
-    credit_characteristics?: string;
-    code?: string;
-  };
+  user_id: number;
+  client_id: number;
+  compte_id: string;
+  credit_type_id: string;
+  montant: string;
+  duree: string;
   taux_interet: number;
   interet_total: number;
+  frais_dossier: number;
   frais_etude: number;
-  frais_dossier?: number;
   montant_total: number;
-  penalite_par_jour?: number;
-  calcul_details?: any;
-  source_revenus?: string;
-  revenus_mensuels?: number;
-  autres_revenus?: number;
-  montant_dettes?: number;
-  description_dette?: string;
-  nom_banque?: string;
-  numero_banque?: string;
-  code_mise_en_place?: string;
-  note_credit?: string;
-  plan_epargne?: number;
-  photo_4x4?: string;
-  plan_localisation?: string;
-  facture_electricite?: string;
-  casier_judiciaire?: string;
-  historique_compte?: string;
-  geolocalisation_img?: string;
-  plan_localisation_activite_img?: string;
-  photo_activite_img?: string;
-  numero_personne_contact?: string;
-  demande_credit_img?: string;
-  observation?: string;
-  avis?: any[];
+  penalite_par_jour: number;
+  calcul_details: string;
+  date_demande: string;
+  source_revenus: string;
+  revenus_mensuels: string;
+  autres_revenus: string;
+  montant_dettes: string;
+  description_dette: string;
+  nom_banque: string;
+  numero_banque: string;
+  numero_personne_contact: string;
+  observation: string;
+  urgence: string;
+  garantie: string;
+  plan_epargne: boolean;
+  statut: string;
+  
+  // Nested data
+  user?: User;
+  client?: Client;
+  documents?: Document[];
+  file_urls?: { [key: string]: string };
+  
+  // For backward compatibility
+  [key: string]: any;
 }
 
 interface CreditType {
@@ -168,6 +266,15 @@ interface Opinion {
   opinion: string;
   commentaire: string;
   niveau_avis: string;
+}
+
+interface DocumentItem {
+  label: string;
+  url: string | null;
+  icon: React.ReactNode;
+  fieldName: string;
+  type: 'field' | 'document';
+  document?: Document;
 }
 
 const ChefAgenceDashboard: React.FC = () => {
@@ -188,9 +295,225 @@ const ChefAgenceDashboard: React.FC = () => {
   const [amortizationData, setAmortizationData] = useState<any[]>([]);
   const [showAmortizationTable, setShowAmortizationTable] = useState(false);
   const [submittingOpinion, setSubmittingOpinion] = useState(false);
+  const [expandedAccordion, setExpandedAccordion] = useState<string | false>('infoGenerale');
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageModalOpen, setImageModalOpen] = useState(false);
 
-  const API_BASE_URL = 'http://127.0.0.1:8000/api';
+  const API_BASE_URL = 'http://127.0.0.1:8000';
   const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+
+  // Liste des champs de documents potentiels dans l'application
+  const documentFields = [
+    // Documents personnels
+    { field: 'demande_credit_img', label: 'Demande de crédit', icon: <AssignmentIcon /> },
+    { field: 'photocopie_cni', label: 'Photocopie CNI', icon: <PersonIcon /> },
+    { field: 'lettre_non_remboursement', label: 'Lettre de non remboursement', icon: <ReceiptIcon /> },
+    
+    // Documents domicile
+    { field: 'plan_localisation_domicile', label: 'Plan localisation domicile', icon: <LocationOnIcon /> },
+    { field: 'description_domicile', label: 'Description domicile', icon: <DescriptionIcon2 /> },
+    { field: 'geolocalisation_domicile', label: 'Géolocalisation domicile', icon: <LocationOnIcon /> },
+    { field: 'photo_domicile_1', label: 'Photo domicile 1', icon: <PhotoIcon /> },
+    { field: 'photo_domicile_2', label: 'Photo domicile 2', icon: <PhotoIcon /> },
+    { field: 'photo_domicile_3', label: 'Photo domicile 3', icon: <PhotoIcon /> },
+    
+    // Documents activité
+    { field: 'description_activite', label: 'Description activité', icon: <WorkIcon /> },
+    { field: 'geolocalisation_img', label: 'Géolocalisation activité', icon: <LocationOnIcon /> },
+    { field: 'photo_activite_1', label: 'Photo activité 1', icon: <PhotoIcon /> },
+    { field: 'photo_activite_2', label: 'Photo activité 2', icon: <PhotoIcon /> },
+    { field: 'photo_activite_3', label: 'Photo activité 3', icon: <PhotoIcon /> },
+    
+    // Documents supplémentaires du file_urls
+    { field: 'photo_4x4', label: 'Photo 4x4', icon: <PersonIcon /> },
+    { field: 'plan_localisation', label: 'Plan localisation', icon: <LocationOnIcon /> },
+    { field: 'facture_electricite', label: 'Facture électricité', icon: <ReceiptIcon /> },
+    { field: 'casier_judiciaire', label: 'Casier judiciaire', icon: <SecurityIcon /> },
+    { field: 'historique_compte', label: 'Historique compte', icon: <HistoryIcon /> },
+    { field: 'plan_localisation_activite_img', label: 'Plan localisation activité', icon: <LocationOnIcon /> },
+    { field: 'photo_activite_img', label: 'Photo activité', icon: <PhotoIcon /> },
+  ];
+
+  // Fonction pour construire l'URL correcte des documents
+  const getDocumentUrl = (path: string | null | undefined): string | null => {
+    if (!path || path === 'N/A' || path === 'null' || path === 'undefined' || path.trim() === '') {
+      return null;
+    }
+    
+    // Si l'URL commence déjà par http ou https, la retourner telle quelle
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    
+    // Si c'est un chemin de stockage Laravel (commence par storage/)
+    if (path.startsWith('storage/')) {
+      return `${API_BASE_URL}/${path}`;
+    }
+    
+    // Si c'est un chemin relatif (commence par /storage)
+    if (path.startsWith('/storage')) {
+      return `${API_BASE_URL}${path}`;
+    }
+    
+    // Pour les autres chemins, on suppose que c'est un chemin dans storage
+    return `${API_BASE_URL}/storage/${path.replace(/^\/+/, '')}`;
+  };
+
+  // Fonction pour récupérer tous les documents disponibles
+  const getAvailableDocuments = (application: Application | null): DocumentItem[] => {
+    if (!application) return [];
+
+    const documents: DocumentItem[] = [];
+
+    // 1. Récupérer les documents du tableau documents (si existant)
+    if (application.documents && Array.isArray(application.documents)) {
+      application.documents.forEach((doc: Document) => {
+        if (doc.file_path && getDocumentUrl(doc.file_path)) {
+          documents.push({
+            label: doc.name || doc.document_type || 'Document',
+            url: doc.file_path,
+            icon: getIconForDocumentType(doc.document_type || doc.name),
+            fieldName: doc.document_type || 'document',
+            type: 'document',
+            document: doc
+          });
+        }
+      });
+    }
+
+    // 2. Récupérer tous les documents des champs principaux
+    documentFields.forEach(docField => {
+      let url: string | null = null;
+      
+      // Vérifier d'abord dans file_urls si c'est un champ de file_urls
+      if (application.file_urls && application.file_urls[docField.field as keyof typeof application.file_urls]) {
+        url = application.file_urls[docField.field as keyof typeof application.file_urls] as string;
+      }
+      // Sinon vérifier dans les champs principaux de l'application
+      else if (application[docField.field]) {
+        url = application[docField.field];
+      }
+      
+      const fullUrl = getDocumentUrl(url);
+      if (fullUrl) {
+        // Vérifier si ce document n'a pas déjà été ajouté via documents[]
+        const alreadyAdded = documents.some(doc => 
+          doc.type === 'document' && doc.url === url
+        );
+        
+        if (!alreadyAdded) {
+          documents.push({
+            label: docField.label,
+            url: url,
+            icon: docField.icon,
+            fieldName: docField.field,
+            type: 'field'
+          });
+        }
+      }
+    });
+
+    // 3. Rechercher dynamiquement d'autres champs qui pourraient être des documents
+    Object.keys(application).forEach(key => {
+      // Si c'est un champ qui contient "img", "photo", "image", "plan", "cni", "facture", etc.
+      if (key.toLowerCase().includes('img') || 
+          key.toLowerCase().includes('photo') || 
+          key.toLowerCase().includes('image') ||
+          key.toLowerCase().includes('plan') ||
+          key.toLowerCase().includes('cni') ||
+          key.toLowerCase().includes('facture') ||
+          key.toLowerCase().includes('casier') ||
+          key.toLowerCase().includes('historique') ||
+          key.toLowerCase().includes('lettre') ||
+          key.toLowerCase().includes('description')) {
+        
+        const value = application[key];
+        if (typeof value === 'string' && value && getDocumentUrl(value)) {
+          // Vérifier si ce document n'a pas déjà été ajouté
+          const alreadyAdded = documents.some(doc => 
+            (doc.type === 'field' && doc.fieldName === key) ||
+            (doc.type === 'document' && doc.url === value)
+          );
+          
+          if (!alreadyAdded) {
+            documents.push({
+              label: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+              url: value,
+              icon: getIconForDocumentType(key),
+              fieldName: key,
+              type: 'field'
+            });
+          }
+        }
+      }
+    });
+
+    return documents;
+  };
+
+  // Fonction pour obtenir l'icône appropriée selon le type de document
+  const getIconForDocumentType = (fieldName: string): React.ReactNode => {
+    const lowerField = fieldName.toLowerCase();
+    
+    if (lowerField.includes('photo') || lowerField.includes('img') || lowerField.includes('image')) {
+      return <PhotoIcon />;
+    }
+    if (lowerField.includes('plan') || lowerField.includes('localisation')) {
+      return <LocationOnIcon />;
+    }
+    if (lowerField.includes('cni') || lowerField.includes('identite')) {
+      return <PersonIcon />;
+    }
+    if (lowerField.includes('facture') || lowerField.includes('receipt') || lowerField.includes('lettre')) {
+      return <ReceiptIcon />;
+    }
+    if (lowerField.includes('casier') || lowerField.includes('judiciaire')) {
+      return <SecurityIcon />;
+    }
+    if (lowerField.includes('historique') || lowerField.includes('compte')) {
+      return <HistoryIcon />;
+    }
+    if (lowerField.includes('description')) {
+      return <DescriptionIcon2 />;
+    }
+    if (lowerField.includes('activite') || lowerField.includes('work')) {
+      return <WorkIcon />;
+    }
+    if (lowerField.includes('demande') || lowerField.includes('credit')) {
+      return <AssignmentIcon />;
+    }
+    
+    return <FileIcon />;
+  };
+
+  // Fonction pour ouvrir l'image en plein écran
+  const handleOpenImage = (url: string) => {
+    const fullUrl = getDocumentUrl(url);
+    if (fullUrl) {
+      setSelectedImage(fullUrl);
+      setImageModalOpen(true);
+    }
+  };
+
+  // Fonction pour télécharger l'image
+  const handleDownloadImage = (url: string, filename: string) => {
+    const fullUrl = getDocumentUrl(url);
+    if (fullUrl) {
+      fetch(fullUrl)
+        .then(response => response.blob())
+        .then(blob => {
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename || 'document.jpg';
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        })
+        .catch(err => console.error('Erreur de téléchargement:', err));
+    }
+  };
 
   useEffect(() => {
     checkApiStatus();
@@ -200,13 +523,13 @@ const ChefAgenceDashboard: React.FC = () => {
 
   const checkApiStatus = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/health`, {
+      const response = await fetch(`${API_BASE_URL}/api/health`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
         }
       });
-      
+
       if (response.ok) {
         setApiStatus('success');
       } else {
@@ -221,17 +544,17 @@ const ChefAgenceDashboard: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       };
-      
+
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      
-      const response = await fetch(`${API_BASE_URL}/credit-applications`, {
+
+      const response = await fetch(`${API_BASE_URL}/api/credit-applications`, {
         method: 'GET',
         headers: headers
       });
@@ -241,15 +564,15 @@ const ChefAgenceDashboard: React.FC = () => {
       }
 
       const data = await response.json();
-      
+
       if (data.status === 'success') {
         setApplications(data.data || []);
       } else {
         setApplications([]);
       }
-      
+
       setApiStatus('success');
-      
+
     } catch (err: any) {
       console.error('Erreur lors du chargement des applications:', err);
       setError(`Impossible de charger les applications: ${err.message}`);
@@ -262,7 +585,7 @@ const ChefAgenceDashboard: React.FC = () => {
 
   const loadCreditTypes = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/credit-types`, {
+      const response = await fetch(`${API_BASE_URL}/api/credit-types`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -285,21 +608,57 @@ const ChefAgenceDashboard: React.FC = () => {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       };
-      
+
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      
-      const response = await fetch(`${API_BASE_URL}/credit-applications/${id}`, {
+
+      const response = await fetch(`${API_BASE_URL}/api/credit-applications/${id}`, {
         method: 'GET',
         headers: headers
       });
 
       if (response.ok) {
         const data = await response.json();
-        return data.data;
+        console.log('Application details response:', data);
+        
+        // Handle different response structures
+        if (data.data) {
+          // Case 1: Data is in data.data
+          const appData = data.data;
+          
+          // Include user information if available
+          if (data.user) {
+            appData.user = data.user;
+          }
+          
+          // Include client information if available
+          if (data.client) {
+            appData.client = data.client;
+          }
+          
+          // Include documents if available
+          if (data.documents) {
+            appData.documents = data.documents;
+          }
+          
+          // Include file_urls if available
+          if (data.file_urls) {
+            appData.file_urls = data.file_urls;
+          }
+          
+          return appData;
+        } else if (data.application) {
+          // Case 2: Data is in data.application
+          return data.application;
+        } else {
+          // Case 3: Data is directly in response
+          return data;
+        }
+      } else {
+        console.error('Failed to load application details:', response.status);
+        return null;
       }
-      return null;
     } catch (err) {
       console.error('Erreur lors du chargement des détails:', err);
       return null;
@@ -311,8 +670,26 @@ const ChefAgenceDashboard: React.FC = () => {
       setError(null);
 
       const details = await loadApplicationDetails(application.id);
-      setSelectedApplication(details || application);
-      setTimeout(() => calculateAmortization(), 100);
+      
+      console.log('Loaded details:', details);
+      
+      if (details) {
+        // Merge the details with the existing application data
+        const mergedDetails: Application = {
+          ...application,
+          ...details,
+          // Preserve any arrays/objects properly
+          user: details.user || application.user,
+          client: details.client || application.client,
+          documents: details.documents || application.documents,
+          file_urls: details.file_urls || application.file_urls,
+        };
+        
+        setSelectedApplication(mergedDetails);
+      } else {
+        setSelectedApplication(application);
+      }
+      
       setDetailsDialogOpen(true);
 
     } catch (err: any) {
@@ -325,8 +702,8 @@ const ChefAgenceDashboard: React.FC = () => {
 
   const handleGiveOpinion = (application: Application) => {
     setSelectedApplication(application);
-    setCurrentOpinion({ 
-      opinion: '', 
+    setCurrentOpinion({
+      opinion: '',
       commentaire: '',
       niveau_avis: 'CHEF_AGENCE'
     });
@@ -343,141 +720,78 @@ const ChefAgenceDashboard: React.FC = () => {
       setSubmittingOpinion(true);
       setError(null);
 
-      // Préparer les données d'avis avec les bonnes valeurs
-      const opinionData = {
-        opinion: currentOpinion.opinion, // 'FAVORABLE' ou 'DEFAVORABLE'
-        commentaire: currentOpinion.commentaire,
-        niveau_avis: currentOpinion.niveau_avis, // 'CHEF_AGENCE'
-        credit_application_id: selectedApplication.id
+      const preAvisData = {
+        opinion: currentOpinion.opinion,
+        commentaire: currentOpinion.commentaire
       };
 
-      console.log('Soumission avis pour application:', selectedApplication.id, 'avec données:', opinionData);
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
 
-      // Utiliser le service de crédit
-      let result;
-      
-      try {
-        // Essayer d'abord l'endpoint spécifique Chef d'Agence
-        result = await creditService.submitAvisChefAgence(selectedApplication.id, opinionData);
-      } catch (error) {
-        console.log('Essai endpoint générique...');
-        result = await creditService.submitAvis(selectedApplication.id, opinionData);
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
 
-      if (result.success) {
-        console.log('✅ Avis soumis avec succès:', result.data);
-        
+      const response = await fetch(`${API_BASE_URL}/api/credit-applications/${selectedApplication.id}/pre-avis`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(preAvisData)
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
         await loadApplications();
-        
         setOpinionDialogOpen(false);
-        setCurrentOpinion({ 
-          opinion: '', 
+        setCurrentOpinion({
+          opinion: '',
           commentaire: '',
           niveau_avis: 'CHEF_AGENCE'
         });
         setSelectedApplication(null);
-        
+
         setError(null);
-        
         setTimeout(() => {
-          setError('success: Avis soumis avec succès!');
+          setError('success: Pré-avis soumis avec succès!');
         }, 100);
       } else {
-        console.error('❌ Erreur lors de la soumission:', result);
-        
-        if (result.status === 403) {
-          setError('Vous n\'êtes pas autorisé à donner un avis sur cette application');
-        } else if (result.status === 409) {
-          setError('Vous avez déjà donné un avis sur cette application');
-        } else if (result.status === 422) {
-          if (result.validationErrors) {
-            const errorMessages = Object.values(result.validationErrors).flat().join(', ');
+        if (response.status === 403) {
+          setError('Vous n\'êtes pas autorisé à donner un pré-avis sur cette application');
+        } else if (response.status === 409) {
+          setError('Un pré-avis a déjà été donné sur cette application');
+        } else if (response.status === 422) {
+          if (result.errors) {
+            const errorMessages = Object.values(result.errors).flat().join(', ');
             setError(`Erreurs de validation: ${errorMessages}`);
           } else {
-            setError(result.error || 'Erreur de validation des données');
+            setError(result.message || 'Erreur de validation des données');
           }
-        } else if (result.status === 401) {
+        } else if (response.status === 401) {
           setError('Votre session a expiré. Veuillez vous reconnecter.');
           setTimeout(() => {
             window.location.href = '/login';
           }, 2000);
         } else {
-          setError(result.error || `Erreur lors de la soumission de l'avis (Code: ${result.status})`);
+          setError(result.message || `Erreur lors de la soumission du pré-avis (Code: ${response.status})`);
         }
       }
     } catch (err: any) {
       console.error('❌ Erreur inattendue:', err);
-      
-      try {
-        const directResult = await submitOpinionDirectly();
-        if (directResult.success) {
-          await loadApplications();
-          setOpinionDialogOpen(false);
-          setError(null);
-          setTimeout(() => {
-            setError('success: Avis soumis avec succès!');
-          }, 100);
-        }
-      } catch (directError) {
-        setError(`Erreur lors de la soumission: ${err.message || 'Erreur inconnue'}`);
-      }
+      setError(`Erreur réseau: ${err.message || 'Impossible de se connecter au serveur'}`);
     } finally {
       setSubmittingOpinion(false);
     }
   };
 
-  const submitOpinionDirectly = async () => {
-    if (!selectedApplication) return { success: false };
-    
-    const opinionData = {
-      opinion: currentOpinion.opinion,
-      commentaire: currentOpinion.commentaire,
-      niveau_avis: currentOpinion.niveau_avis,
-      credit_application_id: selectedApplication.id
-    };
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    };
-    
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const endpoints = [
-      `${API_BASE_URL}/credit-applications/${selectedApplication.id}/avis`,
-      `${API_BASE_URL}/avis/chef-agence`,
-      `${API_BASE_URL}/avis`,
-      `${API_BASE_URL}/chef-agence/avis`
-    ];
-
-    for (const endpoint of endpoints) {
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: headers,
-          body: JSON.stringify(opinionData)
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          return { success: true, data };
-        }
-      } catch (error) {
-        console.log(`Endpoint ${endpoint} échoué, essai suivant...`);
-      }
-    }
-
-    return { success: false, error: 'Tous les endpoints ont échoué' };
-  };
-
-  const formatAmount = (amount: number) => {
+  const formatAmount = (amount: number | string) => {
+    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
       currency: 'XAF',
       minimumFractionDigits: 0,
-    }).format(amount);
+    }).format(numAmount || 0);
   };
 
   const formatDate = (dateString: string) => {
@@ -495,20 +809,10 @@ const ChefAgenceDashboard: React.FC = () => {
     }
   };
 
-  const getCreditTypeName = (typeId: number) => {
+  const getCreditTypeName = (typeId: string) => {
     if (!typeId) return 'Non spécifié';
-    const type = creditTypes.find(t => t.id === typeId);
+    const type = creditTypes.find(t => t.id.toString() === typeId.toString());
     return type ? type.description : `Type ${typeId}`;
-  };
-
-  const getClientName = (application: Application) => {
-    if (application.client_info) {
-      return `${application.client_info.nom || ''} ${application.client_info.prenom || ''}`.trim();
-    }
-    if (application.compte_info?.client_id) {
-      return `Client ${application.compte_info.client_id}`;
-    }
-    return 'Client inconnu';
   };
 
   const filteredApplications = () => {
@@ -533,11 +837,11 @@ const ChefAgenceDashboard: React.FC = () => {
   const calculateAmortization = () => {
     if (!selectedApplication) return;
 
-    const montant = parseFloat(selectedApplication.montant.toString());
-    const duree = parseInt(selectedApplication.duree.toString());
-    const totalInteret = parseFloat(selectedApplication.interet_total?.toString() || '0');
-    const fraisDossier = parseFloat(selectedApplication.frais_dossier?.toString() || '0');
-    const fraisEtude = parseFloat(selectedApplication.frais_etude?.toString() || '0');
+    const montant = parseFloat(selectedApplication.montant);
+    const duree = parseInt(selectedApplication.duree);
+    const totalInteret = selectedApplication.interet_total;
+    const fraisDossier = selectedApplication.frais_dossier;
+    const fraisEtude = selectedApplication.frais_etude;
 
     const totalARembourser = montant + totalInteret + fraisDossier + fraisEtude;
     const remboursementQuotidien = totalARembourser / duree;
@@ -560,9 +864,9 @@ const ChefAgenceDashboard: React.FC = () => {
       amortizationData.push({
         numero: jour,
         dateRemboursement: dateRemboursement.toLocaleDateString('fr-FR'),
-        montantRemboursement: remboursementQuotidien.toFixed(2),
-        soldeRestant: soldeRestant.toFixed(2),
-        cumulRembourse: cumulRembourse.toFixed(2)
+        montantRemboursement: remboursementQuotidien.toFixed(0),
+        soldeRestant: soldeRestant.toFixed(0),
+        cumulRembourse: cumulRembourse.toFixed(0)
       });
     }
 
@@ -573,115 +877,327 @@ const ChefAgenceDashboard: React.FC = () => {
     if (!amortizationData || amortizationData.length === 0) return null;
 
     return (
-      <Box sx={{ mt: 4 }}>
-        <Box sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2,
-          mb: 2,
-          p: 2,
-          backgroundColor: 'primary.light',
-          borderRadius: 2,
-          color: 'white'
-        }}>
+      <Box sx={{ mt: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
           <CalculateIcon />
-          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-            Tableau d'Amortissement
-          </Typography>
-        </Box>
-        <TableContainer
-          component={Paper}
-          elevation={3}
-          sx={{
-            maxHeight: 700,
-            borderRadius: 2,
-            overflow: 'hidden',
-            '& .MuiTable-root': { borderCollapse: 'separate', borderSpacing: '0 4px' }
-          }}
-        >
+          Tableau d'Amortissement
+        </Typography>
+        <TableContainer component={Paper} elevation={2} sx={{ maxHeight: 400 }}>
           <Table stickyHeader size="small">
             <TableHead>
-              <TableRow sx={{
-                backgroundColor: '#f5f5f5',
-                borderBottom: '2px solid #1976d2',
-                '& .MuiTableCell-head': {
-                  color: '#1976d2',
-                  fontWeight: 'bold',
-                  fontSize: '0.875rem',
-                  border: 'none',
-                  py: 2.5,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }
-              }}>
-                <TableCell sx={{ borderTopLeftRadius: 8 }}>Numéro</TableCell>
-                <TableCell>Date de remboursement</TableCell>
-                <TableCell align="right">Montant du remboursement</TableCell>
-                <TableCell align="right">Solde restant</TableCell>
-                <TableCell align="right" sx={{ borderTopRightRadius: 8 }}>Cumul remboursé</TableCell>
+              <TableRow sx={{ backgroundColor: 'primary.light' }}>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Jour</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Date de remboursement</TableCell>
+                <TableCell align="right" sx={{ color: 'white', fontWeight: 'bold' }}>Montant</TableCell>
+                <TableCell align="right" sx={{ color: 'white', fontWeight: 'bold' }}>Solde restant</TableCell>
+                <TableCell align="right" sx={{ color: 'white', fontWeight: 'bold' }}>Cumul remboursé</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {amortizationData.map((row, index) => (
-                <TableRow
-                  key={row.numero}
-                  sx={{
-                    backgroundColor: index % 2 === 0 ? 'grey.50' : 'white',
-                    '&:hover': {
-                      backgroundColor: 'primary.light',
-                      opacity: 0.8,
-                      transform: 'scale(1.01)',
-                      transition: 'all 0.2s ease-in-out'
-                    },
-                    '& .MuiTableCell-body': {
-                      border: 'none',
-                      py: 1.5,
-                      fontSize: '0.875rem'
-                    }
-                  }}
-                >
+                <TableRow key={row.numero} hover>
                   <TableCell>
-                    <Chip
-                      label={row.numero}
-                      size="small"
-                      color="primary"
-                      variant="outlined"
-                      sx={{ fontWeight: 'bold' }}
-                    />
+                    <Chip label={row.numero} size="small" color="primary" variant="outlined" />
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 500 }}>
-                    {row.dateRemboursement}
-                  </TableCell>
+                  <TableCell>{row.dateRemboursement}</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                    {parseFloat(row.montantRemboursement).toLocaleString('fr-FR')} FCFA
+                    {formatAmount(parseFloat(row.montantRemboursement))}
                   </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 500, color: 'warning.main' }}>
-                    {parseFloat(row.soldeRestant).toLocaleString('fr-FR')} FCFA
+                  <TableCell align="right" sx={{ color: 'warning.main' }}>
+                    {formatAmount(parseFloat(row.soldeRestant))}
                   </TableCell>
                   <TableCell align="right" sx={{ fontWeight: 'bold', color: 'info.main' }}>
-                    {parseFloat(row.cumulRembourse).toLocaleString('fr-FR')} FCFA
+                    {formatAmount(parseFloat(row.cumulRembourse))}
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </TableContainer>
-        <Box sx={{
-          mt: 2,
-          p: 2,
-          backgroundColor: 'grey.100',
-          borderRadius: 1,
-          border: '1px solid',
-          borderColor: 'grey.300'
-        }}>
-          <Typography variant="body2" color="textSecondary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CalculateIcon fontSize="small" />
-            <strong>Note:</strong> Le tableau montre le plan de remboursement quotidien pour la durée du crédit sélectionné.
-            Les montants sont calculés automatiquement en fonction des paramètres saisis.
+      </Box>
+    );
+  };
+
+  const renderDocumentCard = (doc: DocumentItem) => {
+    const fullUrl = getDocumentUrl(doc.url);
+    
+    if (!fullUrl) {
+      return null;
+    }
+
+    return (
+      <Grid item xs={12} sm={6} md={4} key={doc.fieldName}>
+        <Card 
+          elevation={2} 
+          sx={{ 
+            height: '100%',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-4px)',
+              boxShadow: 6,
+            }
+          }}
+          onClick={() => handleOpenImage(doc.url!)}
+        >
+          <Box sx={{ position: 'relative', height: 200 }}>
+            <CardMedia
+              component="img"
+              height="200"
+              image={fullUrl}
+              alt={doc.label}
+              sx={{ 
+                objectFit: 'cover',
+                backgroundColor: 'grey.100'
+              }}
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9IiNGNUY1RjUiLz48cGF0aCBkPSJNNjAgODBIMTQwVjEyMEg2MFY4MFoiIGZpbGw9IiNDQ0NDQ0MiLz48cGF0aCBkPSJNODAgNjBIMTIwVjE0MEg4MFY2MFoiIGZpbGw9IiNFMEUwRTAiLz48dGV4dCB4PSIxMDAiIHk9IjE3MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjODg4ODg4Ij5Eb2N1bWVudDwvdGV4dD48L3N2Zz4=';
+              }}
+            />
+            <Box sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              borderRadius: '50%',
+              padding: '4px',
+              color: 'white'
+            }}>
+              <ZoomInIcon fontSize="small" />
+            </Box>
+          </Box>
+          <CardContent sx={{ p: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              {doc.icon}
+              <Typography variant="subtitle2" noWrap>
+                {doc.label}
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary" display="block">
+              {doc.type === 'document' ? 'Document uploadé' : `Champ: ${doc.fieldName}`}
+            </Typography>
+            {doc.document && (
+              <Typography variant="caption" color="text.secondary" display="block">
+                Type: {doc.document.document_type}
+              </Typography>
+            )}
+            <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+              <Button
+                size="small"
+                startIcon={<VisibilityIcon />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenImage(doc.url!);
+                }}
+              >
+                Voir
+              </Button>
+              <Button
+                size="small"
+                startIcon={<DownloadIcon />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const filename = doc.document?.name || `${doc.label.replace(/\s+/g, '_')}.jpg`;
+                  handleDownloadImage(doc.url!, filename);
+                }}
+              >
+                Télécharger
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
+      </Grid>
+    );
+  };
+
+  const renderDocumentSection = () => {
+    if (!selectedApplication) return null;
+
+    const documents = getAvailableDocuments(selectedApplication);
+    
+    if (documents.length === 0) {
+      return (
+        <Box sx={{ textAlign: 'center', py: 4 }}>
+          <FolderIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            Aucun document disponible
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Cette demande de crédit ne contient pas de documents joints.
+          </Typography>
+        </Box>
+      );
+    }
+
+    return (
+      <Box sx={{ mb: 4 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+          <FolderIcon color="primary" fontSize="large" />
+          <Box>
+            <Typography variant="h6">
+              Documents ({documents.length})
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Tous les documents joints à cette demande de crédit
+            </Typography>
+          </Box>
+        </Box>
+        
+        <Grid container spacing={2}>
+          {documents.map((doc, index) => renderDocumentCard(doc))}
+        </Grid>
+        
+        <Box sx={{ mt: 3, p: 2, bgcolor: 'info.50', borderRadius: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            <strong>Note:</strong> Cliquez sur une image pour l'agrandir. Utilisez les boutons "Voir" pour afficher en plein écran et "Télécharger" pour sauvegarder le document.
           </Typography>
         </Box>
       </Box>
     );
+  };
+
+  const renderUserInfoSection = () => {
+    if (!selectedApplication) return null;
+
+    const user = selectedApplication.user;
+    const client = selectedApplication.client;
+
+    if (!user && !client) {
+      return (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Aucune information utilisateur disponible
+        </Alert>
+      );
+    }
+
+    return (
+      <Accordion expanded={expandedAccordion === 'userInfo'} onChange={handleAccordionChange('userInfo')}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <PersonIcon color="primary" />
+            <Typography variant="h6">Informations Utilisateur</Typography>
+          </Box>
+        </AccordionSummary>
+        <AccordionDetails>
+          <Grid container spacing={2}>
+            {user && (
+              <Grid item xs={12} md={6}>
+                <Card elevation={2} sx={{ p: 2, backgroundColor: 'primary.50' }}>
+                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <PersonIcon />
+                    Informations de l'utilisateur
+                  </Typography>
+                  <List dense>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Nom" 
+                        secondary={user.name || 'N/A'}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Email" 
+                        secondary={user.email || 'N/A'}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Téléphone" 
+                        secondary={user.phone || 'N/A'}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Adresse" 
+                        secondary={user.address || 'N/A'}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Date de naissance" 
+                        secondary={formatDate(user.date_of_birth)}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Genre" 
+                        secondary={user.gender || 'N/A'}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Statut marital" 
+                        secondary={user.marital_status || 'N/A'}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Profession" 
+                        secondary={user.profession || 'N/A'}
+                      />
+                    </ListItem>
+                  </List>
+                </Card>
+              </Grid>
+            )}
+            
+            {client && (
+              <Grid item xs={12} md={6}>
+                <Card elevation={2} sx={{ p: 2, backgroundColor: 'success.50' }}>
+                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <BusinessIcon />
+                    Informations du client
+                  </Typography>
+                  <List dense>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Code client" 
+                        secondary={client.client_code || 'N/A'}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Nom complet" 
+                        secondary={client.full_name || 'N/A'}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="CIN" 
+                        secondary={client.cin || 'N/A'}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Téléphone" 
+                        secondary={client.phone || 'N/A'}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Email" 
+                        secondary={client.email || 'N/A'}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Revenu mensuel" 
+                        secondary={formatAmount(client.monthly_income)}
+                      />
+                    </ListItem>
+                  </List>
+                </Card>
+              </Grid>
+            )}
+          </Grid>
+        </AccordionDetails>
+      </Accordion>
+    );
+  };
+
+  const handleAccordionChange = (panel: string) => (event: React.SyntheticEvent, isExpanded: boolean) => {
+    setExpandedAccordion(isExpanded ? panel : false);
   };
 
   if (loading) {
@@ -707,11 +1223,11 @@ const ChefAgenceDashboard: React.FC = () => {
             Validez les applications de crédit analysées par l'analyste.
           </Typography>
         </Box>
-        
+
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          <Chip 
-            label={apiStatus === 'success' ? 'API Connectée' : 'API Hors ligne'} 
-            color={apiStatus === 'success' ? 'success' : 'error'} 
+          <Chip
+            label={apiStatus === 'success' ? 'API Connectée' : 'API Hors ligne'}
+            color={apiStatus === 'success' ? 'success' : 'error'}
             size="small"
             variant="outlined"
           />
@@ -727,16 +1243,16 @@ const ChefAgenceDashboard: React.FC = () => {
       </Box>
 
       {error && error.startsWith('success:') ? (
-        <Alert 
-          severity="success" 
+        <Alert
+          severity="success"
           sx={{ mb: 3 }}
           onClose={() => setError(null)}
         >
           {error.replace('success:', '')}
         </Alert>
       ) : error && (
-        <Alert 
-          severity="error" 
+        <Alert
+          severity="error"
           sx={{ mb: 3 }}
           onClose={() => setError(null)}
           action={
@@ -749,7 +1265,6 @@ const ChefAgenceDashboard: React.FC = () => {
         </Alert>
       )}
 
-      {/* Statistiques */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={3}>
           <Card>
@@ -822,7 +1337,7 @@ const ChefAgenceDashboard: React.FC = () => {
           <Typography variant="h6">
             Applications de Crédit
           </Typography>
-          
+
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
             <Typography variant="body2" color="text.secondary">
               {applications.length} application(s)
@@ -830,12 +1345,11 @@ const ChefAgenceDashboard: React.FC = () => {
           </Box>
         </Box>
 
-        {/* Tabs pour filtrer */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
           <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
-            <Tab label={`En attente (${applications.filter(app => app.statut === 'SOUMIS' || app.statut === 'EN_COURS').length})`} />
-            <Tab label={`Approuvées (${applications.filter(app => app.statut === 'APPROUVE' || app.statut === 'ACCEPTE').length})`} />
-            <Tab label={`Rejetées (${applications.filter(app => app.statut === 'REJETE' || app.statut === 'REFUSE').length})`} />
+            <Tab label={`En attente (${applications.filter(app => app.statut === 'SOUMIS').length})`} />
+            <Tab label={`CA Validé (${applications.filter(app => app.statut === 'CA_VALIDE').length})`} />
+            <Tab label={`Rejetées (${applications.filter(app => app.statut === 'REJETE').length})`} />
           </Tabs>
         </Box>
 
@@ -845,7 +1359,7 @@ const ChefAgenceDashboard: React.FC = () => {
               <TableHead>
                 <TableRow>
                   <TableCell>N° Demande</TableCell>
-                  <TableCell>Client</TableCell>
+                  <TableCell>Client ID</TableCell>
                   <TableCell>Montant</TableCell>
                   <TableCell>Type</TableCell>
                   <TableCell>Durée</TableCell>
@@ -859,10 +1373,10 @@ const ChefAgenceDashboard: React.FC = () => {
                   <TableRow key={app.id} hover>
                     <TableCell>{app.numero_demande}</TableCell>
                     <TableCell>
-                      {getClientName(app)}
+                      {app.client_id}
                     </TableCell>
                     <TableCell>
-                      {formatAmount(app.montant)}
+                      {formatAmount(parseFloat(app.montant))}
                     </TableCell>
                     <TableCell>
                       {getCreditTypeName(app.credit_type_id)}
@@ -886,7 +1400,7 @@ const ChefAgenceDashboard: React.FC = () => {
                           <VisibilityIcon />
                         </IconButton>
                       </Tooltip>
-                      {(app.statut === 'SOUMIS' || app.statut === 'EN_COURS') && (
+                      {app.statut === 'SOUMIS' && (
                         <Tooltip title="Donner un avis">
                           <IconButton
                             color="secondary"
@@ -910,352 +1424,386 @@ const ChefAgenceDashboard: React.FC = () => {
               Aucune application trouvée
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {tabValue === 0 
+              {tabValue === 0
                 ? "Aucune application n'est en attente de validation."
                 : tabValue === 1
-                ? "Aucune application n'a été approuvée."
-                : "Aucune application n'a été rejetée."}
+                  ? "Aucune application n'a été validée par CA."
+                  : "Aucune application n'a été rejetée."}
             </Typography>
           </Box>
         )}
       </StyledPaper>
 
       {/* Dialog Détails Application */}
-      <Dialog
+      <StyledDialog
         open={detailsDialogOpen}
         onClose={() => setDetailsDialogOpen(false)}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
       >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2, backgroundColor: 'primary.main', color: 'white' }}>
           <DescriptionIcon />
           Détails de l'Application #{selectedApplication?.numero_demande}
         </DialogTitle>
-        <DialogContent>
+        <DialogContent dividers sx={{ p: 0 }}>
           {selectedApplication && (
-            <Box sx={{ mt: 2 }}>
-              {/* General Information */}
-              <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', borderBottom: 1, pb: 1 }}>
-                Informations Générales
-              </Typography>
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">N° Demande:</Typography>
-                  <Typography variant="body1" fontWeight="medium">{selectedApplication.numero_demande || 'N/A'}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Statut:</Typography>
-                  <StatusChip statut={selectedApplication.statut} />
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Date de Demande:</Typography>
-                  <Typography variant="body1">{formatDate(selectedApplication.date_demande || selectedApplication.created_at)}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Observation:</Typography>
-                  <Typography variant="body1">{selectedApplication.observation || 'N/A'}</Typography>
-                </Grid>
-              </Grid>
+            <Box sx={{ p: 3 }}>
+              {/* Informations Utilisateur */}
+              {renderUserInfoSection()}
 
-              {/* Client/Account Information */}
-              <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', borderBottom: 1, pb: 1 }}>
-                Informations Client/Compte
-              </Typography>
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                {selectedApplication.compte_info && (
-                  <>
-                    <Grid xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary">N° Compte:</Typography>
-                      <Typography variant="body1">{selectedApplication.compte_info.numero_compte || 'N/A'}</Typography>
-                    </Grid>
-                    <Grid xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary">ID Client:</Typography>
-                      <Typography variant="body1">{selectedApplication.compte_info.client_id || 'N/A'}</Typography>
-                    </Grid>
-                  </>
-                )}
-                {selectedApplication.credit_type_info && (
-                  <>
-                    <Grid xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary">Type de Crédit:</Typography>
-                      <Typography variant="body1">{selectedApplication.credit_type_info.description || 'N/A'}</Typography>
-                    </Grid>
-                    <Grid xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary">Code:</Typography>
-                      <Typography variant="body1">{selectedApplication.credit_type_info.code || 'N/A'}</Typography>
-                    </Grid>
-                    <Grid xs={12}>
-                      <Typography variant="body2" color="text.secondary">Caractéristiques:</Typography>
-                      <Typography variant="body1">{selectedApplication.credit_type_info.credit_characteristics || 'N/A'}</Typography>
-                    </Grid>
-                  </>
-                )}
-              </Grid>
-
-              {/* Financial Details */}
-              <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', borderBottom: 1, pb: 1 }}>
-                Détails Financiers
-              </Typography>
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Montant Demandé:</Typography>
-                  <Typography variant="body1" fontWeight="medium">{formatAmount(selectedApplication.montant)}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Durée:</Typography>
-                  <Typography variant="body1">{selectedApplication.duree} jours</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Taux d'Intérêt:</Typography>
-                  <Typography variant="body1">{selectedApplication.taux_interet ? `${selectedApplication.taux_interet}%` : 'N/A'}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Intérêt Total:</Typography>
-                  <Typography variant="body1">{selectedApplication.interet_total ? formatAmount(selectedApplication.interet_total) : 'N/A'}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Frais de Dossier:</Typography>
-                  <Typography variant="body1">{selectedApplication.frais_dossier ? formatAmount(selectedApplication.frais_dossier) : 'N/A'}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Frais d'Étude:</Typography>
-                  <Typography variant="body1">{selectedApplication.frais_etude ? formatAmount(selectedApplication.frais_etude) : 'N/A'}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Montant Total:</Typography>
-                  <Typography variant="body1" fontWeight="bold">{selectedApplication.montant_total ? formatAmount(selectedApplication.montant_total) : 'N/A'}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Pénalité par Jour:</Typography>
-                  <Typography variant="body1">{selectedApplication.penalite_par_jour ? formatAmount(selectedApplication.penalite_par_jour) : 'N/A'}</Typography>
-                </Grid>
-                {selectedApplication.calcul_details && (
-                  <Grid xs={12}>
-                    <Typography variant="body2" color="text.secondary">Détails de Calcul:</Typography>
-                    <Box sx={{ bgcolor: 'grey.50', p: 2, borderRadius: 1, mt: 1 }}>
-                      <Typography variant="body2">Type: {selectedApplication.calcul_details.type || 'N/A'}</Typography>
-                      <Typography variant="body2">Palier: {selectedApplication.calcul_details.palier || 'N/A'}</Typography>
-                      <Typography variant="body2">Formule: {selectedApplication.calcul_details.formule_interet || 'N/A'}</Typography>
-                      <Typography variant="body2">Intérêt Calculé: {selectedApplication.calcul_details.interet_calcule ? formatAmount(selectedApplication.calcul_details.interet_calcule) : 'N/A'}</Typography>
-                      <Typography variant="body2">Pénalité Journalière: {selectedApplication.calcul_details.penalite_journaliere ? formatAmount(selectedApplication.calcul_details.penalite_journaliere) : 'N/A'}</Typography>
-                    </Box>
-                  </Grid>
-                )}
-              </Grid>
-
-              {/* Income and Debts */}
-              <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', borderBottom: 1, pb: 1 }}>
-                Revenus et Dettes
-              </Typography>
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Source de Revenus:</Typography>
-                  <Typography variant="body1">{selectedApplication.source_revenus || 'N/A'}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Revenus Mensuels:</Typography>
-                  <Typography variant="body1">{selectedApplication.revenus_mensuels ? formatAmount(selectedApplication.revenus_mensuels) : 'N/A'}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Autres Revenus:</Typography>
-                  <Typography variant="body1">{selectedApplication.autres_revenus ? formatAmount(selectedApplication.autres_revenus) : 'N/A'}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Montant des Dettes:</Typography>
-                  <Typography variant="body1">{selectedApplication.montant_dettes ? formatAmount(selectedApplication.montant_dettes) : 'N/A'}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Description des Dettes:</Typography>
-                  <Typography variant="body1">{selectedApplication.description_dette || 'N/A'}</Typography>
-                </Grid>
-              </Grid>
-
-              {/* Other Information */}
-              <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', borderBottom: 1, pb: 1 }}>
-                Autres Informations
-              </Typography>
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Nom de la Banque:</Typography>
-                  <Typography variant="body1">{selectedApplication.nom_banque || 'N/A'}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Numéro de Banque:</Typography>
-                  <Typography variant="body1">{selectedApplication.numero_banque || 'N/A'}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Code Mise en Place:</Typography>
-                  <Typography variant="body1">{selectedApplication.code_mise_en_place || 'N/A'}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Note de Crédit:</Typography>
-                  <Typography variant="body1">{selectedApplication.note_credit || 'N/A'}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Plan d'Épargne:</Typography>
-                  <Typography variant="body1">{selectedApplication.plan_epargne ? 'Oui' : 'Non'}</Typography>
-                </Grid>
-                <Grid xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary">Numéro Personne Contact:</Typography>
-                  <Typography variant="body1">{selectedApplication.numero_personne_contact || 'N/A'}</Typography>
-                </Grid>
-              </Grid>
-
-              {/* Documents */}
-              <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', borderBottom: 1, pb: 1 }}>
-                Documents
-              </Typography>
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                {selectedApplication.photo_4x4 && (
-                  <Grid xs={12} sm={6}>
-                    <Typography variant="body2" color="text.secondary">Photo 4x4:</Typography>
-                    <Box sx={{ mt: 1 }}>
-                      <img
-                        src={selectedApplication.photo_4x4}
-                        alt="Photo 4x4"
-                        style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' }}
-                      />
-                    </Box>
-                  </Grid>
-                )}
-                {selectedApplication.plan_localisation && (
-                  <Grid xs={12} sm={6}>
-                    <Typography variant="body2" color="text.secondary">Plan de Localisation:</Typography>
-                    <Box sx={{ mt: 1 }}>
-                      <img
-                        src={selectedApplication.plan_localisation}
-                        alt="Plan de Localisation"
-                        style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' }}
-                      />
-                    </Box>
-                  </Grid>
-                )}
-                {selectedApplication.facture_electricite && (
-                  <Grid xs={12} sm={6}>
-                    <Typography variant="body2" color="text.secondary">Facture d'Électricité:</Typography>
-                    <Box sx={{ mt: 1 }}>
-                      <img
-                        src={selectedApplication.facture_electricite}
-                        alt="Facture d'Électricité"
-                        style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' }}
-                      />
-                    </Box>
-                  </Grid>
-                )}
-                {selectedApplication.casier_judiciaire && (
-                  <Grid xs={12} sm={6}>
-                    <Typography variant="body2" color="text.secondary">Casier Judiciaire:</Typography>
-                    <Box sx={{ mt: 1 }}>
-                      <img
-                        src={selectedApplication.casier_judiciaire}
-                        alt="Casier Judiciaire"
-                        style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' }}
-                      />
-                    </Box>
-                  </Grid>
-                )}
-                {selectedApplication.historique_compte && (
-                  <Grid xs={12} sm={6}>
-                    <Typography variant="body2" color="text.secondary">Historique Compte:</Typography>
-                    <Box sx={{ mt: 1 }}>
-                      <img
-                        src={selectedApplication.historique_compte}
-                        alt="Historique Compte"
-                        style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' }}
-                      />
-                    </Box>
-                  </Grid>
-                )}
-                {selectedApplication.geolocalisation_img && (
-                  <Grid xs={12} sm={6}>
-                    <Typography variant="body2" color="text.secondary">Géolocalisation:</Typography>
-                    <Box sx={{ mt: 1 }}>
-                      <img
-                        src={selectedApplication.geolocalisation_img}
-                        alt="Géolocalisation"
-                        style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' }}
-                      />
-                    </Box>
-                  </Grid>
-                )}
-                {selectedApplication.plan_localisation_activite_img && (
-                  <Grid xs={12} sm={6}>
-                    <Typography variant="body2" color="text.secondary">Plan Localisation Activité:</Typography>
-                    <Box sx={{ mt: 1 }}>
-                      <img
-                        src={selectedApplication.plan_localisation_activite_img}
-                        alt="Plan Localisation Activité"
-                        style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' }}
-                      />
-                    </Box>
-                  </Grid>
-                )}
-                {selectedApplication.photo_activite_img && (
-                  <Grid xs={12} sm={6}>
-                    <Typography variant="body2" color="text.secondary">Photo Activité:</Typography>
-                    <Box sx={{ mt: 1 }}>
-                      <img
-                        src={selectedApplication.photo_activite_img}
-                        alt="Photo Activité"
-                        style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' }}
-                      />
-                    </Box>
-                  </Grid>
-                )}
-                {selectedApplication.demande_credit_img && (
-                  <Grid xs={12} sm={6}>
-                    <Typography variant="body2" color="text.secondary">Demande Crédit:</Typography>
-                    <Box sx={{ mt: 1 }}>
-                      <img
-                        src={selectedApplication.demande_credit_img}
-                        alt="Demande Crédit"
-                        style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' }}
-                      />
-                    </Box>
-                  </Grid>
-                )}
-                {(!selectedApplication.photo_4x4 && !selectedApplication.plan_localisation && !selectedApplication.facture_electricite &&
-                  !selectedApplication.casier_judiciaire && !selectedApplication.historique_compte && !selectedApplication.geolocalisation_img &&
-                  !selectedApplication.plan_localisation_activite_img && !selectedApplication.photo_activite_img && !selectedApplication.demande_credit_img) && (
-                  <Grid xs={12}>
-                    <Typography variant="body2" color="text.secondary">Aucun document disponible</Typography>
-                  </Grid>
-                )}
-              </Grid>
-
-              {/* Avis */}
-              {selectedApplication.avis && selectedApplication.avis.length > 0 && (
-                <>
-                  <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', borderBottom: 1, pb: 1 }}>
-                    Avis ({selectedApplication.avis.length})
-                  </Typography>
-                  <Box sx={{ mb: 3 }}>
-                    {selectedApplication.avis.map((avis: any, index: number) => (
-                      <Box key={index} sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                          <Typography variant="body2" fontWeight="medium">
-                            Avis #{avis.id || (index + 1)}
-                          </Typography>
-                          <Chip
-                            label={avis.opinion === 'FAVORABLE' ? 'Favorable' : avis.opinion === 'DEFAVORABLE' ? 'Défavorable' : avis.opinion}
-                            color={avis.opinion === 'FAVORABLE' ? 'success' : avis.opinion === 'DEFAVORABLE' ? 'error' : 'default'}
-                            size="small"
-                          />
-                        </Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                          Commentaire: {avis.commentaire || 'N/A'}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Date: {formatDate(avis.created_at)}
-                        </Typography>
-                      </Box>
-                    ))}
+              <Accordion expanded={expandedAccordion === 'infoGenerale'} onChange={handleAccordionChange('infoGenerale')}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <InfoIcon color="primary" />
+                    <Typography variant="h6">Informations Générales de la Demande</Typography>
                   </Box>
-                </>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6} md={4}>
+                      <List dense>
+                        <ListItem>
+                          <ListItemIcon>
+                            <AssignmentIcon color="primary" />
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary="N° Demande" 
+                            secondary={selectedApplication.numero_demande || 'N/A'}
+                          />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemIcon>
+                            <PersonIcon color="primary" />
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary="Client ID" 
+                            secondary={selectedApplication.client_id || 'N/A'}
+                          />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemIcon>
+                            <CreditCardIcon color="primary" />
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary="Compte ID" 
+                            secondary={selectedApplication.compte_id || 'N/A'}
+                          />
+                        </ListItem>
+                      </List>
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={4}>
+                      <List dense>
+                        <ListItem>
+                          <ListItemIcon>
+                            <SpeedIcon color="primary" />
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary="Statut" 
+                            secondary={<StatusChip statut={selectedApplication.statut} />}
+                          />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemIcon>
+                            <ScheduleIcon color="primary" />
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary="Date de Demande" 
+                            secondary={formatDate(selectedApplication.date_demande)}
+                          />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemIcon>
+                            <WarningIcon color="primary" />
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary="Urgence" 
+                            secondary={selectedApplication.urgence || 'N/A'}
+                          />
+                        </ListItem>
+                      </List>
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={4}>
+                      <List dense>
+                        <ListItem>
+                          <ListItemIcon>
+                            <NotesIcon color="primary" />
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary="Observation" 
+                            secondary={selectedApplication.observation || 'N/A'}
+                          />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemIcon>
+                            <SecurityIcon color="primary" />
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary="Garantie" 
+                            secondary={selectedApplication.garantie || 'N/A'}
+                          />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemIcon>
+                            <AccountBalanceIcon color="primary" />
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary="Plan d'Épargne" 
+                            secondary={selectedApplication.plan_epargne ? 'Oui' : 'Non'}
+                          />
+                        </ListItem>
+                      </List>
+                    </Grid>
+                  </Grid>
+                </AccordionDetails>
+              </Accordion>
+
+              <Accordion expanded={expandedAccordion === 'financier'} onChange={handleAccordionChange('financier')}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <MonetizationOnIcon color="primary" />
+                    <Typography variant="h6">Informations Financières</Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={6}>
+                      <Card elevation={2} sx={{ p: 2, backgroundColor: 'primary.50' }}>
+                        <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                          Montant du Crédit
+                        </Typography>
+                        <List dense>
+                          <ListItem>
+                            <ListItemText 
+                              primary="Montant demandé" 
+                              secondary={formatAmount(parseFloat(selectedApplication.montant))}
+                              secondaryTypographyProps={{ fontWeight: 'bold', color: 'primary.main' }}
+                            />
+                          </ListItem>
+                          <ListItem>
+                            <ListItemText 
+                              primary="Durée" 
+                              secondary={`${selectedApplication.duree} jours`}
+                            />
+                          </ListItem>
+                          <ListItem>
+                            <ListItemText 
+                              primary="Taux d'intérêt" 
+                              secondary={`${selectedApplication.taux_interet}%`}
+                            />
+                          </ListItem>
+                        </List>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Card elevation={2} sx={{ p: 2, backgroundColor: 'success.50' }}>
+                        <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                          Frais et Totaux
+                        </Typography>
+                        <List dense>
+                          <ListItem>
+                            <ListItemText 
+                              primary="Intérêt total" 
+                              secondary={formatAmount(selectedApplication.interet_total)}
+                            />
+                          </ListItem>
+                          <ListItem>
+                            <ListItemText 
+                              primary="Frais de dossier" 
+                              secondary={formatAmount(selectedApplication.frais_dossier)}
+                            />
+                          </ListItem>
+                          <ListItem>
+                            <ListItemText 
+                              primary="Frais d'étude" 
+                              secondary={formatAmount(selectedApplication.frais_etude)}
+                            />
+                          </ListItem>
+                          <ListItem>
+                            <ListItemText 
+                              primary="Montant total" 
+                              secondary={formatAmount(selectedApplication.montant_total)}
+                              secondaryTypographyProps={{ fontWeight: 'bold', color: 'success.main' }}
+                            />
+                          </ListItem>
+                          <ListItem>
+                            <ListItemText 
+                              primary="Pénalité par jour" 
+                              secondary={formatAmount(selectedApplication.penalite_par_jour)}
+                            />
+                          </ListItem>
+                        </List>
+                      </Card>
+                    </Grid>
+                  </Grid>
+                  
+                  {selectedApplication.calcul_details && (
+                    <Box sx={{ mt: 3, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
+                      <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CalculateIcon />
+                        Détails de Calcul
+                      </Typography>
+                      {(() => {
+                        try {
+                          const calculDetails = typeof selectedApplication.calcul_details === 'string' 
+                            ? JSON.parse(selectedApplication.calcul_details) 
+                            : selectedApplication.calcul_details;
+                          
+                          return (
+                            <Grid container spacing={2}>
+                              <Grid item xs={6} sm={3}>
+                                <Typography variant="body2" color="text.secondary">Type:</Typography>
+                                <Typography variant="body1">{calculDetails.type || 'N/A'}</Typography>
+                              </Grid>
+                              <Grid item xs={6} sm={3}>
+                                <Typography variant="body2" color="text.secondary">Palier:</Typography>
+                                <Typography variant="body1">{calculDetails.palier || 'N/A'}</Typography>
+                              </Grid>
+                            </Grid>
+                          );
+                        } catch {
+                          return (
+                            <Typography variant="body2" color="text.secondary">
+                              {selectedApplication.calcul_details}
+                            </Typography>
+                          );
+                        }
+                      })()}
+                    </Box>
+                  )}
+                </AccordionDetails>
+              </Accordion>
+
+              <Accordion expanded={expandedAccordion === 'revenus'} onChange={handleAccordionChange('revenus')}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <LocalAtmIcon color="primary" />
+                    <Typography variant="h6">Revenus et Dettes</Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={6}>
+                      <Card elevation={2} sx={{ p: 2, backgroundColor: 'info.50' }}>
+                        <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                          Sources de Revenus
+                        </Typography>
+                        <List dense>
+                          <ListItem>
+                            <ListItemText 
+                              primary="Source principale" 
+                              secondary={selectedApplication.source_revenus || 'N/A'}
+                            />
+                          </ListItem>
+                          <ListItem>
+                            <ListItemText 
+                              primary="Revenus mensuels" 
+                              secondary={formatAmount(parseFloat(selectedApplication.revenus_mensuels))}
+                              secondaryTypographyProps={{ fontWeight: 'bold' }}
+                            />
+                          </ListItem>
+                          <ListItem>
+                            <ListItemText 
+                              primary="Autres revenus" 
+                              secondary={formatAmount(parseFloat(selectedApplication.autres_revenus))}
+                            />
+                          </ListItem>
+                        </List>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Card elevation={2} sx={{ p: 2, backgroundColor: 'warning.50' }}>
+                        <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                          Dettes existantes
+                        </Typography>
+                        <List dense>
+                          <ListItem>
+                            <ListItemText 
+                              primary="Montant des dettes" 
+                              secondary={formatAmount(parseFloat(selectedApplication.montant_dettes))}
+                            />
+                          </ListItem>
+                          <ListItem>
+                            <ListItemText 
+                              primary="Description des dettes" 
+                              secondary={selectedApplication.description_dette || 'N/A'}
+                            />
+                          </ListItem>
+                        </List>
+                      </Card>
+                    </Grid>
+                  </Grid>
+                </AccordionDetails>
+              </Accordion>
+
+              <Accordion expanded={expandedAccordion === 'banque'} onChange={handleAccordionChange('banque')}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <AccountBalanceIcon color="primary" />
+                    <Typography variant="h6">Informations Bancaires</Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <List dense>
+                        <ListItem>
+                          <ListItemText 
+                            primary="Nom de la banque" 
+                            secondary={selectedApplication.nom_banque || 'N/A'}
+                          />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemText 
+                            primary="Numéro de banque" 
+                            secondary={selectedApplication.numero_banque || 'N/A'}
+                          />
+                        </ListItem>
+                      </List>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <List dense>
+                        <ListItem>
+                          <ListItemIcon>
+                            <ContactPhoneIcon color="primary" />
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary="Contact d'urgence" 
+                            secondary={selectedApplication.numero_personne_contact || 'N/A'}
+                          />
+                        </ListItem>
+                      </List>
+                    </Grid>
+                  </Grid>
+                </AccordionDetails>
+              </Accordion>
+
+              <Accordion expanded={expandedAccordion === 'documents'} onChange={handleAccordionChange('documents')}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <PictureAsPdfIcon color="primary" />
+                    <Typography variant="h6">Documents</Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  {renderDocumentSection()}
+                </AccordionDetails>
+              </Accordion>
+
+              {showAmortizationTable && (
+                <Accordion expanded={expandedAccordion === 'amortissement'} onChange={handleAccordionChange('amortissement')}>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <CalculateIcon color="primary" />
+                      <Typography variant="h6">Tableau d'Amortissement</Typography>
+                    </Box>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    {renderAmortizationTable()}
+                  </AccordionDetails>
+                </Accordion>
               )}
 
-              {/* Bouton Tableau d'Amortissement */}
-              <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
+              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center', gap: 2 }}>
                 <Button
                   variant="contained"
                   color="primary"
@@ -1266,22 +1814,18 @@ const ChefAgenceDashboard: React.FC = () => {
                     setShowAmortizationTable(!showAmortizationTable);
                   }}
                   startIcon={<CalculateIcon />}
-                  sx={{ minWidth: 200 }}
                 >
-                  {showAmortizationTable ? 'Masquer' : 'Voir'} Tableau d'Amortissement
+                  {showAmortizationTable ? 'Masquer' : 'Afficher'} Tableau d'Amortissement
                 </Button>
               </Box>
-
-              {/* Tableau d'Amortissement */}
-              {showAmortizationTable && renderAmortizationTable()}
             </Box>
           )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setDetailsDialogOpen(false)}>
             Fermer
           </Button>
-          {selectedApplication && (selectedApplication.statut === 'SOUMIS' || selectedApplication.statut === 'EN_COURS') && (
+          {selectedApplication && selectedApplication.statut === 'SOUMIS' && (
             <Button
               variant="contained"
               onClick={() => {
@@ -1294,7 +1838,51 @@ const ChefAgenceDashboard: React.FC = () => {
             </Button>
           )}
         </DialogActions>
-      </Dialog>
+      </StyledDialog>
+
+      {/* Modal pour afficher l'image en plein écran */}
+      <ImageModal
+        open={imageModalOpen}
+        onClose={() => setImageModalOpen(false)}
+        closeAfterTransition
+        BackdropComponent={Backdrop}
+        BackdropProps={{
+          timeout: 500,
+        }}
+      >
+        <Fade in={imageModalOpen}>
+          <ModalContent>
+            <CloseButton onClick={() => setImageModalOpen(false)}>
+              <CloseIcon />
+            </CloseButton>
+            <DownloadButton onClick={() => {
+              if (selectedImage) {
+                const filename = selectedImage.split('/').pop() || 'document.jpg';
+                handleDownloadImage(selectedImage, filename);
+              }
+            }}>
+              <DownloadIcon />
+            </DownloadButton>
+            {selectedImage && (
+              <img
+                src={selectedImage}
+                alt="Document agrandi"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '85vh',
+                  objectFit: 'contain',
+                  display: 'block',
+                  margin: '0 auto'
+                }}
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgdmlld0JveD0iMCAwIDgwMCA2MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjgwMCIgaGVpZ2h0PSI2MDAiIGZpbGw9IiNGNUY1RjUiLz48cGF0aCBkPSJNMjQwIDI0MEg1NjBWNDQwSDI0MFYyNDBaIiBmaWxsPSIjQ0NDQ0NDIi8+PHBhdGggZD0iTTMyMCAyNDBINDgwVjQ0MEgzMjBWMjQwWiIgZmlsbD0iI0UwRTBFMCIvPjx0ZXh0IHg9IjQwMCIgeT0iNTAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiM4ODg4ODgiPkRvY3VtZW50IG5vbiBkaXNwb25pYmxlPC90ZXh0Pjwvc3ZnPg==';
+                }}
+              />
+            )}
+          </ModalContent>
+        </Fade>
+      </ImageModal>
 
       {/* Dialog Avis */}
       <Dialog
@@ -1312,27 +1900,27 @@ const ChefAgenceDashboard: React.FC = () => {
             {selectedApplication && (
               <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
                 <Typography variant="body2" color="text.secondary">
-                  Client: {getClientName(selectedApplication)}
+                  Client ID: {selectedApplication.client_id}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Montant: {formatAmount(selectedApplication.montant)}
+                  Montant: {formatAmount(parseFloat(selectedApplication.montant))}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Durée: {selectedApplication.duree} jours
                 </Typography>
               </Box>
             )}
-            
+
             <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
               Sélectionnez votre opinion:
             </Typography>
-            
+
             <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
               <Button
                 fullWidth
                 variant={currentOpinion.opinion === 'FAVORABLE' ? 'contained' : 'outlined'}
                 color="success"
-                onClick={() => setCurrentOpinion({...currentOpinion, opinion: 'FAVORABLE'})}
+                onClick={() => setCurrentOpinion({ ...currentOpinion, opinion: 'FAVORABLE' })}
                 startIcon={<CheckCircleIcon />}
                 sx={{ py: 1.5 }}
               >
@@ -1342,7 +1930,7 @@ const ChefAgenceDashboard: React.FC = () => {
                 fullWidth
                 variant={currentOpinion.opinion === 'DEFAVORABLE' ? 'contained' : 'outlined'}
                 color="error"
-                onClick={() => setCurrentOpinion({...currentOpinion, opinion: 'DEFAVORABLE'})}
+                onClick={() => setCurrentOpinion({ ...currentOpinion, opinion: 'DEFAVORABLE' })}
                 startIcon={<CancelIcon />}
                 sx={{ py: 1.5 }}
               >
@@ -1358,7 +1946,7 @@ const ChefAgenceDashboard: React.FC = () => {
               multiline
               rows={4}
               value={currentOpinion.commentaire}
-              onChange={(e) => setCurrentOpinion({...currentOpinion, commentaire: e.target.value})}
+              onChange={(e) => setCurrentOpinion({ ...currentOpinion, commentaire: e.target.value })}
               placeholder="Ajoutez un commentaire pour justifier votre opinion..."
               variant="outlined"
               required
@@ -1366,7 +1954,7 @@ const ChefAgenceDashboard: React.FC = () => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button 
+          <Button
             onClick={() => setOpinionDialogOpen(false)}
             disabled={submittingOpinion}
           >
@@ -1379,7 +1967,7 @@ const ChefAgenceDashboard: React.FC = () => {
             disabled={!currentOpinion.opinion || !currentOpinion.commentaire || submittingOpinion}
             startIcon={<ThumbUpIcon />}
           >
-            {submittingOpinion ? 'Soumission...' : 'Soumettre l\'Avis'}
+            {submittingOpinion ? 'Soumission...' : 'Soumettre le Pré-Avis'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1387,4 +1975,4 @@ const ChefAgenceDashboard: React.FC = () => {
   );
 };
 
-export default ChefAgenceDashboard;
+export default ChefAgenceDashboard

@@ -52,6 +52,7 @@ import ContactPhoneIcon from '@mui/icons-material/ContactPhone';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import { useNavigate } from 'react-router-dom';
 import { clientService } from '../../services/api/clientApi';
+import { compteService } from '../../services/api/compteApi';
 
 // ============================
 // STYLED COMPONENTS
@@ -1126,6 +1127,7 @@ const NouvelleDemandeFlash = () => {
                     {compte.statut === 'actif' ? 'Actif' : 'Inactif'}
                   </Typography>
                 </TableCell>
+                
                 <TableCell>
                   <Box>
                     <Typography variant="body2">
@@ -1136,6 +1138,7 @@ const NouvelleDemandeFlash = () => {
                     </Typography>
                   </Box>
                 </TableCell>
+                
                 <TableCell>
                   <Chip
                     label={compte.client?.type_client === 'physique' ? 'Physique' : 'Morale'}

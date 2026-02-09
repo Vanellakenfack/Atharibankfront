@@ -36,7 +36,9 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Divider
+  Divider,
+  FormControlLabel,
+  Checkbox
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import SearchIcon from '@mui/icons-material/Search';
@@ -57,6 +59,9 @@ import ContactPhoneIcon from '@mui/icons-material/ContactPhone';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import PersonIcon from '@mui/icons-material/Person';
 import WorkIcon from '@mui/icons-material/Work';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import GavelIcon from '@mui/icons-material/Gavel';
+import ReceiptIcon from '@mui/icons-material/Receipt';
 import { useNavigate } from 'react-router-dom';
 
 // ============================
@@ -76,10 +81,6 @@ const StyledCard = styled(Card)(({ theme, selected }) => ({
   },
   transition: 'all 0.2s ease-in-out',
 }));
-
-// ============================
-// COMPOSANTS PERSONNALISÉS
-// ============================
 
 // Transition pour le toast
 function SlideTransition(props) {
@@ -190,36 +191,44 @@ const NouvelleDemande = () => {
     urgence: 'normale',
     source_revenus: '',
     revenus_mensuels: '',
-    contact_urgence: ''
+    autres_revenus: '',
+    montant_dettes: '',
+    description_dette: 'RAS',
+    nom_banque: '',
+    numero_banque: '',
+    contact_urgence: '',
+    garantie: '',
+    plan_epargne: false,
+    description_domicile: '',
+    description_activite: ''
   });
 
   // ============================
   // ÉTATS POUR LES DOCUMENTS (TOUS LES DOCUMENTS)
   // ============================
   const [documents, setDocuments] = useState({
-    // Documents de base
-    demande_credit: { file: null },
+    // Documents existants
+    demande_credit_img: { file: null },
     photocopie_cni: { file: null },
+    photo_4x4: { file: null },
+    plan_localisation: { file: null },
+    facture_electricite: { file: null },
+    casier_judiciaire: { file: null },
+    historique_compte: { file: null },
+    geolocalisation_img: { file: null },
+    plan_localisation_activite_img: { file: null },
+    photo_activite_img: { file: null },
     
-    // Documents domicile
+    // Nouveaux documents pour crédit flash
     plan_localisation_domicile: { file: null },
-    description_domicile: { file: null },
-    photo_domicile: { file: null },
-    
-    // Documents activité
-    plan_localisation_activite: { file: null },
-    description_activite: { file: null },
-    geolocalisation_activite: { file: null },
-    photo_activite: { file: null },
-    
-    // Documents supplémentaires
-    dernier_bulletin: { file: null },
-    attestation_travail: { file: null },
-    releve_compte: { file: null },
-    
-    // Autres
-    lettre_non_remboursement: { file: null },
-    piece_identite: { file: null }
+    geolocalisation_domicile: { file: null },
+    photo_domicile_1: { file: null },
+    photo_domicile_2: { file: null },
+    photo_domicile_3: { file: null },
+    photo_activite_1: { file: null },
+    photo_activite_2: { file: null },
+    photo_activite_3: { file: null },
+    lettre_non_remboursement: { file: null }
   });
 
   // ============================
@@ -236,29 +245,32 @@ const NouvelleDemande = () => {
   // LISTE DES DOCUMENTS REQUIS POUR TOUS LES CRÉDITS
   // ============================
   const documentList = [
-    // Documents de base
-    { key: 'demande_credit', label: "Demande de crédit", required: true, icon: <DescriptionOutlinedIcon /> },
+    // Documents existants
+    { key: 'demande_credit_img', label: "Demande de crédit signée", required: true, icon: <DescriptionOutlinedIcon /> },
     { key: 'photocopie_cni', label: "Photocopie de la CNI", required: true, icon: <PersonIcon /> },
+    { key: 'photo_4x4', label: "Photo 4x4", required: true, icon: <PersonIcon /> },
+    { key: 'plan_localisation', label: "Plan de localisation", required: true, icon: <LocationOnIcon /> },
+    { key: 'facture_electricite', label: "Facture d'électricité", required: true, icon: <ReceiptIcon /> },
+    { key: 'casier_judiciaire', label: "Casier judiciaire", required: true, icon: <GavelIcon /> },
+    { key: 'historique_compte', label: "Historique de compte", required: true, icon: <AccountBalanceWalletIcon /> },
+    { key: 'geolocalisation_img', label: "Image de géolocalisation", required: true, icon: <LocationOnIcon /> },
+    { key: 'plan_localisation_activite_img', label: "Plan de localisation activité", required: true, icon: <BusinessIcon /> },
+    { key: 'photo_activite_img', label: "Photo de l'activité", required: true, icon: <PhotoCameraIcon /> },
     
-    // Documents domicile
+    // Nouveaux documents domicile
     { key: 'plan_localisation_domicile', label: "Plan de localisation du domicile", required: true, icon: <HomeIcon /> },
-    { key: 'description_domicile', label: "Description du domicile", required: false, icon: <DescriptionOutlinedIcon /> },
-    { key: 'photo_domicile', label: "Photo du domicile", required: true, icon: <PhotoCameraIcon /> },
+    { key: 'geolocalisation_domicile', label: "Géolocalisation du domicile", required: true, icon: <LocationOnIcon /> },
+    { key: 'photo_domicile_1', label: "Photo du domicile 1", required: true, icon: <PhotoCameraIcon /> },
+    { key: 'photo_domicile_2', label: "Photo du domicile 2 (optionnel)", required: false, icon: <PhotoCameraIcon /> },
+    { key: 'photo_domicile_3', label: "Photo du domicile 3 (optionnel)", required: false, icon: <PhotoCameraIcon /> },
     
-    // Documents activité
-    { key: 'plan_localisation_activite', label: "Plan de localisation du lieu d'activité", required: true, icon: <BusinessIcon /> },
-    { key: 'description_activite', label: "Description du lieu d'activité", required: false, icon: <DescriptionOutlinedIcon /> },
-    { key: 'geolocalisation_activite', label: "Géolocalisation de l'activité", required: true, icon: <LocationOnIcon /> },
-    { key: 'photo_activite', label: "Photo de l'activité", required: true, icon: <PhotoCameraIcon /> },
+    // Nouveaux documents activité
+    { key: 'photo_activite_1', label: "Photo de l'activité 1", required: true, icon: <PhotoCameraIcon /> },
+    { key: 'photo_activite_2', label: "Photo de l'activité 2 (optionnel)", required: false, icon: <PhotoCameraIcon /> },
+    { key: 'photo_activite_3', label: "Photo de l'activité 3 (optionnel)", required: false, icon: <PhotoCameraIcon /> },
     
-    // Documents financiers
-    { key: 'dernier_bulletin', label: "Dernier bulletin de salaire", required: true, icon: <WorkIcon /> },
-    { key: 'attestation_travail', label: "Attestation de travail", required: true, icon: <WorkIcon /> },
-    { key: 'releve_compte', label: "Relevé de compte récent", required: true, icon: <AccountBalanceIcon /> },
-    
-    // Autres
-    { key: 'lettre_non_remboursement', label: "Lettre de non remboursement des frais d'étude signée", required: true, icon: <DescriptionOutlinedIcon /> },
-    { key: 'piece_identite', label: "Pièce d'identité originale", required: true, icon: <PersonIcon /> }
+    // Autres documents
+    { key: 'lettre_non_remboursement', label: "Lettre de non remboursement signée", required: true, icon: <DescriptionOutlinedIcon /> }
   ];
 
   const API_BASE_URL = 'http://127.0.0.1:8000/api';
@@ -573,102 +585,6 @@ const NouvelleDemande = () => {
   };
 
   // ============================
-  // FONCTIONS DE CALCUL D'INTÉRÊT
-  // ============================
-
-  // Calculer les intérêts basés sur la grille de tarification
-  const calculateInterest = () => {
-    const selectedType = creditTypes.find(type => type.id === parseInt(creditData.credit_type_id));
-    const montant = parseFloat(creditData.montant) || 0;
-    const duree = parseInt(creditData.duree) || 0;
-
-    if (!selectedType || !montant || !duree || duree <= 0) {
-      showToast('Veuillez sélectionner un type de crédit et saisir le montant et la durée', 'warning');
-      return;
-    }
-
-    const details = selectedType.details_supplementaires;
-    
-    // Si pas de grille de tarification, calcul simple
-    if (!details || !details.grille_tarification) {
-      const interet = montant * (selectedType.taux_interet / 100) * (duree / 365);
-      const total = montant + interet + (selectedType.frais_dossier || 0);
-      
-      setCalculationResult({
-        montant,
-        duree,
-        interet: interet.toFixed(2),
-        frais_dossier: selectedType.frais_dossier || 0,
-        total: total.toFixed(2),
-        taux_applique: selectedType.taux_interet,
-        method: 'Calcul simple'
-      });
-      setShowCalculation(true);
-      return;
-    }
-
-    // Calcul avec grille de tarification
-    const grille = details.grille_tarification;
-    let palier = null;
-    
-    // Trouver le palier correspondant au montant
-    for (const p of grille) {
-      if (montant >= p.min && montant <= p.max) {
-        palier = p;
-        break;
-      }
-    }
-
-    if (!palier) {
-      showToast('Montant hors des paliers définis', 'error');
-      return;
-    }
-
-    let frais_etude = palier.frais_etude;
-    let premier_jour = palier.premier_jour;
-    let penalite_jour = palier.penalite_jour;
-    let journalier = palier.journalier;
-
-    // Application de la règle de 3 pour le palier 5
-    if (palier.palier === 5 && palier.description.includes('Règle de 3')) {
-      const proportion = (montant - palier.min) / (palier.max - palier.min);
-      const palier4 = grille.find(p => p.palier === 4);
-      
-      if (palier4) {
-        frais_etude = palier4.frais_etude + (3000 - palier4.frais_etude) * proportion;
-        premier_jour = palier4.premier_jour + (10000 - palier4.premier_jour) * proportion;
-        penalite_jour = palier4.penalite_jour + (3000 - palier4.penalite_jour) * proportion;
-      }
-    }
-
-    // Calcul des intérêts
-    let interet = 0;
-    if (duree === 1) {
-      interet = parseFloat(premier_jour);
-    } else {
-      interet = parseFloat(premier_jour) + (parseFloat(journalier) * (duree - 1));
-    }
-
-    const total = montant + interet + parseFloat(frais_etude);
-    const taux_effectif = (interet / montant) * (365 / duree) * 100;
-    
-    setCalculationResult({
-      montant,
-      duree,
-      palier: palier.description,
-      frais_etude: parseFloat(frais_etude),
-      premier_jour: parseFloat(premier_jour),
-      journalier: parseFloat(journalier),
-      interet: interet.toFixed(2),
-      penalite_jour: parseFloat(penalite_jour),
-      total: total.toFixed(2),
-      taux_effectif: taux_effectif.toFixed(2),
-      method: 'Grille de tarification'
-    });
-    setShowCalculation(true);
-  };
-
-  // ============================
   // GESTIONNAIRES D'ÉVÉNEMENTS
   // ============================
 
@@ -796,7 +712,16 @@ const NouvelleDemande = () => {
       urgence: 'normale',
       source_revenus: '',
       revenus_mensuels: '',
-      contact_urgence: ''
+      autres_revenus: '',
+      montant_dettes: '',
+      description_dette: 'RAS',
+      nom_banque: '',
+      numero_banque: '',
+      contact_urgence: '',
+      garantie: '',
+      plan_epargne: false,
+      description_domicile: '',
+      description_activite: ''
     });
     setDocuments(Object.fromEntries(documentList.map(d => [d.key, { file: null }])));
     setSearchTerm('');
@@ -833,12 +758,21 @@ const NouvelleDemande = () => {
       formData.append('observation', creditData.observation || '');
       formData.append('source_revenus', creditData.source_revenus);
       formData.append('revenus_mensuels', creditData.revenus_mensuels);
-      formData.append('contact_urgence', creditData.contact_urgence);
+      formData.append('autres_revenus', creditData.autres_revenus || '0.00');
+      formData.append('montant_dettes', creditData.montant_dettes || '0.00');
+      formData.append('description_dette', creditData.description_dette || 'RAS');
+      formData.append('nom_banque', creditData.nom_banque || 'N/A');
+      formData.append('numero_banque', creditData.numero_banque || 'N/A');
+      formData.append('numero_personne_contact', creditData.contact_urgence);
+      formData.append('garantie', creditData.garantie || '');
+      formData.append('plan_epargne', creditData.plan_epargne ? '1' : '0');
+      formData.append('description_domicile', creditData.description_domicile || '');
+      formData.append('description_activite', creditData.description_activite || '');
       
       // Ajouter tous les documents
       Object.keys(documents).forEach(key => {
         if (documents[key]?.file) {
-          formData.append(`documents[${key}]`, documents[key].file);
+          formData.append(key, documents[key].file);
         }
       });
       
@@ -1018,7 +952,7 @@ const NouvelleDemande = () => {
         </AccordionSummary>
         <AccordionDetails>
           <Grid container spacing={3}>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid item xs={12} md={6}>
               <Card variant="outlined">
                 <CardContent>
                   <Typography variant="h6" gutterBottom>
@@ -1043,7 +977,7 @@ const NouvelleDemande = () => {
                 </CardContent>
               </Card>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid item xs={12} md={6}>
               <Card variant="outlined">
                 <CardContent>
                   <Typography variant="h6" gutterBottom>
@@ -1094,7 +1028,7 @@ const NouvelleDemande = () => {
   const renderCreditTypeSelection = () => (
     <Grid container spacing={2}>
       {creditTypes.map((type) => (
-        <Grid size={{ xs: 12, md: 6 }} key={type.id}>
+        <Grid item xs={12} md={6} key={type.id}>
           <StyledCard
             selected={creditData.credit_type_id === type.id.toString()}
             onClick={() => handleCreditChange('credit_type_id', type.id)}
@@ -1134,7 +1068,7 @@ const NouvelleDemande = () => {
               </Box>
               <Divider sx={{ my: 2 }} />
               <Grid container spacing={1}>
-                <Grid size={6}>
+                <Grid item xs={6}>
                   <Typography variant="caption" display="block" color="textSecondary">
                     Montant max
                   </Typography>
@@ -1142,7 +1076,7 @@ const NouvelleDemande = () => {
                     {type.montant_max ? type.montant_max.toLocaleString('fr-FR') : '0'} FCFA
                   </Typography>
                 </Grid>
-                <Grid size={6}>
+                <Grid item xs={6}>
                   <Typography variant="caption" display="block" color="textSecondary">
                     Durée max
                   </Typography>
@@ -1161,7 +1095,7 @@ const NouvelleDemande = () => {
   // Rendre le formulaire des détails du crédit
   const renderCreditDetailsForm = () => (
     <Grid container spacing={3}>
-      <Grid size={{ xs: 12, md: 6 }}>
+      <Grid item xs={12} md={6}>
         <TextField
           fullWidth
           label="Montant demandé (FCFA)"
@@ -1175,10 +1109,10 @@ const NouvelleDemande = () => {
           helperText="Le montant doit être compris entre les limites du type de crédit"
         />
       </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
+      <Grid item xs={12} md={6}>
         <TextField
           fullWidth
-          label="Durée (Mois)"
+          label="Durée (Jours)"
           type="number"
           value={creditData.duree}
           onChange={(e) => handleCreditChange('duree', e.target.value)}
@@ -1186,7 +1120,7 @@ const NouvelleDemande = () => {
           helperText="Durée en jours du crédit"
         />
       </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
+      <Grid item xs={12} md={6}>
         <TextField
           fullWidth
           label="Source de revenus"
@@ -1196,7 +1130,7 @@ const NouvelleDemande = () => {
           placeholder="Ex: Salaire, Commerce, etc."
         />
       </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
+      <Grid item xs={12} md={6}>
         <TextField
           fullWidth
           label="Revenus mensuels (FCFA)"
@@ -1209,7 +1143,42 @@ const NouvelleDemande = () => {
           }}
         />
       </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
+      <Grid item xs={12} md={6}>
+        <TextField
+          fullWidth
+          label="Autres revenus (FCFA)"
+          type="number"
+          value={creditData.autres_revenus}
+          onChange={(e) => handleCreditChange('autres_revenus', e.target.value)}
+          InputProps={{
+            startAdornment: <InputAdornment position="start">FCFA</InputAdornment>,
+          }}
+          helperText="Autres sources de revenus (optionnel)"
+        />
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <TextField
+          fullWidth
+          label="Montant des dettes (FCFA)"
+          type="number"
+          value={creditData.montant_dettes}
+          onChange={(e) => handleCreditChange('montant_dettes', e.target.value)}
+          InputProps={{
+            startAdornment: <InputAdornment position="start">FCFA</InputAdornment>,
+          }}
+          helperText="Dettes actuelles (optionnel)"
+        />
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <TextField
+          fullWidth
+          label="Description des dettes"
+          value={creditData.description_dette}
+          onChange={(e) => handleCreditChange('description_dette', e.target.value)}
+          placeholder="Ex: Prêt auto, Crédit immobilier..."
+        />
+      </Grid>
+      <Grid item xs={12} md={6}>
         <TextField
           fullWidth
           label="Numéro de contact en cas d'urgence"
@@ -1223,7 +1192,56 @@ const NouvelleDemande = () => {
           helperText="Personne à contacter en cas d'urgence"
         />
       </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
+      <Grid item xs={12} md={6}>
+        <TextField
+          fullWidth
+          label="Banque principale"
+          value={creditData.nom_banque}
+          onChange={(e) => handleCreditChange('nom_banque', e.target.value)}
+          placeholder="Ex: BICICI, SGBCI..."
+        />
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <TextField
+          fullWidth
+          label="Numéro de compte bancaire"
+          value={creditData.numero_banque}
+          onChange={(e) => handleCreditChange('numero_banque', e.target.value)}
+          placeholder="Numéro de compte principal"
+        />
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <TextField
+          fullWidth
+          label="Garantie proposée"
+          value={creditData.garantie}
+          onChange={(e) => handleCreditChange('garantie', e.target.value)}
+          placeholder="Ex: Titre foncier, Véhicule..."
+        />
+      </Grid>
+      <Grid item xs={12}>
+        <TextField
+          fullWidth
+          label="Description du domicile (optionnel)"
+          multiline
+          rows={3}
+          value={creditData.description_domicile}
+          onChange={(e) => handleCreditChange('description_domicile', e.target.value)}
+          placeholder="Décrivez le domicile : type de construction, nombre de pièces, environnement..."
+        />
+      </Grid>
+      <Grid item xs={12}>
+        <TextField
+          fullWidth
+          label="Description de l'activité (optionnel)"
+          multiline
+          rows={3}
+          value={creditData.description_activite}
+          onChange={(e) => handleCreditChange('description_activite', e.target.value)}
+          placeholder="Décrivez l'activité : nature du commerce, produits/services, localisation..."
+        />
+      </Grid>
+      <Grid item xs={12} md={6}>
         <FormControl fullWidth>
           <InputLabel>Type de compte</InputLabel>
           <Select
@@ -1239,7 +1257,7 @@ const NouvelleDemande = () => {
           </Select>
         </FormControl>
       </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
+      <Grid item xs={12} md={6}>
         <FormControl fullWidth>
           <InputLabel>Niveau d'urgence</InputLabel>
           <Select
@@ -1253,7 +1271,18 @@ const NouvelleDemande = () => {
           </Select>
         </FormControl>
       </Grid>
-      <Grid size={{ xs: 12 }}>
+      <Grid item xs={12} md={6}>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={creditData.plan_epargne}
+              onChange={(e) => handleCreditChange('plan_epargne', e.target.checked)}
+            />
+          }
+          label="Plan d'épargne associé"
+        />
+      </Grid>
+      <Grid item xs={12}>
         <TextField
           fullWidth
           label="Observations (optionnel)"
@@ -1264,84 +1293,14 @@ const NouvelleDemande = () => {
           placeholder="Ajoutez des informations complémentaires si nécessaire..."
         />
       </Grid>
-      <Grid size={{ xs: 12 }}>
-        <Button
-          variant="outlined"
-          startIcon={<CalculateIcon />}
-          onClick={calculateInterest}
-          disabled={!creditData.montant || !creditData.duree || !creditData.credit_type_id}
-        >
-          Calculer les intérêts
-        </Button>
-      </Grid>
     </Grid>
   );
-
-  // Rendre les résultats du calcul
-  const renderCalculationResult = () => {
-    if (!showCalculation || !calculationResult) return null;
-    
-    return (
-      <Accordion defaultExpanded sx={{ mt: 2 }}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <CalculateIcon color="primary" />
-            <Typography variant="h6">Résultat du Calcul</Typography>
-          </Box>
-        </AccordionSummary>
-        <AccordionDetails>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                    Détails du calcul
-                  </Typography>
-                  <Typography><strong>Montant:</strong> {calculationResult.montant.toLocaleString('fr-FR')} FCFA</Typography>
-                  <Typography><strong>Durée:</strong> {calculationResult.duree} jours</Typography>
-                  <Typography><strong>Intérêts:</strong> {calculationResult.interet} FCFA</Typography>
-                  {calculationResult.frais_dossier && (
-                    <Typography><strong>Frais de dossier:</strong> {calculationResult.frais_dossier} FCFA</Typography>
-                  )}
-                  {calculationResult.frais_etude && (
-                    <Typography><strong>Frais d'étude:</strong> {calculationResult.frais_etude} FCFA</Typography>
-                  )}
-                  <Typography variant="h6" sx={{ mt: 2, color: 'primary.main' }}>
-                    Total à rembourser: {calculationResult.total} FCFA
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                    Informations supplémentaires
-                  </Typography>
-                  <Typography><strong>Méthode:</strong> {calculationResult.method}</Typography>
-                  {calculationResult.taux_applique && (
-                    <Typography><strong>Taux appliqué:</strong> {calculationResult.taux_applique}%</Typography>
-                  )}
-                  {calculationResult.taux_effectif && (
-                    <Typography><strong>Taux effectif annuel:</strong> {calculationResult.taux_effectif}%</Typography>
-                  )}
-                  {calculationResult.palier && (
-                    <Typography><strong>Palier appliqué:</strong> {calculationResult.palier}</Typography>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        </AccordionDetails>
-      </Accordion>
-    );
-  };
 
   // Rendre la section des documents
   const renderDocumentsSection = () => (
     <Grid container spacing={2}>
       {documentList.map((doc) => (
-        <Grid size={{ xs: 12, md: 6 }} key={doc.key}>
+        <Grid item xs={12} md={6} key={doc.key}>
           <Card variant="outlined">
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -1359,7 +1318,7 @@ const NouvelleDemande = () => {
                 )}
               </Box>
               <input
-                accept=".pdf,.jpg,.jpeg,.png"
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                 style={{ display: 'none' }}
                 id={`file-upload-${doc.key}`}
                 type="file"
@@ -1506,7 +1465,6 @@ const NouvelleDemande = () => {
             3. Détails du Crédit
           </Typography>
           {renderCreditDetailsForm()}
-          {renderCalculationResult()}
         </StyledPaper>
 
         {/* SECTION 4: Documents Requis */}
@@ -1569,49 +1527,49 @@ const NouvelleDemande = () => {
               <Divider sx={{ my: 2 }} />
               
               <Grid container spacing={2}>
-                <Grid size={6}>
+                <Grid item xs={6}>
                   <Typography variant="body2">
                     <strong>Code:</strong> {extractStringValue(selectedCreditDetails.code) || 'N/A'}
                   </Typography>
                 </Grid>
-                <Grid size={6}>
+                <Grid item xs={6}>
                   <Typography variant="body2">
                     <strong>Libellé:</strong> {extractStringValue(selectedCreditDetails.libelle) || 'N/A'}
                   </Typography>
                 </Grid>
-                <Grid size={6}>
+                <Grid item xs={6}>
                   <Typography variant="body2">
                     <strong>Taux d'intérêt annuel:</strong> {extractStringValue(selectedCreditDetails.taux_interet_annuel) || 0}%
                   </Typography>
                 </Grid>
-                <Grid size={6}>
+                <Grid item xs={6}>
                   <Typography variant="body2">
                     <strong>Statut:</strong> {selectedCreditDetails.actif ? 'Actif' : 'Inactif'}
                   </Typography>
                 </Grid>
                 {selectedCreditDetails.duree_blocage_min && (
-                  <Grid size={6}>
+                  <Grid item xs={6}>
                     <Typography variant="body2">
                       <strong>Durée min:</strong> {extractStringValue(selectedCreditDetails.duree_blocage_min)} jours
                     </Typography>
                   </Grid>
                 )}
                 {selectedCreditDetails.duree_blocage_max && (
-                  <Grid size={6}>
+                  <Grid item xs={6}>
                     <Typography variant="body2">
                       <strong>Durée max:</strong> {extractStringValue(selectedCreditDetails.duree_blocage_max)} jours
                     </Typography>
                   </Grid>
                 )}
                 {selectedCreditDetails.frais_ouverture && (
-                  <Grid size={6}>
+                  <Grid item xs={6}>
                     <Typography variant="body2">
                       <strong>Frais d'ouverture:</strong> {extractStringValue(selectedCreditDetails.frais_ouverture)} FCFA
                     </Typography>
                   </Grid>
                 )}
                 {selectedCreditDetails.created_at && (
-                  <Grid size={12}>
+                  <Grid item xs={12}>
                     <Typography variant="body2">
                       <strong>Créé le:</strong> {new Date(selectedCreditDetails.created_at).toLocaleDateString('fr-FR')}
                     </Typography>
