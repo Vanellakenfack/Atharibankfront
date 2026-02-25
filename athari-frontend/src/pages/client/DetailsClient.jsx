@@ -34,7 +34,15 @@ import {
     NoteAdd as NoteAddIcon, ReceiptLong as ReceiptLongIcon,
     Paid as PaidIcon, AccountBox as AccountBoxIcon,
     SupervisorAccount as SupervisorAccountIcon,
-    HowToReg as HowToRegIcon, BadgeOutlined as BadgeOutlinedIcon
+    HowToReg as HowToRegIcon, BadgeOutlined as BadgeOutlinedIcon,
+    Article as ArticleIcon, FileCopy as FileCopyIcon,
+    RequestPage as RequestPageIcon, Checklist as ChecklistIcon,
+    RealEstateAgent as RealEstateAgentIcon, LocationOnOutlined as LocationOnOutlinedIcon,
+    GroupWork as GroupWorkIcon, People as PeopleIcon,
+    FactCheck as FactCheckIcon, Receipt as ReceiptOutlinedIcon,
+    AccountBalance as AccountBalanceOutlinedIcon,
+    BusinessCenter as BusinessCenterOutlinedIcon,
+    Description as DescriptionOutlinedIcon
 } from '@mui/icons-material';
 import apiClient from '../../services/api/ApiClient';
 import Layout from '../../components/layout/Layout';
@@ -54,6 +62,8 @@ export default function DetailsClient() {
     // Onglets
     const [activeDocTab, setActiveDocTab] = useState(0);
     const [activeSignataireTab, setActiveSignataireTab] = useState(0);
+    const [activeMoraleDocTab, setActiveMoraleDocTab] = useState(0);
+    const [activeSignataireDocTab, setActiveSignataireDocTab] = useState(0);
     
     // Accordions
     const [expandedAccordions, setExpandedAccordions] = useState({
@@ -67,7 +77,11 @@ export default function DetailsClient() {
         entreprise: true,
         gerants: true,
         signataires: true,
-        documentsJuridiques: true
+        documentsJuridiques: true,
+        documentsSiege: true,
+        documentsSignataires: true,
+        attestations: true,
+        documentsGerants: true
     });
 
     const handleAccordionChange = (panel) => (event, isExpanded) => {
@@ -98,9 +112,11 @@ export default function DetailsClient() {
     }, [id]);
 
     const handleOpenImageModal = (imageUrl, title) => {
-        setCurrentImage(imageUrl);
-        setCurrentImageTitle(title);
-        setOpenImageModal(true);
+        if (imageUrl) {
+            setCurrentImage(imageUrl);
+            setCurrentImageTitle(title);
+            setOpenImageModal(true);
+        }
     };
 
     const handleCloseModal = () => {
@@ -150,18 +166,24 @@ export default function DetailsClient() {
     const getUrls = () => {
         if (isPhysique && client.physique) {
             return {
-                // Documents images
-                photoUrl: client.physique.photo_url,
-                signatureUrl: client.physique.signature_url,
+                // Documents images demandés
+                photoLocalisationActiviteUrl: client.photo_localisation_activite,
+                photoLocalisationDomicileUrl: client.photo_localisation_domicile,
                 cniRectoUrl: client.physique.cni_recto_url,
                 cniVersoUrl: client.physique.cni_verso_url,
                 niuImageUrl: client.physique.niu_image_url,
+                photoUrl: client.physique.photo_url,
+                signatureUrl: client.physique.signature_url,
                 
                 // Documents PDF
-                attestationConformitePdfUrl: null, // Pas dans votre exemple pour physique
+                attestationConformitePdfUrl: client.physique.attestation_conformite_pdf_url,
             };
         } else if (!isPhysique && client.morale) {
             return {
+                // Documents communs
+                photoLocalisationDomicileUrl: client.photo_localisation_domicile,
+                photoLocalisationActiviteUrl: client.photo_localisation_activite,
+                
                 // Photos gérants
                 gerantPhotoUrls: [
                     client.morale.photo_gerant_url,
@@ -186,7 +208,9 @@ export default function DetailsClient() {
                 acteDesignationPdfUrl: client.morale.acte_designation_signataires_pdf_url,
                 listeConseilPdfUrl: client.morale.liste_conseil_administration_pdf_url,
                 listeMembresPdfUrl: client.morale.liste_membres_pdf_url,
-                attestationConformitePdfMoraleUrl: null, // Pas dans votre exemple
+                attestationConformitePdfMoraleUrl: client.morale.attestation_conformite_pdf_url,
+                demandeOuverturePdfUrl: client.morale.demande_ouverture_pdf_url,
+                formulaireOuverturePdfUrl: client.morale.formulaire_ouverture_pdf_url,
                 
                 // Plans et factures siège
                 planSiegeUrl: client.morale.plan_localisation_siege_image_url,
@@ -200,12 +224,14 @@ export default function DetailsClient() {
                     client.morale.plan_localisation_signataire3_image_url
                 ],
                 
-                // Factures signataires
+                // Factures eau signataires
                 factureEauSignataireUrls: [
                     client.morale.facture_eau_signataire1_image_url,
                     client.morale.facture_eau_signataire2_image_url,
                     client.morale.facture_eau_signataire3_image_url
                 ],
+                
+                // Factures électricité signataires
                 factureElecSignataireUrls: [
                     client.morale.facture_electricite_signataire1_image_url,
                     client.morale.facture_electricite_signataire2_image_url,
@@ -217,10 +243,69 @@ export default function DetailsClient() {
     };
 
     const urls = getUrls();
-    
-    // URLs communes
-    const domicilePhotoUrl = client.photo_localisation_domicile_url;
-    const activitePhotoUrl = client.photo_localisation_activite_url;
+
+    // Liste complète des documents pour client physique
+    const physiqueDocuments = [
+        { key: 'photoLocalisationActiviteUrl', title: 'Photo localisation activité', icon: <BusinessIcon />, type: 'image' },
+        { key: 'photoLocalisationDomicileUrl', title: 'Photo localisation domicile', icon: <HomeIcon />, type: 'image' },
+        { key: 'cniRectoUrl', title: 'Recto CNI', icon: <CreditCardIcon />, type: 'image' },
+        { key: 'cniVersoUrl', title: 'Verso CNI', icon: <CreditCardIcon />, type: 'image' },
+        { key: 'niuImageUrl', title: 'Photocopie NUI', icon: <FingerprintIcon />, type: 'image' },
+        { key: 'photoUrl', title: 'Photo du client', icon: <CameraIcon />, type: 'image' },
+        { key: 'signatureUrl', title: 'Signature', icon: <SignatureIcon />, type: 'image' },
+        { key: 'attestationConformitePdfUrl', title: 'Attestation de Conformité', icon: <PdfIcon />, type: 'pdf' }
+    ];
+
+    // Liste complète des documents pour client moral
+    const moraleDocuments = {
+        // Documents généraux
+        generaux: [
+            { key: 'photoLocalisationDomicileUrl', title: 'Photo localisation domicile', icon: <HomeIcon />, type: 'image' },
+            { key: 'photoLocalisationActiviteUrl', title: 'Photo localisation activité', icon: <BusinessIcon />, type: 'image' }
+        ],
+        
+        // Documents juridiques selon type d'entreprise
+        juridiquesCommuns: [
+            { key: 'extraitRccmUrl', title: 'Extrait RCCM', icon: <DocumentScannerIcon />, type: 'image' },
+            { key: 'titrePatenteUrl', title: 'Titre de Patente', icon: <AssignmentIcon />, type: 'image' },
+            { key: 'niuImageMoraleUrl', title: 'Photocopie NUI', icon: <FingerprintIcon />, type: 'image' },
+            { key: 'statutsUrl', title: 'Photocopie des Statuts', icon: <InsertDriveFileIcon />, type: 'image' }
+        ],
+        
+        juridiquesAssociation: [
+            { key: 'pvAgcUrl', title: 'PV de l\'AGC', icon: <DocumentScannerIcon />, type: 'image' },
+            { key: 'attestationNonRedevanceUrl', title: 'Attestation de non redevance', icon: <AssignmentIcon />, type: 'image' },
+            { key: 'procesVerbalUrl', title: 'Procès Verbal', icon: <InsertDriveFileIcon />, type: 'image' },
+            { key: 'registreCoopUrl', title: 'Registre COOP-GIC', icon: <ListAltIcon />, type: 'image' },
+            { key: 'recepisseDeclarationUrl', title: 'Récépissé de déclaration', icon: <NoteAddIcon />, type: 'image' }
+        ],
+        
+        documentsPdf: [
+            { key: 'acteDesignationPdfUrl', title: 'Acte de Désignation des Signataires', icon: <PdfIcon />, type: 'pdf' },
+            { key: 'listeConseilPdfUrl', title: 'Liste Conseil d\'Administration', icon: <PdfIcon />, type: 'pdf' },
+            { key: 'listeMembresPdfUrl', title: 'Liste des Membres', icon: <PdfIcon />, type: 'pdf' },
+            { key: 'attestationConformitePdfMoraleUrl', title: 'Attestation de Conformité', icon: <PdfIcon />, type: 'pdf' },
+            { key: 'demandeOuverturePdfUrl', title: 'Demande d\'Ouverture', icon: <PdfIcon />, type: 'pdf' },
+            { key: 'formulaireOuverturePdfUrl', title: 'Formulaire d\'Ouverture', icon: <PdfIcon />, type: 'pdf' }
+        ],
+        
+        siegeSocial: [
+            { key: 'planSiegeUrl', title: 'Plan localisation siège', icon: <MapIcon />, type: 'image' },
+            { key: 'factureEauSiegeUrl', title: 'Facture eau siège', icon: <WaterIcon />, type: 'image' },
+            { key: 'factureElecSiegeUrl', title: 'Facture électricité siège', icon: <BoltIcon />, type: 'image' }
+        ]
+    };
+
+    // Documents spécifiques aux signataires
+    const signataireDocuments = [
+        { key: 'cni_photo_recto_url', title: 'CNI Recto', icon: <CreditCardIcon />, type: 'image' },
+        { key: 'cni_photo_verso_url', title: 'CNI Verso', icon: <CreditCardIcon />, type: 'image' },
+        { key: 'nui_image_url', title: 'NUI', icon: <FingerprintIcon />, type: 'image' },
+        { key: 'photo_url', title: 'Photo', icon: <CameraIcon />, type: 'image' },
+        { key: 'signature_url', title: 'Signature', icon: <SignatureIcon />, type: 'image' },
+        { key: 'lieu_dit_domicile_photo_url', title: 'Lieu-dit domicile', icon: <LocationOnOutlinedIcon />, type: 'image' },
+        { key: 'photo_localisation_domicile_url', title: 'Photo localisation domicile', icon: <HomeIcon />, type: 'image' }
+    ];
 
     return (
         <Layout>
@@ -252,26 +337,27 @@ export default function DetailsClient() {
                         <Grid item>
                             <Box sx={{ position: 'relative' }}>
                                 <Avatar 
-                                    src={isPhysique ? urls.photoUrl : (urls.gerantPhotoUrls ? urls.gerantPhotoUrls[0] : null)} 
+                                    src={isPhysique ? urls.photoUrl : (urls.gerantPhotoUrls && urls.gerantPhotoUrls[0] ? urls.gerantPhotoUrls[0] : null)} 
                                     sx={{ 
                                         width: 120, 
                                         height: 120, 
                                         border: '4px solid #F1F5F9', 
                                         boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
-                                        cursor: 'pointer',
-                                        '&:hover': { opacity: 0.9 }
+                                        cursor: hasValue(isPhysique ? urls.photoUrl : (urls.gerantPhotoUrls && urls.gerantPhotoUrls[0])) ? 'pointer' : 'default',
+                                        opacity: hasValue(isPhysique ? urls.photoUrl : (urls.gerantPhotoUrls && urls.gerantPhotoUrls[0])) ? 1 : 0.7,
+                                        '&:hover': hasValue(isPhysique ? urls.photoUrl : (urls.gerantPhotoUrls && urls.gerantPhotoUrls[0])) ? { opacity: 0.9 } : {}
                                     }}
                                     onClick={() => {
-                                        if (isPhysique && urls.photoUrl) {
+                                        if (isPhysique && hasValue(urls.photoUrl)) {
                                             handleOpenImageModal(urls.photoUrl, 'Photo du client');
-                                        } else if (!isPhysique && urls.gerantPhotoUrls && urls.gerantPhotoUrls[0]) {
+                                        } else if (!isPhysique && urls.gerantPhotoUrls && hasValue(urls.gerantPhotoUrls[0])) {
                                             handleOpenImageModal(urls.gerantPhotoUrls[0], 'Photo Gérant Principal');
                                         }
                                     }}
                                 >
                                     {isPhysique ? <PersonIcon fontSize="large" /> : <BusinessIcon fontSize="large" />}
                                 </Avatar>
-                                {((isPhysique && urls.photoUrl) || (!isPhysique && urls.gerantPhotoUrls && urls.gerantPhotoUrls[0])) && (
+                                {((isPhysique && hasValue(urls.photoUrl)) || (!isPhysique && urls.gerantPhotoUrls && hasValue(urls.gerantPhotoUrls[0]))) && (
                                     <IconButton
                                         size="small"
                                         sx={{
@@ -283,9 +369,9 @@ export default function DetailsClient() {
                                             '&:hover': { backgroundColor: '#f5f5f5' }
                                         }}
                                         onClick={() => {
-                                            if (isPhysique && urls.photoUrl) {
+                                            if (isPhysique && hasValue(urls.photoUrl)) {
                                                 handleOpenImageModal(urls.photoUrl, 'Photo du client');
-                                            } else if (!isPhysique && urls.gerantPhotoUrls && urls.gerantPhotoUrls[0]) {
+                                            } else if (!isPhysique && urls.gerantPhotoUrls && hasValue(urls.gerantPhotoUrls[0])) {
                                                 handleOpenImageModal(urls.gerantPhotoUrls[0], 'Photo Gérant Principal');
                                             }
                                         }}
@@ -475,7 +561,7 @@ export default function DetailsClient() {
                     {/* Colonne Droite - Détails complets */}
                     <Grid item xs={12} md={8}>
                         {isPhysique ? (
-                            /* Détails client physique */
+                            /* ========== DÉTAILS CLIENT PHYSIQUE ========== */
                             <>
                                 {/* Identité & Filiation */}
                                 <Accordion 
@@ -558,7 +644,7 @@ export default function DetailsClient() {
                                     </Accordion>
                                 )}
 
-                                {/* Documents */}
+                                {/* Documents Client Physique - AVEC TOUS LES DOCUMENTS DEMANDÉS */}
                                 <Accordion 
                                     expanded={expandedAccordions.documents}
                                     onChange={handleAccordionChange('documents')}
@@ -571,84 +657,50 @@ export default function DetailsClient() {
                                         </Box>
                                     </AccordionSummary>
                                     <AccordionDetails>
-                                        <Stack spacing={3}>
-                                            {/* Documents images */}
-                                            {(urls.photoUrl || urls.signatureUrl || urls.cniRectoUrl || urls.cniVersoUrl || urls.niuImageUrl || domicilePhotoUrl || activitePhotoUrl) && (
-                                                <Box>
-                                                    <Typography variant="subtitle2" fontWeight="700" sx={{ mb: 2 }}>Documents Images</Typography>
-                                                    <Grid container spacing={2}>
-                                                        {urls.cniRectoUrl && (
-                                                            <Grid item xs={12} md={6}>
-                                                                <DocumentCard 
-                                                                    title="Recto CNI"
-                                                                    icon={<CreditCardIcon />}
-                                                                    onClick={() => handleOpenImageModal(urls.cniRectoUrl, 'Recto CNI')}
-                                                                />
-                                                            </Grid>
-                                                        )}
-                                                        {urls.cniVersoUrl && (
-                                                            <Grid item xs={12} md={6}>
-                                                                <DocumentCard 
-                                                                    title="Verso CNI"
-                                                                    icon={<CreditCardIcon />}
-                                                                    onClick={() => handleOpenImageModal(urls.cniVersoUrl, 'Verso CNI')}
-                                                                />
-                                                            </Grid>
-                                                        )}
-                                                        {urls.niuImageUrl && (
-                                                            <Grid item xs={12} md={6}>
-                                                                <DocumentCard 
-                                                                    title="Photocopie NUI"
-                                                                    icon={<FingerprintIcon />}
-                                                                    onClick={() => handleOpenImageModal(urls.niuImageUrl, 'Photocopie NUI')}
-                                                                />
-                                                            </Grid>
-                                                        )}
-                                                        {urls.photoUrl && (
-                                                            <Grid item xs={12} md={6}>
-                                                                <DocumentCard 
-                                                                    title="Photo du client"
-                                                                    icon={<CameraIcon />}
-                                                                    onClick={() => handleOpenImageModal(urls.photoUrl, 'Photo du client')}
-                                                                />
-                                                            </Grid>
-                                                        )}
-                                                        {urls.signatureUrl && (
-                                                            <Grid item xs={12} md={6}>
-                                                                <DocumentCard 
-                                                                    title="Signature"
-                                                                    icon={<SignatureIcon />}
-                                                                    onClick={() => handleOpenImageModal(urls.signatureUrl, 'Signature')}
-                                                                />
-                                                            </Grid>
-                                                        )}
-                                                        {domicilePhotoUrl && (
-                                                            <Grid item xs={12} md={6}>
-                                                                <DocumentCard 
-                                                                    title="Photo domicile"
-                                                                    icon={<HomeIcon />}
-                                                                    onClick={() => handleOpenImageModal(domicilePhotoUrl, 'Photo domicile')}
-                                                                />
-                                                            </Grid>
-                                                        )}
-                                                        {activitePhotoUrl && (
-                                                            <Grid item xs={12} md={6}>
-                                                                <DocumentCard 
-                                                                    title="Photo activité"
-                                                                    icon={<BusinessIcon />}
-                                                                    onClick={() => handleOpenImageModal(activitePhotoUrl, 'Photo activité')}
-                                                                />
-                                                            </Grid>
-                                                        )}
-                                                    </Grid>
-                                                </Box>
-                                            )}
-                                        </Stack>
+                                        <Tabs value={activeDocTab} onChange={(e, v) => setActiveDocTab(v)} sx={{ mb: 3 }}>
+                                            <Tab label="Images" />
+                                            <Tab label="Documents PDF" />
+                                        </Tabs>
+
+                                        {/* Onglet Images */}
+                                        {activeDocTab === 0 && (
+                                            <Grid container spacing={2}>
+                                                {physiqueDocuments
+                                                    .filter(doc => doc.type === 'image')
+                                                    .map((doc, index) => (
+                                                        <Grid item xs={12} md={4} key={index}>
+                                                            <DocumentCard 
+                                                                title={doc.title}
+                                                                icon={doc.icon}
+                                                                hasValue={hasValue(urls[doc.key])}
+                                                                onClick={() => hasValue(urls[doc.key]) && handleOpenImageModal(urls[doc.key], doc.title)}
+                                                            />
+                                                        </Grid>
+                                                    ))}
+                                            </Grid>
+                                        )}
+
+                                        {/* Onglet Documents PDF */}
+                                        {activeDocTab === 1 && (
+                                            <Grid container spacing={2}>
+                                                {physiqueDocuments
+                                                    .filter(doc => doc.type === 'pdf')
+                                                    .map((doc, index) => (
+                                                        <Grid item xs={12} md={6} key={index}>
+                                                            <PdfDocumentCard 
+                                                                title={doc.title}
+                                                                hasValue={hasValue(urls[doc.key])}
+                                                                onClick={() => hasValue(urls[doc.key]) && window.open(urls[doc.key], '_blank')}
+                                                            />
+                                                        </Grid>
+                                                    ))}
+                                            </Grid>
+                                        )}
                                     </AccordionDetails>
                                 </Accordion>
                             </>
                         ) : (
-                            /* Détails client moral */
+                            /* ========== DÉTAILS CLIENT MORAL ========== */
                             <>
                                 {/* Informations de l'entreprise */}
                                 <Accordion 
@@ -675,7 +727,7 @@ export default function DetailsClient() {
                                     </AccordionDetails>
                                 </Accordion>
 
-                                {/* Gérants */}
+                                {/* Gérants avec leurs documents */}
                                 {(detail?.nom_gerant || detail?.nom_gerant2) && (
                                     <Accordion 
                                         expanded={expandedAccordions.gerants}
@@ -696,20 +748,42 @@ export default function DetailsClient() {
                                                         <Card variant="outlined" sx={{ borderRadius: 2 }}>
                                                             <CardContent>
                                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                                                                    <Avatar 
-                                                                        src={urls.gerantPhotoUrls && urls.gerantPhotoUrls[0]}
-                                                                        sx={{ width: 60, height: 60 }}
-                                                                        onClick={() => urls.gerantPhotoUrls && urls.gerantPhotoUrls[0] && handleOpenImageModal(urls.gerantPhotoUrls[0], 'Photo Gérant Principal')}
-                                                                    >
-                                                                        <AccountBoxIcon />
-                                                                    </Avatar>
+                                                                    <Box sx={{ position: 'relative' }}>
+                                                                        <Avatar 
+                                                                            src={urls.gerantPhotoUrls && urls.gerantPhotoUrls[0]}
+                                                                            sx={{ 
+                                                                                width: 60, 
+                                                                                height: 60, 
+                                                                                cursor: hasValue(urls.gerantPhotoUrls && urls.gerantPhotoUrls[0]) ? 'pointer' : 'default',
+                                                                                opacity: hasValue(urls.gerantPhotoUrls && urls.gerantPhotoUrls[0]) ? 1 : 0.7
+                                                                            }}
+                                                                            onClick={() => hasValue(urls.gerantPhotoUrls && urls.gerantPhotoUrls[0]) && handleOpenImageModal(urls.gerantPhotoUrls[0], 'Photo Gérant Principal')}
+                                                                        >
+                                                                            <AccountBoxIcon />
+                                                                        </Avatar>
+                                                                        {hasValue(urls.gerantPhotoUrls && urls.gerantPhotoUrls[0]) && (
+                                                                            <IconButton
+                                                                                size="small"
+                                                                                sx={{
+                                                                                    position: 'absolute',
+                                                                                    bottom: -8,
+                                                                                    right: -8,
+                                                                                    backgroundColor: 'white',
+                                                                                    border: '1px solid #e0e0e0',
+                                                                                    '&:hover': { backgroundColor: '#f5f5f5' }
+                                                                                }}
+                                                                                onClick={() => handleOpenImageModal(urls.gerantPhotoUrls[0], 'Photo Gérant Principal')}
+                                                                            >
+                                                                                <ZoomInIcon fontSize="small" />
+                                                                            </IconButton>
+                                                                        )}
+                                                                    </Box>
                                                                     <Box>
                                                                         <Typography variant="subtitle1" fontWeight="700">Gérant Principal</Typography>
                                                                         <Typography variant="body2" color="textSecondary">{detail.nom_gerant}</Typography>
                                                                     </Box>
                                                                 </Box>
                                                                 <InfoRow label="Téléphone" value={detail.telephone_gerant} small />
-                                                                <InfoRow label="Photo" value={urls.gerantPhotoUrls && urls.gerantPhotoUrls[0] ? "✓ Disponible" : "Non fournie"} small />
                                                             </CardContent>
                                                         </Card>
                                                     </Grid>
@@ -721,20 +795,42 @@ export default function DetailsClient() {
                                                         <Card variant="outlined" sx={{ borderRadius: 2 }}>
                                                             <CardContent>
                                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                                                                    <Avatar 
-                                                                        src={urls.gerantPhotoUrls && urls.gerantPhotoUrls[1]}
-                                                                        sx={{ width: 60, height: 60 }}
-                                                                        onClick={() => urls.gerantPhotoUrls && urls.gerantPhotoUrls[1] && handleOpenImageModal(urls.gerantPhotoUrls[1], 'Photo Gérant Secondaire')}
-                                                                    >
-                                                                        <AccountBoxIcon />
-                                                                    </Avatar>
+                                                                    <Box sx={{ position: 'relative' }}>
+                                                                        <Avatar 
+                                                                            src={urls.gerantPhotoUrls && urls.gerantPhotoUrls[1]}
+                                                                            sx={{ 
+                                                                                width: 60, 
+                                                                                height: 60, 
+                                                                                cursor: hasValue(urls.gerantPhotoUrls && urls.gerantPhotoUrls[1]) ? 'pointer' : 'default',
+                                                                                opacity: hasValue(urls.gerantPhotoUrls && urls.gerantPhotoUrls[1]) ? 1 : 0.7
+                                                                            }}
+                                                                            onClick={() => hasValue(urls.gerantPhotoUrls && urls.gerantPhotoUrls[1]) && handleOpenImageModal(urls.gerantPhotoUrls[1], 'Photo Gérant Secondaire')}
+                                                                        >
+                                                                            <AccountBoxIcon />
+                                                                        </Avatar>
+                                                                        {hasValue(urls.gerantPhotoUrls && urls.gerantPhotoUrls[1]) && (
+                                                                            <IconButton
+                                                                                size="small"
+                                                                                sx={{
+                                                                                    position: 'absolute',
+                                                                                    bottom: -8,
+                                                                                    right: -8,
+                                                                                    backgroundColor: 'white',
+                                                                                    border: '1px solid #e0e0e0',
+                                                                                    '&:hover': { backgroundColor: '#f5f5f5' }
+                                                                                }}
+                                                                                onClick={() => handleOpenImageModal(urls.gerantPhotoUrls[1], 'Photo Gérant Secondaire')}
+                                                                            >
+                                                                                <ZoomInIcon fontSize="small" />
+                                                                            </IconButton>
+                                                                        )}
+                                                                    </Box>
                                                                     <Box>
                                                                         <Typography variant="subtitle1" fontWeight="700">Gérant Secondaire</Typography>
                                                                         <Typography variant="body2" color="textSecondary">{detail.nom_gerant2}</Typography>
                                                                     </Box>
                                                                 </Box>
                                                                 <InfoRow label="Téléphone" value={detail.telephone_gerant2} small />
-                                                                <InfoRow label="Photo" value={urls.gerantPhotoUrls && urls.gerantPhotoUrls[1] ? "✓ Disponible" : "Non fournie"} small />
                                                             </CardContent>
                                                         </Card>
                                                     </Grid>
@@ -744,7 +840,7 @@ export default function DetailsClient() {
                                     </Accordion>
                                 )}
 
-                                {/* Signataires */}
+                                {/* Signataires avec tous leurs documents */}
                                 {urls.signataires && urls.signataires.length > 0 && (
                                     <Accordion 
                                         expanded={expandedAccordions.signataires}
@@ -765,28 +861,52 @@ export default function DetailsClient() {
                                                 sx={{ mb: 3 }}
                                             >
                                                 {urls.signataires.map((signataire, index) => (
-                                                    <Tab key={index} label={`Signataire ${index + 1}`} />
+                                                    <Tab key={index} label={`Signataire ${signataire.numero_signataire || index + 1}`} />
                                                 ))}
                                             </Tabs>
 
-                                            <Grid container spacing={3}>
-                                                {urls.signataires.map((signataire, index) => (
-                                                    activeSignataireTab === index && (
-                                                        <React.Fragment key={index}>
+                                            {urls.signataires.map((signataire, index) => (
+                                                activeSignataireTab === index && (
+                                                    <Box key={index}>
+                                                        <Grid container spacing={3}>
+                                                            {/* Informations du signataire */}
                                                             <Grid item xs={12} md={6}>
                                                                 <Card variant="outlined" sx={{ borderRadius: 2 }}>
                                                                     <CardContent>
                                                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-                                                                            <Avatar 
-                                                                                src={signataire.photo_url}
-                                                                                sx={{ width: 80, height: 80 }}
-                                                                                onClick={() => signataire.photo_url && handleOpenImageModal(signataire.photo_url, `Photo Signataire ${index + 1}`)}
-                                                                            >
-                                                                                <AccountBoxIcon />
-                                                                            </Avatar>
+                                                                            <Box sx={{ position: 'relative' }}>
+                                                                                <Avatar 
+                                                                                    src={signataire.photo_url}
+                                                                                    sx={{ 
+                                                                                        width: 80, 
+                                                                                        height: 80, 
+                                                                                        cursor: hasValue(signataire.photo_url) ? 'pointer' : 'default',
+                                                                                        opacity: hasValue(signataire.photo_url) ? 1 : 0.7
+                                                                                    }}
+                                                                                    onClick={() => hasValue(signataire.photo_url) && handleOpenImageModal(signataire.photo_url, `Photo Signataire ${signataire.numero_signataire || index + 1}`)}
+                                                                                >
+                                                                                    <AccountBoxIcon />
+                                                                                </Avatar>
+                                                                                {hasValue(signataire.photo_url) && (
+                                                                                    <IconButton
+                                                                                        size="small"
+                                                                                        sx={{
+                                                                                            position: 'absolute',
+                                                                                            bottom: -8,
+                                                                                            right: -8,
+                                                                                            backgroundColor: 'white',
+                                                                                            border: '1px solid #e0e0e0',
+                                                                                            '&:hover': { backgroundColor: '#f5f5f5' }
+                                                                                        }}
+                                                                                        onClick={() => handleOpenImageModal(signataire.photo_url, `Photo Signataire ${signataire.numero_signataire || index + 1}`)}
+                                                                                    >
+                                                                                        <ZoomInIcon fontSize="small" />
+                                                                                    </IconButton>
+                                                                                )}
+                                                                            </Box>
                                                                             <Box>
                                                                                 <Typography variant="h6" fontWeight="700">{signataire.nom}</Typography>
-                                                                                <Typography variant="body2" color="textSecondary">Signataire {index + 1}</Typography>
+                                                                                <Typography variant="body2" color="textSecondary">Signataire {signataire.numero_signataire || index + 1}</Typography>
                                                                             </Box>
                                                                         </Box>
 
@@ -805,80 +925,93 @@ export default function DetailsClient() {
                                                                 </Card>
                                                             </Grid>
 
+                                                            {/* Documents du signataire */}
                                                             <Grid item xs={12} md={6}>
                                                                 <Card variant="outlined" sx={{ borderRadius: 2 }}>
                                                                     <CardContent>
-                                                                        <Typography variant="subtitle1" fontWeight="700" sx={{ mb: 2 }}>Documents du Signataire</Typography>
+                                                                        <Typography variant="subtitle1" fontWeight="700" sx={{ mb: 2 }}>
+                                                                            Documents du Signataire
+                                                                        </Typography>
+                                                                        
                                                                         <Grid container spacing={2}>
-                                                                            {/* Images */}
-                                                                            <Grid item xs={12}>
-                                                                                <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1 }}>Images</Typography>
-                                                                                <Grid container spacing={1}>
-                                                                                    {signataire.photo_url && (
-                                                                                        <Grid item xs={6}>
-                                                                                            <DocumentCard 
-                                                                                                title="Photo"
-                                                                                                icon={<CameraIcon />}
-                                                                                                small
-                                                                                                onClick={() => handleOpenImageModal(signataire.photo_url, `Photo Signataire ${index + 1}`)}
-                                                                                            />
-                                                                                        </Grid>
-                                                                                    )}
-                                                                                    {signataire.signature_url && (
-                                                                                        <Grid item xs={6}>
-                                                                                            <DocumentCard 
-                                                                                                title="Signature"
-                                                                                                icon={<SignatureIcon />}
-                                                                                                small
-                                                                                                onClick={() => handleOpenImageModal(signataire.signature_url, `Signature Signataire ${index + 1}`)}
-                                                                                            />
-                                                                                        </Grid>
-                                                                                    )}
-                                                                                    {signataire.cni_photo_recto_url && (
-                                                                                        <Grid item xs={6}>
-                                                                                            <DocumentCard 
-                                                                                                title="CNI Recto"
-                                                                                                icon={<CreditCardIcon />}
-                                                                                                small
-                                                                                                onClick={() => handleOpenImageModal(signataire.cni_photo_recto_url, `CNI Recto S${index + 1}`)}
-                                                                                            />
-                                                                                        </Grid>
-                                                                                    )}
-                                                                                    {signataire.cni_photo_verso_url && (
-                                                                                        <Grid item xs={6}>
-                                                                                            <DocumentCard 
-                                                                                                title="CNI Verso"
-                                                                                                icon={<CreditCardIcon />}
-                                                                                                small
-                                                                                                onClick={() => handleOpenImageModal(signataire.cni_photo_verso_url, `CNI Verso S${index + 1}`)}
-                                                                                            />
-                                                                                        </Grid>
-                                                                                    )}
-                                                                                    {signataire.nui_image_url && (
-                                                                                        <Grid item xs={6}>
-                                                                                            <DocumentCard 
-                                                                                                title="NUI"
-                                                                                                icon={<FingerprintIcon />}
-                                                                                                small
-                                                                                                onClick={() => handleOpenImageModal(signataire.nui_image_url, `NUI S${index + 1}`)}
-                                                                                            />
-                                                                                        </Grid>
-                                                                                    )}
-                                                                                </Grid>
+                                                                            {/* CNI Recto */}
+                                                                            <Grid item xs={6}>
+                                                                                <DocumentCard 
+                                                                                    title="CNI Recto"
+                                                                                    icon={<CreditCardIcon />}
+                                                                                    hasValue={hasValue(signataire.cni_photo_recto_url)}
+                                                                                    onClick={() => hasValue(signataire.cni_photo_recto_url) && handleOpenImageModal(signataire.cni_photo_recto_url, `CNI Recto S${signataire.numero_signataire || index + 1}`)}
+                                                                                    small
+                                                                                />
+                                                                            </Grid>
+                                                                            
+                                                                            {/* CNI Verso */}
+                                                                            <Grid item xs={6}>
+                                                                                <DocumentCard 
+                                                                                    title="CNI Verso"
+                                                                                    icon={<CreditCardIcon />}
+                                                                                    hasValue={hasValue(signataire.cni_photo_verso_url)}
+                                                                                    onClick={() => hasValue(signataire.cni_photo_verso_url) && handleOpenImageModal(signataire.cni_photo_verso_url, `CNI Verso S${signataire.numero_signataire || index + 1}`)}
+                                                                                    small
+                                                                                />
+                                                                            </Grid>
+                                                                            
+                                                                            {/* NUI */}
+                                                                            <Grid item xs={6}>
+                                                                                <DocumentCard 
+                                                                                    title="NUI"
+                                                                                    icon={<FingerprintIcon />}
+                                                                                    hasValue={hasValue(signataire.nui_image_url)}
+                                                                                    onClick={() => hasValue(signataire.nui_image_url) && handleOpenImageModal(signataire.nui_image_url, `NUI S${signataire.numero_signataire || index + 1}`)}
+                                                                                    small
+                                                                                />
+                                                                            </Grid>
+                                                                            
+                                                                            {/* Signature */}
+                                                                            <Grid item xs={6}>
+                                                                                <DocumentCard 
+                                                                                    title="Signature"
+                                                                                    icon={<SignatureIcon />}
+                                                                                    hasValue={hasValue(signataire.signature_url)}
+                                                                                    onClick={() => hasValue(signataire.signature_url) && handleOpenImageModal(signataire.signature_url, `Signature S${signataire.numero_signataire || index + 1}`)}
+                                                                                    small
+                                                                                />
+                                                                            </Grid>
+                                                                            
+                                                                            {/* Lieu-dit domicile */}
+                                                                            <Grid item xs={6}>
+                                                                                <DocumentCard 
+                                                                                    title="Lieu-dit domicile"
+                                                                                    icon={<LocationOnOutlinedIcon />}
+                                                                                    hasValue={hasValue(signataire.lieu_dit_domicile_photo_url)}
+                                                                                    onClick={() => hasValue(signataire.lieu_dit_domicile_photo_url) && handleOpenImageModal(signataire.lieu_dit_domicile_photo_url, `Lieu-dit domicile S${signataire.numero_signataire || index + 1}`)}
+                                                                                    small
+                                                                                />
+                                                                            </Grid>
+                                                                            
+                                                                            {/* Photo localisation domicile */}
+                                                                            <Grid item xs={6}>
+                                                                                <DocumentCard 
+                                                                                    title="Photo localisation domicile"
+                                                                                    icon={<HomeIcon />}
+                                                                                    hasValue={hasValue(signataire.photo_localisation_domicile_url)}
+                                                                                    onClick={() => hasValue(signataire.photo_localisation_domicile_url) && handleOpenImageModal(signataire.photo_localisation_domicile_url, `Photo domicile S${signataire.numero_signataire || index + 1}`)}
+                                                                                    small
+                                                                                />
                                                                             </Grid>
                                                                         </Grid>
                                                                     </CardContent>
                                                                 </Card>
                                                             </Grid>
-                                                        </React.Fragment>
-                                                    )
-                                                ))}
-                                            </Grid>
+                                                        </Grid>
+                                                    </Box>
+                                                )
+                                            ))}
                                         </AccordionDetails>
                                     </Accordion>
                                 )}
 
-                                {/* Documents juridiques */}
+                                {/* Documents juridiques et administratifs - AVEC TOUS LES DOCUMENTS */}
                                 <Accordion 
                                     expanded={expandedAccordions.documentsJuridiques}
                                     onChange={handleAccordionChange('documentsJuridiques')}
@@ -887,190 +1020,184 @@ export default function DetailsClient() {
                                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                             <DescriptionOutlineIcon sx={{ color: '#6366f1' }} />
-                                            <Typography variant="h6" fontWeight="700">Documents Juridiques</Typography>
+                                            <Typography variant="h6" fontWeight="700">Documents Juridiques & Administratifs</Typography>
                                         </Box>
                                     </AccordionSummary>
                                     <AccordionDetails>
-                                        <Tabs value={activeDocTab} onChange={(e, v) => setActiveDocTab(v)} sx={{ mb: 3 }}>
+                                        <Tabs 
+                                            value={activeMoraleDocTab} 
+                                            onChange={(e, v) => setActiveMoraleDocTab(v)} 
+                                            sx={{ mb: 3 }}
+                                        >
                                             <Tab label="Images" />
-                                            <Tab label="PDF" />
-                                            <Tab label="Localisation" />
+                                            <Tab label="Documents PDF" />
+                                            <Tab label="Siège Social" />
                                         </Tabs>
 
-                                        {activeDocTab === 0 && (
-                                            <Grid container spacing={2}>
-                                                {/* Documents images selon type d'entreprise */}
+                                        {/* Onglet Images */}
+                                        {activeMoraleDocTab === 0 && (
+                                            <>
+                                                {/* Documents généraux */}
+                                                <Typography variant="subtitle2" fontWeight="700" sx={{ mb: 2, color: '#6366f1' }}>
+                                                    Documents Généraux
+                                                </Typography>
+                                                <Grid container spacing={2} sx={{ mb: 3 }}>
+                                                    {moraleDocuments.generaux.map((doc, index) => (
+                                                        <Grid item xs={12} md={4} key={index}>
+                                                            <DocumentCard 
+                                                                title={doc.title}
+                                                                icon={doc.icon}
+                                                                hasValue={hasValue(urls[doc.key])}
+                                                                onClick={() => hasValue(urls[doc.key]) && handleOpenImageModal(urls[doc.key], doc.title)}
+                                                            />
+                                                        </Grid>
+                                                    ))}
+                                                </Grid>
+
+                                                {/* Documents selon type d'entreprise */}
                                                 {detail?.type_entreprise === 'association' ? (
                                                     <>
-                                                        {urls.pvAgcUrl && (
-                                                            <Grid item xs={12} md={4}>
-                                                                <DocumentCard 
-                                                                    title="PV de l'AGC"
-                                                                    icon={<DocumentScannerIcon />}
-                                                                    onClick={() => handleOpenImageModal(urls.pvAgcUrl, 'PV de l\'AGC')}
-                                                                />
-                                                            </Grid>
-                                                        )}
-                                                        {urls.attestationNonRedevanceUrl && (
-                                                            <Grid item xs={12} md={4}>
-                                                                <DocumentCard 
-                                                                    title="Attestation de non redevance"
-                                                                    icon={<AssignmentIcon />}
-                                                                    onClick={() => handleOpenImageModal(urls.attestationNonRedevanceUrl, 'Attestation de non redevance')}
-                                                                />
-                                                            </Grid>
-                                                        )}
-                                                        {urls.procesVerbalUrl && (
-                                                            <Grid item xs={12} md={4}>
-                                                                <DocumentCard 
-                                                                    title="Procès Verbal"
-                                                                    icon={<InsertDriveFileIcon />}
-                                                                    onClick={() => handleOpenImageModal(urls.procesVerbalUrl, 'Procès Verbal')}
-                                                                />
-                                                            </Grid>
-                                                        )}
-                                                        {urls.registreCoopUrl && (
-                                                            <Grid item xs={12} md={4}>
-                                                                <DocumentCard 
-                                                                    title="Registre COOP-GIC"
-                                                                    icon={<ListAltIcon />}
-                                                                    onClick={() => handleOpenImageModal(urls.registreCoopUrl, 'Registre COOP-GIC')}
-                                                                />
-                                                            </Grid>
-                                                        )}
-                                                        {urls.recepisseDeclarationUrl && (
-                                                            <Grid item xs={12} md={4}>
-                                                                <DocumentCard 
-                                                                    title="Récépissé de déclaration"
-                                                                    icon={<NoteAddIcon />}
-                                                                    onClick={() => handleOpenImageModal(urls.recepisseDeclarationUrl, 'Récépissé de déclaration')}
-                                                                />
-                                                            </Grid>
-                                                        )}
+                                                        <Typography variant="subtitle2" fontWeight="700" sx={{ mb: 2, color: '#a855f7' }}>
+                                                            Documents Association / Coopérative
+                                                        </Typography>
+                                                        <Grid container spacing={2}>
+                                                            {moraleDocuments.juridiquesAssociation.map((doc, index) => (
+                                                                <Grid item xs={12} md={4} key={index}>
+                                                                    <DocumentCard 
+                                                                        title={doc.title}
+                                                                        icon={doc.icon}
+                                                                        hasValue={hasValue(urls[doc.key])}
+                                                                        onClick={() => hasValue(urls[doc.key]) && handleOpenImageModal(urls[doc.key], doc.title)}
+                                                                    />
+                                                                </Grid>
+                                                            ))}
+                                                        </Grid>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        {urls.extraitRccmUrl && (
-                                                            <Grid item xs={12} md={4}>
-                                                                <DocumentCard 
-                                                                    title="Extrait RCCM"
-                                                                    icon={<DocumentScannerIcon />}
-                                                                    onClick={() => handleOpenImageModal(urls.extraitRccmUrl, 'Extrait RCCM')}
-                                                                />
-                                                            </Grid>
-                                                        )}
-                                                        {urls.titrePatenteUrl && (
-                                                            <Grid item xs={12} md={4}>
-                                                                <DocumentCard 
-                                                                    title="Titre de Patente"
-                                                                    icon={<AssignmentIcon />}
-                                                                    onClick={() => handleOpenImageModal(urls.titrePatenteUrl, 'Titre de Patente')}
-                                                                />
-                                                            </Grid>
-                                                        )}
-                                                        {urls.niuImageMoraleUrl && (
-                                                            <Grid item xs={12} md={4}>
-                                                                <DocumentCard 
-                                                                    title="Photocopie NUI"
-                                                                    icon={<FingerprintIcon />}
-                                                                    onClick={() => handleOpenImageModal(urls.niuImageMoraleUrl, 'Photocopie NUI Entreprise')}
-                                                                />
-                                                            </Grid>
-                                                        )}
-                                                        {urls.statutsUrl && (
-                                                            <Grid item xs={12} md={4}>
-                                                                <DocumentCard 
-                                                                    title="Photocopie des Statuts"
-                                                                    icon={<InsertDriveFileIcon />}
-                                                                    onClick={() => handleOpenImageModal(urls.statutsUrl, 'Photocopie des Statuts')}
-                                                                />
-                                                            </Grid>
-                                                        )}
+                                                        <Typography variant="subtitle2" fontWeight="700" sx={{ mb: 2, color: '#10b981' }}>
+                                                            Documents Entreprise
+                                                        </Typography>
+                                                        <Grid container spacing={2}>
+                                                            {moraleDocuments.juridiquesCommuns.map((doc, index) => (
+                                                                <Grid item xs={12} md={4} key={index}>
+                                                                    <DocumentCard 
+                                                                        title={doc.title}
+                                                                        icon={doc.icon}
+                                                                        hasValue={hasValue(urls[doc.key])}
+                                                                        onClick={() => hasValue(urls[doc.key]) && handleOpenImageModal(urls[doc.key], doc.title)}
+                                                                    />
+                                                                </Grid>
+                                                            ))}
+                                                        </Grid>
                                                     </>
                                                 )}
+                                            </>
+                                        )}
+
+                                        {/* Onglet Documents PDF */}
+                                        {activeMoraleDocTab === 1 && (
+                                            <Grid container spacing={2}>
+                                                {moraleDocuments.documentsPdf.map((doc, index) => (
+                                                    <Grid item xs={12} md={6} key={index}>
+                                                        <PdfDocumentCard 
+                                                            title={doc.title}
+                                                            hasValue={hasValue(urls[doc.key])}
+                                                            onClick={() => hasValue(urls[doc.key]) && window.open(urls[doc.key], '_blank')}
+                                                        />
+                                                    </Grid>
+                                                ))}
                                             </Grid>
                                         )}
 
-                                        {activeDocTab === 1 && (
+                                        {/* Onglet Siège Social */}
+                                        {activeMoraleDocTab === 2 && (
                                             <Grid container spacing={2}>
-                                                {urls.acteDesignationPdfUrl && (
-                                                    <Grid item xs={12} md={6}>
-                                                        <PdfDocumentCard 
-                                                            title="Acte de Désignation des Signataires"
-                                                            onClick={() => window.open(urls.acteDesignationPdfUrl, '_blank')}
-                                                        />
-                                                    </Grid>
-                                                )}
-                                                {urls.listeConseilPdfUrl && (
-                                                    <Grid item xs={12} md={6}>
-                                                        <PdfDocumentCard 
-                                                            title="Liste Conseil d'Administration"
-                                                            onClick={() => window.open(urls.listeConseilPdfUrl, '_blank')}
-                                                        />
-                                                    </Grid>
-                                                )}
-                                                {urls.listeMembresPdfUrl && (
-                                                    <Grid item xs={12} md={6}>
-                                                        <PdfDocumentCard 
-                                                            title="Liste des Membres"
-                                                            onClick={() => window.open(urls.listeMembresPdfUrl, '_blank')}
-                                                        />
-                                                    </Grid>
-                                                )}
-                                            </Grid>
-                                        )}
-
-                                        {activeDocTab === 2 && (
-                                            <Grid container spacing={2}>
-                                                {urls.planSiegeUrl && (
-                                                    <Grid item xs={12} md={4}>
+                                                {moraleDocuments.siegeSocial.map((doc, index) => (
+                                                    <Grid item xs={12} md={4} key={index}>
                                                         <DocumentCard 
-                                                            title="Plan localisation siège"
-                                                            icon={<MapIcon />}
-                                                            onClick={() => handleOpenImageModal(urls.planSiegeUrl, 'Plan localisation siège')}
+                                                            title={doc.title}
+                                                            icon={doc.icon}
+                                                            hasValue={hasValue(urls[doc.key])}
+                                                            onClick={() => hasValue(urls[doc.key]) && handleOpenImageModal(urls[doc.key], doc.title)}
                                                         />
                                                     </Grid>
-                                                )}
-                                                {urls.factureEauSiegeUrl && (
-                                                    <Grid item xs={12} md={4}>
-                                                        <DocumentCard 
-                                                            title="Facture eau siège"
-                                                            icon={<WaterIcon />}
-                                                            onClick={() => handleOpenImageModal(urls.factureEauSiegeUrl, 'Facture eau siège')}
-                                                        />
-                                                    </Grid>
-                                                )}
-                                                {urls.factureElecSiegeUrl && (
-                                                    <Grid item xs={12} md={4}>
-                                                        <DocumentCard 
-                                                            title="Facture électricité siège"
-                                                            icon={<BoltIcon />}
-                                                            onClick={() => handleOpenImageModal(urls.factureElecSiegeUrl, 'Facture électricité siège')}
-                                                        />
-                                                    </Grid>
-                                                )}
-                                                {domicilePhotoUrl && (
-                                                    <Grid item xs={12} md={4}>
-                                                        <DocumentCard 
-                                                            title="Photo localisation domicile"
-                                                            icon={<HomeIcon />}
-                                                            onClick={() => handleOpenImageModal(domicilePhotoUrl, 'Photo localisation domicile')}
-                                                        />
-                                                    </Grid>
-                                                )}
-                                                {activitePhotoUrl && (
-                                                    <Grid item xs={12} md={4}>
-                                                        <DocumentCard 
-                                                            title="Photo localisation activité"
-                                                            icon={<BusinessIcon />}
-                                                            onClick={() => handleOpenImageModal(activitePhotoUrl, 'Photo localisation activité')}
-                                                        />
-                                                    </Grid>
-                                                )}
+                                                ))}
                                             </Grid>
                                         )}
                                     </AccordionDetails>
                                 </Accordion>
+
+                                {/* Documents des Signataires (Plans et Factures) */}
+                                {urls.signataires && urls.signataires.length > 0 && (
+                                    <Accordion 
+                                        expanded={expandedAccordions.documentsSignataires}
+                                        onChange={handleAccordionChange('documentsSignataires')}
+                                        sx={{ borderRadius: '8px !important', mb: 2 }}
+                                    >
+                                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                <ContactPhoneIcon sx={{ color: '#6366f1' }} />
+                                                <Typography variant="h6" fontWeight="700">Documents des Signataires (Plans & Factures)</Typography>
+                                            </Box>
+                                        </AccordionSummary>
+                                        <AccordionDetails>
+                                            <Tabs 
+                                                value={activeSignataireTab} 
+                                                onChange={(e, v) => setActiveSignataireTab(v)} 
+                                                sx={{ mb: 3 }}
+                                            >
+                                                {urls.signataires.map((signataire, index) => (
+                                                    <Tab key={index} label={`Signataire ${signataire.numero_signataire || index + 1}`} />
+                                                ))}
+                                            </Tabs>
+
+                                            {urls.signataires.map((signataire, index) => (
+                                                activeSignataireTab === index && (
+                                                    <Box key={index}>
+                                                        <Grid container spacing={2}>
+                                                            {/* Plan localisation */}
+                                                            {urls.planSignataireUrls && (
+                                                                <Grid item xs={12} md={4}>
+                                                                    <DocumentCard 
+                                                                        title={`Plan localisation S${signataire.numero_signataire || index + 1}`}
+                                                                        icon={<MapIcon />}
+                                                                        hasValue={hasValue(urls.planSignataireUrls[index])}
+                                                                        onClick={() => hasValue(urls.planSignataireUrls[index]) && handleOpenImageModal(urls.planSignataireUrls[index], `Plan localisation S${signataire.numero_signataire || index + 1}`)}
+                                                                    />
+                                                                </Grid>
+                                                            )}
+
+                                                            {/* Facture eau */}
+                                                            {urls.factureEauSignataireUrls && (
+                                                                <Grid item xs={12} md={4}>
+                                                                    <DocumentCard 
+                                                                        title={`Facture eau S${signataire.numero_signataire || index + 1}`}
+                                                                        icon={<WaterIcon />}
+                                                                        hasValue={hasValue(urls.factureEauSignataireUrls[index])}
+                                                                        onClick={() => hasValue(urls.factureEauSignataireUrls[index]) && handleOpenImageModal(urls.factureEauSignataireUrls[index], `Facture eau S${signataire.numero_signataire || index + 1}`)}
+                                                                    />
+                                                                </Grid>
+                                                            )}
+
+                                                            {/* Facture électricité */}
+                                                            {urls.factureElecSignataireUrls && (
+                                                                <Grid item xs={12} md={4}>
+                                                                    <DocumentCard 
+                                                                        title={`Facture électricité S${signataire.numero_signataire || index + 1}`}
+                                                                        icon={<BoltIcon />}
+                                                                        hasValue={hasValue(urls.factureElecSignataireUrls[index])}
+                                                                        onClick={() => hasValue(urls.factureElecSignataireUrls[index]) && handleOpenImageModal(urls.factureElecSignataireUrls[index], `Facture électricité S${signataire.numero_signataire || index + 1}`)}
+                                                                    />
+                                                                </Grid>
+                                                            )}
+                                                        </Grid>
+                                                    </Box>
+                                                )
+                                            ))}
+                                        </AccordionDetails>
+                                    </Accordion>
+                                )}
                             </>
                         )}
                     </Grid>
@@ -1161,29 +1288,40 @@ function StackStat({ label, value, color }) {
     );
 }
 
-function DocumentCard({ title, icon, onClick, small = false }) {
+function DocumentCard({ title, icon, onClick, hasValue = false, small = false }) {
     return (
         <Card 
             variant="outlined" 
             sx={{ 
                 borderRadius: 2, 
-                cursor: 'pointer', 
-                '&:hover': { borderColor: '#6366f1', bgcolor: '#f8fafc' },
+                cursor: hasValue ? 'pointer' : 'default',
+                opacity: hasValue ? 1 : 0.5,
+                bgcolor: hasValue ? 'white' : '#f5f5f5',
+                borderColor: hasValue ? '#e0e0e0' : '#e0e0e0',
+                '&:hover': hasValue ? { borderColor: '#6366f1', bgcolor: '#f8fafc' } : {},
                 height: small ? 80 : 120,
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
                 alignItems: 'center',
-                p: 2
+                p: 2,
+                transition: 'all 0.2s'
             }}
-            onClick={onClick}
+            onClick={hasValue ? onClick : undefined}
         >
-            <Box sx={{ color: '#6366f1', mb: 1 }}>{icon}</Box>
+            <Box sx={{ 
+                color: hasValue ? '#6366f1' : '#9e9e9e', 
+                mb: 1, 
+                fontSize: small ? 24 : 32 
+            }}>
+                {icon}
+            </Box>
             <Typography 
                 variant={small ? "caption" : "body2"} 
                 sx={{ 
                     fontWeight: 600, 
                     textAlign: 'center',
+                    color: hasValue ? 'inherit' : '#9e9e9e',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     display: '-webkit-box',
@@ -1193,33 +1331,43 @@ function DocumentCard({ title, icon, onClick, small = false }) {
             >
                 {title}
             </Typography>
+            {!hasValue && (
+                <Typography variant="caption" sx={{ color: '#9e9e9e', mt: 0.5 }}>
+                    Non disponible
+                </Typography>
+            )}
         </Card>
     );
 }
 
-function PdfDocumentCard({ title, onClick }) {
+function PdfDocumentCard({ title, onClick, hasValue = false }) {
     return (
         <Card 
             variant="outlined" 
             sx={{ 
                 borderRadius: 2, 
-                cursor: 'pointer', 
-                '&:hover': { borderColor: '#ef4444', bgcolor: '#fef2f2' },
+                cursor: hasValue ? 'pointer' : 'default',
+                opacity: hasValue ? 1 : 0.5,
+                bgcolor: hasValue ? 'white' : '#f5f5f5',
+                borderColor: hasValue ? '#e0e0e0' : '#e0e0e0',
+                '&:hover': hasValue ? { borderColor: '#ef4444', bgcolor: '#fef2f2' } : {},
                 height: 120,
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
                 alignItems: 'center',
-                p: 2
+                p: 2,
+                transition: 'all 0.2s'
             }}
-            onClick={onClick}
+            onClick={hasValue ? onClick : undefined}
         >
-            <PdfIcon sx={{ color: '#ef4444', fontSize: 40, mb: 1 }} />
+            <PdfIcon sx={{ color: hasValue ? '#ef4444' : '#9e9e9e', fontSize: 40, mb: 1 }} />
             <Typography 
                 variant="body2" 
                 sx={{ 
                     fontWeight: 600, 
                     textAlign: 'center',
+                    color: hasValue ? 'inherit' : '#9e9e9e',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     display: '-webkit-box',
@@ -1229,6 +1377,11 @@ function PdfDocumentCard({ title, onClick }) {
             >
                 {title}
             </Typography>
+            {!hasValue && (
+                <Typography variant="caption" sx={{ color: '#9e9e9e', mt: 0.5 }}>
+                    Non disponible
+                </Typography>
+            )}
         </Card>
     );
 }

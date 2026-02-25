@@ -288,6 +288,12 @@ const AccountForm: React.FC<AccountFormProps> = ({
   const handleValidateStep2 = async (etape2Data: any) => {
     try {
       setLoading(true);
+      // DEBUG: log before sending to trace source of agency_id
+      console.log('DEBUG => Envoi validerEtape2, etape2Data:', etape2Data);
+      console.log('DEBUG => formData.client.agence_id:', formData.client?.agence_id);
+      console.log('DEBUG => formData.options.agency_id:', (formData.options as any)?.agency_id);
+      console.log('DEBUG => localStorage.agence_id/current_agency_id:', localStorage.getItem('agence_id'), localStorage.getItem('current_agency_id'));
+
       const response = await compteService.validerEtape2(etape2Data);
       
       // Mettre à jour le formData avec l'accountType
@@ -400,6 +406,7 @@ const AccountForm: React.FC<AccountFormProps> = ({
         return (
           <Step2AccountType
             accountType={formData.accountType}
+            selectedClient={formData.client} // <--- AJOUTER CETTE LIGNE
             accountSubType={formData.accountSubType}
             options={formData.options}
             onChange={updateFormData}

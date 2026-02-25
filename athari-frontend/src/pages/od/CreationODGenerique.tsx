@@ -19,21 +19,30 @@ import { indigo, green, blue, red, orange } from "@mui/material/colors";
 import Layout from "../../components/layout/Layout";
 import ApiClient from "../../services/api/ApiClient";
 
-interface ComptePlan {
-  id: number;
+// Interface pour un compte (client ou plan)
+interface CompteOption {
+  id: string; // Format: "client_123" ou "plan_456"
+  original_id: number;
+  type: 'client' | 'plan';
   code: string;
   libelle: string;
+  client_nom?: string;
+  display_text: string;
+  search_text: string;
+}
+
+// Interface pour un compte avec montant
+interface CompteMontant {
+  type?: 'client' | 'plan';
+  compte_id?: number | string; // Pour plan comptable
+  compte_client_id?: number; // Pour client
+  montant: number | string;
 }
 
 interface Agency {
   id: number;
   name: string;
   code: string;
-}
-
-interface CompteMontant {
-  compte_id: number | string;
-  montant: number | string;
 }
 
 interface ODGeneriqueData {
@@ -48,10 +57,8 @@ interface ODGeneriqueData {
   description: string;
   montant_total: number | string;
   devise: string;
-  compte_debit_id: number | string;
-  comptes_credits: CompteMontant[];
-  compte_credit_id: number | string;
   comptes_debits: CompteMontant[];
+  comptes_credits: CompteMontant[];
   sens_operation: "DEBIT" | "CREDIT";
   est_collecte: boolean;
   est_urgence: boolean;
@@ -79,8 +86,9 @@ export default function CreationODGenerique() {
   const [open, setOpen] = useState(false);
   const [tabIndex, setTabIndex] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadingComptes, setLoadingComptes] = useState(false);
   const [agences, setAgences] = useState<Agency[]>([]);
-  const [comptesPlan, setComptesPlan] = useState<ComptePlan[]>([]);
+  const [tousComptes, setTousComptes] = useState<CompteOption[]>([]);
   const [justificatifFile, setJustificatifFile] = useState<JustificatifFile>({ file: null });
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" as "success" | "error" });
   const [montantTotal, setMontantTotal] = useState<number>(0);
@@ -97,10 +105,8 @@ export default function CreationODGenerique() {
     description: "",
     montant_total: "",
     devise: "FCFA",
-    compte_debit_id: "",
-    comptes_credits: [{ compte_id: "", montant: "" }],
-    compte_credit_id: "",
-    comptes_debits: [{ compte_id: "", montant: "" }],
+    comptes_debits: [{ montant: "" }],
+    comptes_credits: [{ montant: "" }],
     sens_operation: "DEBIT",
     est_collecte: false,
     est_urgence: false,
@@ -172,15 +178,102 @@ export default function CreationODGenerique() {
 
   const fetchInitialData = async () => {
     try {
-      const [agencesRes, comptesRes] = await Promise.all([
+      setLoadingComptes(true);
+      
+      const [agencesRes, comptesPlanRes, comptesClientsRes] = await Promise.all([
         ApiClient.get("/operation-diverses/agences/liste"),
-        ApiClient.get("/operation-diverses/comptes/plan")
+        ApiClient.get("/operation-diverses/comptes/plan"),
+        ApiClient.get("/comptes")
       ]);
 
-      setAgences(agencesRes.data?.data || agencesRes.data?.agences || []);
-      setComptesPlan(comptesRes.data?.data || []);
+      console.log("Agences response:", agencesRes.data);
+      console.log("Comptes plan response:", comptesPlanRes.data);
+      console.log("Comptes clients response:", comptesClientsRes.data);
+
+      // Traiter les agences
+      const agencesData = agencesRes.data?.data || agencesRes.data?.agences || [];
+      setAgences(Array.isArray(agencesData) ? agencesData : []);
+      
+      // Traiter les comptes plan
+      let comptesPlan = [];
+      if (comptesPlanRes.data?.data && Array.isArray(comptesPlanRes.data.data)) {
+        comptesPlan = comptesPlanRes.data.data;
+      } else if (Array.isArray(comptesPlanRes.data)) {
+        comptesPlan = comptesPlanRes.data;
+      }
+      
+      // Traiter les comptes clients (structure paginée)
+      let comptesClients = [];
+      if (comptesClientsRes.data?.data?.data && Array.isArray(comptesClientsRes.data.data.data)) {
+        // La réponse est dans data.data.data (pagination)
+        comptesClients = comptesClientsRes.data.data.data;
+      } else if (comptesClientsRes.data?.data && Array.isArray(comptesClientsRes.data.data)) {
+        // La réponse est dans data.data
+        comptesClients = comptesClientsRes.data.data;
+      } else if (Array.isArray(comptesClientsRes.data)) {
+        // La réponse est directement un tableau
+        comptesClients = comptesClientsRes.data;
+      }
+      
+      console.log("Comptes plan traités:", comptesPlan.length);
+      console.log("Comptes clients traités:", comptesClients.length);
+      
+      // Fusionner et formater tous les comptes
+      const tousComptesFormatted: CompteOption[] = [
+        // Comptes du plan comptable
+        ...comptesPlan.map((c: any) => ({
+          id: `plan_${c.id}`,
+          original_id: c.id,
+          type: 'plan' as const,
+          code: c.code || '',
+          libelle: c.libelle || '',
+          display_text: c.code && c.libelle ? `${c.code} - ${c.libelle}` : 'Compte inconnu',
+          search_text: `${c.code || ''} ${c.libelle || ''}`
+        })),
+        // Comptes clients
+        ...comptesClients.map((c: any) => ({
+          id: `client_${c.id}`,
+          original_id: c.id,
+          type: 'client' as const,
+          code: c.numero_compte || c.code || '',
+          libelle: c.plan_comptable?.libelle || c.libelle || 'Compte client',
+          client_nom: c.client?.nom || c.client_nom || '',
+          display_text: (() => {
+            const code = c.numero_compte || c.code || '';
+            const libelle = c.plan_comptable?.libelle || c.libelle || '';
+            const clientNom = c.client?.nom || c.client_nom || '';
+            
+            if (code && libelle) {
+              return clientNom 
+                ? `${code} - ${libelle} (${clientNom})`
+                : `${code} - ${libelle}`;
+            }
+            return code || 'Compte client';
+          })(),
+          search_text: (() => {
+            const code = c.numero_compte || c.code || '';
+            const libelle = c.plan_comptable?.libelle || c.libelle || '';
+            const clientNom = c.client?.nom || c.client_nom || '';
+            return `${code} ${libelle} ${clientNom}`;
+          })()
+        }))
+      ];
+      
+      // Trier par code
+      tousComptesFormatted.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+      
+      console.log("Tous comptes fusionnés:", tousComptesFormatted.length);
+      setTousComptes(tousComptesFormatted);
+      
     } catch (error) {
       console.error("Erreur chargement données:", error);
+      setSnackbar({
+        open: true,
+        message: "Erreur lors du chargement des données",
+        severity: "error"
+      });
+    } finally {
+      setLoadingComptes(false);
     }
   };
 
@@ -210,11 +303,113 @@ export default function CreationODGenerique() {
     }
   };
 
+  // Composant Autocomplete réutilisable pour les comptes
+  const CompteAutocomplete = ({ 
+    value, 
+    onChange, 
+    label, 
+    error 
+  }: { 
+    value: any; 
+    onChange: (compteId: string, type: 'client' | 'plan', originalId: number) => void;
+    label: string;
+    error?: string;
+  }) => {
+    const [inputValue, setInputValue] = useState('');
+
+    const selectedCompte = tousComptes.find(c => c.id === value);
+
+    return (
+      <Autocomplete
+        options={tousComptes}
+        getOptionLabel={(option) => option.display_text}
+        value={selectedCompte || null}
+        onChange={(e, newValue) => {
+          if (newValue) {
+            onChange(newValue.id, newValue.type, newValue.original_id);
+          } else {
+            onChange('', 'plan', 0);
+          }
+        }}
+        inputValue={inputValue}
+        onInputChange={(e, newInputValue) => setInputValue(newInputValue)}
+        loading={loadingComptes}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label={label}
+            error={!!error}
+            helperText={error}
+            InputProps={{
+              ...params.InputProps,
+              startAdornment: (
+                <>
+                  {selectedCompte?.type === 'client' && (
+                    <InputAdornment position="start">
+                      <Chip 
+                        label="Client" 
+                        size="small" 
+                        color="primary" 
+                        variant="outlined" 
+                        sx={{ mr: 1 }}
+                      />
+                    </InputAdornment>
+                  )}
+                  {selectedCompte?.type === 'plan' && (
+                    <InputAdornment position="start">
+                      <Chip 
+                        label="Plan" 
+                        size="small" 
+                        color="secondary" 
+                        variant="outlined" 
+                        sx={{ mr: 1 }}
+                      />
+                    </InputAdornment>
+                  )}
+                  {params.InputProps.startAdornment}
+                </>
+              )
+            }}
+          />
+        )}
+        renderOption={(props, option) => (
+          <li {...props}>
+            <Box>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Chip 
+                  label={option.type === 'client' ? 'Client' : 'Plan'} 
+                  size="small" 
+                  color={option.type === 'client' ? 'primary' : 'secondary'} 
+                  variant="outlined"
+                />
+                <Typography variant="body2">
+                  <strong>{option.code}</strong> - {option.libelle}
+                </Typography>
+              </Stack>
+              {option.type === 'client' && option.client_nom && (
+                <Typography variant="caption" color="text.secondary">
+                  {option.client_nom}
+                </Typography>
+              )}
+            </Box>
+          </li>
+        )}
+        filterOptions={(options, state) => {
+          const search = state.inputValue.toLowerCase();
+          return options.filter(option => 
+            option.search_text.toLowerCase().includes(search)
+          );
+        }}
+        noOptionsText="Aucun compte trouvé"
+      />
+    );
+  };
+
   // Gestion des comptes crédits
   const handleAddCompteCredit = () => {
     setFormData(prev => ({
       ...prev,
-      comptes_credits: [...prev.comptes_credits, { compte_id: "", montant: "" }]
+      comptes_credits: [...prev.comptes_credits, { montant: "" }]
     }));
   };
 
@@ -227,12 +422,25 @@ export default function CreationODGenerique() {
     }
   };
 
-  const handleCompteCreditChange = (index: number, field: keyof CompteMontant, value: string | number) => {
+  const handleCompteCreditChange = (index: number, field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
-      comptes_credits: prev.comptes_credits.map((item, i) => 
-        i === index ? { ...item, [field]: value } : item
-      )
+      comptes_credits: prev.comptes_credits.map((item, i) => {
+        if (i === index) {
+          if (field === 'compte') {
+            const [type, id] = value.split('_');
+            const numId = parseInt(id);
+            return {
+              ...item,
+              type: type as 'client' | 'plan',
+              compte_id: type === 'plan' ? numId : undefined,
+              compte_client_id: type === 'client' ? numId : undefined
+            };
+          }
+          return { ...item, [field]: value };
+        }
+        return item;
+      })
     }));
   };
 
@@ -240,7 +448,7 @@ export default function CreationODGenerique() {
   const handleAddCompteDebit = () => {
     setFormData(prev => ({
       ...prev,
-      comptes_debits: [...prev.comptes_debits, { compte_id: "", montant: "" }]
+      comptes_debits: [...prev.comptes_debits, { montant: "" }]
     }));
   };
 
@@ -253,12 +461,25 @@ export default function CreationODGenerique() {
     }
   };
 
-  const handleCompteDebitChange = (index: number, field: keyof CompteMontant, value: string | number) => {
+  const handleCompteDebitChange = (index: number, field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
-      comptes_debits: prev.comptes_debits.map((item, i) => 
-        i === index ? { ...item, [field]: value } : item
-      )
+      comptes_debits: prev.comptes_debits.map((item, i) => {
+        if (i === index) {
+          if (field === 'compte') {
+            const [type, id] = value.split('_');
+            const numId = parseInt(id);
+            return {
+              ...item,
+              type: type as 'client' | 'plan',
+              compte_id: type === 'plan' ? numId : undefined,
+              compte_client_id: type === 'client' ? numId : undefined
+            };
+          }
+          return { ...item, [field]: value };
+        }
+        return item;
+      })
     }));
   };
 
@@ -270,12 +491,29 @@ export default function CreationODGenerique() {
     if (!formData.montant_total || Number(formData.montant_total) <= 0) newErrors.montant_total = "Montant invalide";
     
     if (formData.sens_operation === "DEBIT") {
-      if (!formData.compte_debit_id) newErrors.compte_debit_id = "Compte débit requis";
+      // Validation des comptes débits
+      let hasDebitError = false;
+      formData.comptes_debits.forEach((item, index) => {
+        const hasCompte = item.compte_id || item.compte_client_id;
+        if (!hasCompte) {
+          newErrors[`compte_debit_${index}` as keyof ODGeneriqueData] = "Compte débit requis";
+          hasDebitError = true;
+        }
+        if (!item.montant || Number(item.montant) <= 0) {
+          newErrors[`montant_debit_${index}` as keyof ODGeneriqueData] = "Montant débit invalide";
+          hasDebitError = true;
+        }
+      });
+      
+      if (hasDebitError) {
+        newErrors.comptes_debits = "Veuillez vérifier les comptes débits";
+      }
       
       // Validation des comptes crédits
       let hasCreditError = false;
       formData.comptes_credits.forEach((item, index) => {
-        if (!item.compte_id) {
+        const hasCompte = item.compte_id || item.compte_client_id;
+        if (!hasCompte) {
           newErrors[`compte_credit_${index}` as keyof ODGeneriqueData] = "Compte crédit requis";
           hasCreditError = true;
         }
@@ -289,12 +527,29 @@ export default function CreationODGenerique() {
         newErrors.comptes_credits = "Veuillez vérifier les comptes crédits";
       }
     } else { // Mode CREDIT
-      if (!formData.compte_credit_id) newErrors.compte_credit_id = "Compte crédit requis";
+      // Validation des comptes crédits
+      let hasCreditError = false;
+      formData.comptes_credits.forEach((item, index) => {
+        const hasCompte = item.compte_id || item.compte_client_id;
+        if (!hasCompte) {
+          newErrors[`compte_credit_${index}` as keyof ODGeneriqueData] = "Compte crédit requis";
+          hasCreditError = true;
+        }
+        if (!item.montant || Number(item.montant) <= 0) {
+          newErrors[`montant_credit_${index}` as keyof ODGeneriqueData] = "Montant crédit invalide";
+          hasCreditError = true;
+        }
+      });
+      
+      if (hasCreditError) {
+        newErrors.comptes_credits = "Veuillez vérifier les comptes crédits";
+      }
       
       // Validation des comptes débits
       let hasDebitError = false;
       formData.comptes_debits.forEach((item, index) => {
-        if (!item.compte_id) {
+        const hasCompte = item.compte_id || item.compte_client_id;
+        if (!hasCompte) {
           newErrors[`compte_debit_${index}` as keyof ODGeneriqueData] = "Compte débit requis";
           hasDebitError = true;
         }
@@ -327,16 +582,18 @@ export default function CreationODGenerique() {
       const payload = {
         ...formData,
         montant_total: Number(formData.montant_total),
-        comptes_credits: formData.sens_operation === "DEBIT" ? 
-          formData.comptes_credits.map(item => ({
-            compte_id: item.compte_id,
-            montant: Number(item.montant)
-          })) : [],
-        comptes_debits: formData.sens_operation === "CREDIT" ?
-          formData.comptes_debits.map(item => ({
-            compte_id: item.compte_id,
-            montant: Number(item.montant)
-          })) : [],
+        comptes_debits: formData.comptes_debits.map(item => ({
+          type: item.type,
+          montant: Number(item.montant),
+          ...(item.type === 'plan' ? { compte_id: item.compte_id } : {}),
+          ...(item.type === 'client' ? { compte_client_id: item.compte_client_id } : {})
+        })),
+        comptes_credits: formData.comptes_credits.map(item => ({
+          type: item.type,
+          montant: Number(item.montant),
+          ...(item.type === 'plan' ? { compte_id: item.compte_id } : {}),
+          ...(item.type === 'client' ? { compte_client_id: item.compte_client_id } : {})
+        })),
         ...(justificatifFile.base64 && {
           justificatif_base64: justificatifFile.base64,
           justificatif_filename: justificatifFile.file?.name,
@@ -348,7 +605,7 @@ export default function CreationODGenerique() {
         delete payload.justificatif_path;
       }
 
-      const response = await ApiClient.post("/operation-diverses/odGenerique", payload, {
+      const response = await ApiClient.post("/operation-diverses", payload, {
         headers: { "Content-Type": "application/json" }
       });
 
@@ -380,10 +637,8 @@ export default function CreationODGenerique() {
       description: "",
       montant_total: "",
       devise: "FCFA",
-      compte_debit_id: "",
-      comptes_credits: [{ compte_id: "", montant: "" }],
-      compte_credit_id: "",
-      comptes_debits: [{ compte_id: "", montant: "" }],
+      comptes_debits: [{ montant: "" }],
+      comptes_credits: [{ montant: "" }],
       sens_operation: "DEBIT",
       est_collecte: false,
       est_urgence: false,
@@ -406,9 +661,15 @@ export default function CreationODGenerique() {
   };
 
   // Fonction pour obtenir l'intitulé d'un compte
-  const getCompteIntitule = (compteId: number | string) => {
-    const compte = comptesPlan.find(c => c.id === compteId);
-    return compte ? `${compte.code} - ${compte.libelle}` : "...";
+  const getCompteIntitule = (compte: any) => {
+    if (compte.type === 'client' && compte.compte_client_id) {
+      const compteClient = tousComptes.find(c => c.type === 'client' && c.original_id === compte.compte_client_id);
+      return compteClient ? compteClient.display_text : "...";
+    } else if (compte.compte_id) {
+      const comptePlan = tousComptes.find(c => c.type === 'plan' && c.original_id === compte.compte_id);
+      return comptePlan ? comptePlan.display_text : "...";
+    }
+    return "...";
   };
 
   return (
@@ -449,9 +710,10 @@ export default function CreationODGenerique() {
               <Grid item xs={12} md={6}>
                 <Typography variant="subtitle2" fontWeight="bold">Fonctionnalités:</Typography>
                 <Stack spacing={1} sx={{ mt: 1 }}>
-                  <Chip label="✔ Mode Débit (1 débit → N crédits)" size="small" color="error" variant="outlined" />
-                  <Chip label="✔ Mode Crédit (1 crédit → N débits)" size="small" color="success" variant="outlined" />
+                  <Chip label="✔ Mode Débit (N débits → N crédits)" size="small" color="error" variant="outlined" />
+                  <Chip label="✔ Mode Crédit (N crédits → N débits)" size="small" color="success" variant="outlined" />
                   <Chip label="✔ Types de justificatifs étendus" size="small" color="primary" variant="outlined" />
+                  <Chip label="✔ Comptes clients et plan comptable" size="small" color="info" variant="outlined" />
                 </Stack>
               </Grid>
               <Grid item xs={12} md={6}>
@@ -467,14 +729,14 @@ export default function CreationODGenerique() {
         </Card>
 
         {/* Modal de création avec onglets */}
-        <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+        <Dialog open={open} onClose={handleClose} maxWidth="xl" fullWidth>
           <DialogTitle sx={{ borderBottom: 1, borderColor: 'divider', pb: 2 }}>
             <Stack direction="row" alignItems="center" spacing={1}>
               <SyncAlt color="primary" />
               <Typography variant="h6">Nouvelle OD Générique</Typography>
             </Stack>
             <Typography variant="body2" color="text.secondary">
-              Création d'une opération diverse standard avec multi-comptes
+              Création d'une opération diverse standard avec multi-comptes (clients + plan comptable)
             </Typography>
           </DialogTitle>
 
@@ -494,7 +756,7 @@ export default function CreationODGenerique() {
                   </Typography>
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={6}>
-                      <FormControl sx={{minWidth:250}} error={!!errors.agence_id}>
+                      <FormControl sx={{minWidth: 200}} error={!!errors.agence_id}>
                         <InputLabel>Agence</InputLabel>
                         <Select
                           value={formData.agence_id}
@@ -533,6 +795,7 @@ export default function CreationODGenerique() {
                         fullWidth
                         type="date"
                         label="Date opération"
+                        disabled
                         value={formData.date_operation}
                         onChange={(e) => setFormData({ ...formData, date_operation: e.target.value })}
                         InputLabelProps={{ shrink: true }}
@@ -543,6 +806,7 @@ export default function CreationODGenerique() {
                         fullWidth
                         type="date"
                         label="Date valeur"
+                        disabled
                         value={formData.date_valeur}
                         onChange={(e) => setFormData({ ...formData, date_valeur: e.target.value })}
                         InputLabelProps={{ shrink: true }}
@@ -553,6 +817,7 @@ export default function CreationODGenerique() {
                         fullWidth
                         type="date"
                         label="Date comptable"
+                        disabled
                         value={formData.date_comptable}
                         onChange={(e) => setFormData({ ...formData, date_comptable: e.target.value })}
                         InputLabelProps={{ shrink: true }}
@@ -567,7 +832,7 @@ export default function CreationODGenerique() {
                   </Typography>
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={6}>
-                      <FormControl sx={{minWidth:250}}>
+                      <FormControl fullWidth>
                         <InputLabel>Type opération</InputLabel>
                         <Select
                           value={formData.type_operation}
@@ -583,7 +848,7 @@ export default function CreationODGenerique() {
                       </FormControl>
                     </Grid>
                     <Grid item xs={12} md={6}>
-                      <FormControl sx={{minWidth:250}}>
+                      <FormControl fullWidth>
                         <InputLabel>Type collecte</InputLabel>
                         <Select
                           value={formData.type_collecte}
@@ -627,7 +892,7 @@ export default function CreationODGenerique() {
                   <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
                     Sens de l'opération
                   </Typography>
-                  <FormControl sx={{minWidth:250}}>
+                  <FormControl fullWidth>
                     <InputLabel>Sens de l'opération</InputLabel>
                     <Select
                       value={formData.sens_operation}
@@ -636,22 +901,19 @@ export default function CreationODGenerique() {
                         setFormData({ 
                           ...formData, 
                           sens_operation: newSens,
-                          // Réinitialiser les comptes selon le sens
-                          compte_debit_id: newSens === "DEBIT" ? formData.compte_debit_id : "",
-                          compte_credit_id: newSens === "CREDIT" ? formData.compte_credit_id : "",
-                          comptes_credits: newSens === "DEBIT" ? formData.comptes_credits : [{ compte_id: "", montant: "" }],
-                          comptes_debits: newSens === "CREDIT" ? formData.comptes_debits : [{ compte_id: "", montant: "" }]
+                          comptes_debits: newSens === "DEBIT" ? formData.comptes_debits : [{ montant: "" }],
+                          comptes_credits: newSens === "CREDIT" ? formData.comptes_credits : [{ montant: "" }]
                         });
                       }}
                       label="Sens de l'opération"
                     >
-                      <MenuItem value="DEBIT">Mode Débit (1 compte débit, N comptes crédits)</MenuItem>
-                      <MenuItem value="CREDIT">Mode Crédit (1 compte crédit, N comptes débits)</MenuItem>
+                      <MenuItem value="DEBIT">Mode Débit (N comptes débits, N comptes crédits)</MenuItem>
+                      <MenuItem value="CREDIT">Mode Crédit (N comptes crédits, N comptes débits)</MenuItem>
                     </Select>
                     <FormHelperText>
                       {formData.sens_operation === "DEBIT" 
-                        ? "Un compte sera débité, plusieurs comptes seront crédités" 
-                        : "Un compte sera crédité, plusieurs comptes seront débités"}
+                        ? "Des comptes seront débités, des comptes seront crédités" 
+                        : "Des comptes seront crédités, des comptes seront débités"}
                     </FormHelperText>
                   </FormControl>
                 </Grid>
@@ -709,30 +971,137 @@ export default function CreationODGenerique() {
                 {formData.sens_operation === "DEBIT" ? (
                   <>
                     <Grid item xs={12}>
-                      <Typography variant="subtitle1" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <ArrowBack color="error" />
-                        Compte Débit
-                      </Typography>
-                      <FormControl sx={{minWidth:250}} error={!!errors.compte_debit_id}>
-                        <Autocomplete
-                          options={comptesPlan}
-                          getOptionLabel={(option) => `${option.code} - ${option.libelle}`}
-                          value={comptesPlan.find(c => c.id === formData.compte_debit_id) || null}
-                          onChange={(e, newValue) => {
-                            setFormData({ ...formData, compte_debit_id: newValue?.id || "" });
-                          }}
-                          renderInput={(params) => (
-                            <TextField
-                              {...params}
-                              label="Rechercher un compte débit"
-                              error={!!errors.compte_debit_id}
-                              helperText={errors.compte_debit_id || "Compte qui sera débité du montant total"}
-                            />
-                          )}
-                        />
-                      </FormControl>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="subtitle1" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <ArrowBack color="error" />
+                          Comptes Débits
+                        </Typography>
+                        <Button
+                          variant="outlined"
+                          startIcon={<AddCircle />}
+                          onClick={handleAddCompteDebit}
+                          size="small"
+                        >
+                          Ajouter un compte débit
+                        </Button>
+                      </Box>
+                      
+                      {formData.comptes_debits.map((compteDebit, index) => {
+                        const compteId = compteDebit.type === 'client' 
+                          ? `client_${compteDebit.compte_client_id}`
+                          : compteDebit.type === 'plan'
+                          ? `plan_${compteDebit.compte_id}`
+                          : '';
+
+                        return (
+                          <Grid container spacing={2} key={index} sx={{ mb: 2 }}>
+                            <Grid item xs={6} sx={{minWidth:250}}>
+                              <CompteAutocomplete
+                                value={compteId}
+                                onChange={(id, type, originalId) => {
+                                  handleCompteDebitChange(index, 'compte', id);
+                                }}
+                                label={`Compte débit ${index + 1}`}
+                                error={errors[`compte_debit_${index}` as keyof ODGeneriqueData]}
+                              />
+                            </Grid>
+                            <Grid item xs={4}>
+                              <TextField
+                                label="Montant"
+                                type="number"
+                                value={compteDebit.montant}
+                                onChange={(e) => handleCompteDebitChange(index, "montant", e.target.value)}
+                                error={!!errors[`montant_debit_${index}` as keyof ODGeneriqueData]}
+                                helperText={errors[`montant_debit_${index}` as keyof ODGeneriqueData]}
+                                InputProps={{
+                                  endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                                }}
+                              />
+                            </Grid>
+                            <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                              {formData.comptes_debits.length > 1 && (
+                                <IconButton 
+                                  color="error" 
+                                  onClick={() => handleRemoveCompteDebit(index)}
+                                  size="small"
+                                >
+                                  <Delete />
+                                </IconButton>
+                              )}
+                            </Grid>
+                          </Grid>
+                        );
+                      })}
                     </Grid>
 
+                    <Grid item xs={12} >
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="subtitle1" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <ArrowForward color="success" />
+                          Comptes Crédits
+                        </Typography>
+                        <Button
+                          variant="outlined"
+                          startIcon={<AddCircle />}
+                          onClick={handleAddCompteCredit}
+                          size="small"
+                        >
+                          Ajouter un compte crédit
+                        </Button>
+                      </Box>
+                      
+                      {formData.comptes_credits.map((compteCredit, index) => {
+                        const compteId = compteCredit.type === 'client' 
+                          ? `client_${compteCredit.compte_client_id}`
+                          : compteCredit.type === 'plan'
+                          ? `plan_${compteCredit.compte_id}`
+                          : '';
+
+                        return (
+                          <Grid container spacing={2} key={index} sx={{ mb: 2 }}>
+                            <Grid item xs={6} sx={{minWidth:250}}>
+                              <CompteAutocomplete
+                                value={compteId}
+                                onChange={(id, type, originalId) => {
+                                  handleCompteCreditChange(index, 'compte', id);
+                                }}
+                                label={`Compte crédit ${index + 1}`}
+                                error={errors[`compte_credit_${index}` as keyof ODGeneriqueData]}
+                              />
+                            </Grid>
+                            <Grid item xs={4}>
+                              <TextField
+                                fullWidth
+                                label="Montant"
+                                type="number"
+                                value={compteCredit.montant}
+                                onChange={(e) => handleCompteCreditChange(index, "montant", e.target.value)}
+                                error={!!errors[`montant_credit_${index}` as keyof ODGeneriqueData]}
+                                helperText={errors[`montant_credit_${index}` as keyof ODGeneriqueData]}
+                                InputProps={{
+                                  endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                                }}
+                              />
+                            </Grid>
+                            <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                              {formData.comptes_credits.length > 1 && (
+                                <IconButton 
+                                  color="error" 
+                                  onClick={() => handleRemoveCompteCredit(index)}
+                                  size="small"
+                                >
+                                  <Delete />
+                                </IconButton>
+                              )}
+                            </Grid>
+                          </Grid>
+                        );
+                      })}
+                    </Grid>
+                  </>
+                ) : (
+                  /* Mode CRÉDIT */
+                  <>
                     <Grid item xs={12}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                         <Typography variant="subtitle1" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -745,87 +1114,57 @@ export default function CreationODGenerique() {
                           onClick={handleAddCompteCredit}
                           size="small"
                         >
-                          Ajouter un compte
+                          Ajouter un compte crédit
                         </Button>
                       </Box>
                       
-                      {formData.comptes_credits.map((compteCredit, index) => (
-                        <Grid container spacing={2} key={index} sx={{ mb: 2 }}>
-                          <Grid item xs={6}>
-                            <FormControl sx={{minWidth:250}} error={!!errors[`compte_credit_${index}` as keyof ODGeneriqueData]}>
-                              <Autocomplete
-                                options={comptesPlan}
-                                getOptionLabel={(option) => `${option.code} - ${option.libelle}`}
-                                value={comptesPlan.find(c => c.id === compteCredit.compte_id) || null}
-                                onChange={(e, newValue) => {
-                                  handleCompteCreditChange(index, "compte_id", newValue?.id || "");
+                      {formData.comptes_credits.map((compteCredit, index) => {
+                        const compteId = compteCredit.type === 'client' 
+                          ? `client_${compteCredit.compte_client_id}`
+                          : compteCredit.type === 'plan'
+                          ? `plan_${compteCredit.compte_id}`
+                          : '';
+
+                        return (
+                          <Grid container spacing={2} key={index} sx={{ mb: 2 }}>
+                            <Grid item xs={6}>
+                              <CompteAutocomplete
+                                value={compteId}
+                                onChange={(id, type, originalId) => {
+                                  handleCompteCreditChange(index, 'compte', id);
                                 }}
-                                renderInput={(params) => (
-                                  <TextField
-                                    {...params}
-                                    label={`Compte crédit ${index + 1}`}
-                                    error={!!errors[`compte_credit_${index}` as keyof ODGeneriqueData]}
-                                    helperText={errors[`compte_credit_${index}` as keyof ODGeneriqueData]}
-                                  />
-                                )}
+                                label={`Compte crédit ${index + 1}`}
+                                error={errors[`compte_credit_${index}` as keyof ODGeneriqueData]}
                               />
-                            </FormControl>
+                            </Grid>
+                            <Grid item xs={4}>
+                              <TextField
+                                fullWidth
+                                label="Montant"
+                                type="number"
+                                value={compteCredit.montant}
+                                onChange={(e) => handleCompteCreditChange(index, "montant", e.target.value)}
+                                error={!!errors[`montant_credit_${index}` as keyof ODGeneriqueData]}
+                                helperText={errors[`montant_credit_${index}` as keyof ODGeneriqueData]}
+                                InputProps={{
+                                  endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                                }}
+                              />
+                            </Grid>
+                            <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                              {formData.comptes_credits.length > 1 && (
+                                <IconButton 
+                                  color="error" 
+                                  onClick={() => handleRemoveCompteCredit(index)}
+                                  size="small"
+                                >
+                                  <Delete />
+                                </IconButton>
+                              )}
+                            </Grid>
                           </Grid>
-                          <Grid item xs={4}>
-                            <TextField
-                              fullWidth
-                              label="Montant"
-                              type="number"
-                              value={compteCredit.montant}
-                              onChange={(e) => handleCompteCreditChange(index, "montant", e.target.value)}
-                              error={!!errors[`montant_credit_${index}` as keyof ODGeneriqueData]}
-                              helperText={errors[`montant_credit_${index}` as keyof ODGeneriqueData]}
-                              InputProps={{
-                                endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
-                              }}
-                            />
-                          </Grid>
-                          <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
-                            {formData.comptes_credits.length > 1 && (
-                              <IconButton 
-                                color="error" 
-                                onClick={() => handleRemoveCompteCredit(index)}
-                                size="small"
-                              >
-                                <Delete />
-                              </IconButton>
-                            )}
-                          </Grid>
-                        </Grid>
-                      ))}
-                    </Grid>
-                  </>
-                ) : (
-                  /* Mode CRÉDIT */
-                  <>
-                    <Grid item xs={12}>
-                      <Typography variant="subtitle1" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <ArrowForward color="success" />
-                        Compte Crédit
-                      </Typography>
-                      <FormControl sx={{minWidth:250}} error={!!errors.compte_credit_id}>
-                        <Autocomplete
-                          options={comptesPlan}
-                          getOptionLabel={(option) => `${option.code} - ${option.libelle}`}
-                          value={comptesPlan.find(c => c.id === formData.compte_credit_id) || null}
-                          onChange={(e, newValue) => {
-                            setFormData({ ...formData, compte_credit_id: newValue?.id || "" });
-                          }}
-                          renderInput={(params) => (
-                            <TextField
-                              {...params}
-                              label="Rechercher un compte crédit"
-                              error={!!errors.compte_credit_id}
-                              helperText={errors.compte_credit_id || "Compte qui sera crédité du montant total"}
-                            />
-                          )}
-                        />
-                      </FormControl>
+                        );
+                      })}
                     </Grid>
 
                     <Grid item xs={12}>
@@ -840,59 +1179,57 @@ export default function CreationODGenerique() {
                           onClick={handleAddCompteDebit}
                           size="small"
                         >
-                          Ajouter un compte
+                          Ajouter un compte débit
                         </Button>
                       </Box>
                       
-                      {formData.comptes_debits.map((compteDebit, index) => (
-                        <Grid container spacing={2} key={index} sx={{ mb: 2 }}>
-                          <Grid item xs={6}>
-                            <FormControl sx={{minWidth:250}} error={!!errors[`compte_debit_${index}` as keyof ODGeneriqueData]}>
-                              <Autocomplete
-                                options={comptesPlan}
-                                getOptionLabel={(option) => `${option.code} - ${option.libelle}`}
-                                value={comptesPlan.find(c => c.id === compteDebit.compte_id) || null}
-                                onChange={(e, newValue) => {
-                                  handleCompteDebitChange(index, "compte_id", newValue?.id || "");
+                      {formData.comptes_debits.map((compteDebit, index) => {
+                        const compteId = compteDebit.type === 'client' 
+                          ? `client_${compteDebit.compte_client_id}`
+                          : compteDebit.type === 'plan'
+                          ? `plan_${compteDebit.compte_id}`
+                          : '';
+
+                        return (
+                          <Grid container spacing={2} key={index} sx={{ mb: 2 }}>
+                            <Grid item xs={6}>
+                              <CompteAutocomplete
+                                value={compteId}
+                                onChange={(id, type, originalId) => {
+                                  handleCompteDebitChange(index, 'compte', id);
                                 }}
-                                renderInput={(params) => (
-                                  <TextField
-                                    {...params}
-                                    label={`Compte débit ${index + 1}`}
-                                    error={!!errors[`compte_debit_${index}` as keyof ODGeneriqueData]}
-                                    helperText={errors[`compte_debit_${index}` as keyof ODGeneriqueData]}
-                                  />
-                                )}
+                                label={`Compte débit ${index + 1}`}
+                                error={errors[`compte_debit_${index}` as keyof ODGeneriqueData]}
                               />
-                            </FormControl>
+                            </Grid>
+                            <Grid item xs={4}>
+                              <TextField
+                                fullWidth
+                                label="Montant"
+                                type="number"
+                                value={compteDebit.montant}
+                                onChange={(e) => handleCompteDebitChange(index, "montant", e.target.value)}
+                                error={!!errors[`montant_debit_${index}` as keyof ODGeneriqueData]}
+                                helperText={errors[`montant_debit_${index}` as keyof ODGeneriqueData]}
+                                InputProps={{
+                                  endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                                }}
+                              />
+                            </Grid>
+                            <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                              {formData.comptes_debits.length > 1 && (
+                                <IconButton 
+                                  color="error" 
+                                  onClick={() => handleRemoveCompteDebit(index)}
+                                  size="small"
+                                >
+                                  <Delete />
+                                </IconButton>
+                              )}
+                            </Grid>
                           </Grid>
-                          <Grid item xs={4}>
-                            <TextField
-                              fullWidth
-                              label="Montant"
-                              type="number"
-                              value={compteDebit.montant}
-                              onChange={(e) => handleCompteDebitChange(index, "montant", e.target.value)}
-                              error={!!errors[`montant_debit_${index}` as keyof ODGeneriqueData]}
-                              helperText={errors[`montant_debit_${index}` as keyof ODGeneriqueData]}
-                              InputProps={{
-                                endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
-                              }}
-                            />
-                          </Grid>
-                          <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
-                            {formData.comptes_debits.length > 1 && (
-                              <IconButton 
-                                color="error" 
-                                onClick={() => handleRemoveCompteDebit(index)}
-                                size="small"
-                              >
-                                <Delete />
-                              </IconButton>
-                            )}
-                          </Grid>
-                        </Grid>
-                      ))}
+                        );
+                      })}
                     </Grid>
                   </>
                 )}
@@ -1073,65 +1410,79 @@ export default function CreationODGenerique() {
                     <Table size="small">
                       <TableHead sx={{ bgcolor: '#f5f5f5' }}>
                         <TableRow>
+                          <TableCell><strong>Type</strong></TableCell>
                           <TableCell><strong>Compte</strong></TableCell>
                           <TableCell><strong>Libellé</strong></TableCell>
-                          <TableCell><strong>Intitulé du compte</strong></TableCell>
+                          <TableCell><strong>Intitulé</strong></TableCell>
                           <TableCell align="right"><strong>Débit (FCFA)</strong></TableCell>
                           <TableCell align="right"><strong>Crédit (FCFA)</strong></TableCell>
-                          <TableCell><strong>Sens</strong></TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {/* Mode DÉBIT */}
                         {formData.sens_operation === "DEBIT" && (
                           <>
-                            {/* Ligne du compte débit */}
-                            {formData.compte_debit_id && (
-                              <TableRow sx={{ bgcolor: '#fff5f5' }}>
-                                <TableCell>
-                                  <strong>
-                                    {comptesPlan.find(c => c.id === formData.compte_debit_id)?.code || "..."}
-                                  </strong>
-                                </TableCell>
-                                <TableCell>{formData.libelle || "..."}</TableCell>
-                                <TableCell>
-                                  {getCompteIntitule(formData.compte_debit_id)}
-                                </TableCell>
-                                <TableCell align="right">
-                                  <strong style={{ color: red[600] }}>
-                                    {formData.montant_total ? new Intl.NumberFormat().format(Number(formData.montant_total)) : "0"}
-                                  </strong>
-                                </TableCell>
-                                <TableCell align="right">-</TableCell>
-                                <TableCell>
-                                  <Chip label="DÉBIT" size="small" color="error" variant="outlined" />
-                                </TableCell>
-                              </TableRow>
-                            )}
+                            {/* Lignes des comptes débits */}
+                            {formData.comptes_debits.map((compteDebit, index) => {
+                              const intitule = getCompteIntitule(compteDebit);
+                              if (!compteDebit.montant || Number(compteDebit.montant) <= 0) return null;
+                              
+                              return (
+                                <TableRow key={`debit-${index}`} sx={{ 
+                                  bgcolor: '#fff5f5',
+                                  borderLeft: `4px solid ${red[100]}`
+                                }}>
+                                  <TableCell>
+                                    <Chip 
+                                      label={compteDebit.type === 'client' ? 'Client' : 'Plan'} 
+                                      size="small" 
+                                      color={compteDebit.type === 'client' ? 'primary' : 'secondary'} 
+                                      variant="outlined"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <strong>{compteDebit.type === 'client' ? compteDebit.compte_client_id : compteDebit.compte_id}</strong>
+                                  </TableCell>
+                                  <TableCell>{formData.libelle || "..."}</TableCell>
+                                  <TableCell>{intitule}</TableCell>
+                                  <TableCell align="right">
+                                    <strong style={{ color: red[600] }}>
+                                      {compteDebit.montant ? new Intl.NumberFormat().format(Number(compteDebit.montant)) : "0"}
+                                    </strong>
+                                  </TableCell>
+                                  <TableCell align="right">-</TableCell>
+                                </TableRow>
+                              );
+                            })}
 
                             {/* Lignes des comptes crédits */}
                             {formData.comptes_credits.map((compteCredit, index) => {
-                              const compte = comptesPlan.find(c => c.id === compteCredit.compte_id);
-                              if (!compte || !compteCredit.montant || Number(compteCredit.montant) <= 0) return null;
+                              const intitule = getCompteIntitule(compteCredit);
+                              if (!compteCredit.montant || Number(compteCredit.montant) <= 0) return null;
                               
                               return (
-                                <TableRow key={index} sx={{ 
-                                  bgcolor: index % 2 === 0 ? '#f8fff5' : 'white',
+                                <TableRow key={`credit-${index}`} sx={{ 
+                                  bgcolor: '#f8fff5',
                                   borderLeft: `4px solid ${green[100]}`
                                 }}>
                                   <TableCell>
-                                    <strong>{compte.code}</strong>
+                                    <Chip 
+                                      label={compteCredit.type === 'client' ? 'Client' : 'Plan'} 
+                                      size="small" 
+                                      color={compteCredit.type === 'client' ? 'primary' : 'secondary'} 
+                                      variant="outlined"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <strong>{compteCredit.type === 'client' ? compteCredit.compte_client_id : compteCredit.compte_id}</strong>
                                   </TableCell>
                                   <TableCell>{formData.libelle || "..."}</TableCell>
-                                  <TableCell>{compte.libelle}</TableCell>
+                                  <TableCell>{intitule}</TableCell>
                                   <TableCell align="right">-</TableCell>
                                   <TableCell align="right">
                                     <strong style={{ color: green[600] }}>
                                       {compteCredit.montant ? new Intl.NumberFormat().format(Number(compteCredit.montant)) : "0"}
                                     </strong>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Chip label="CRÉDIT" size="small" color="success" variant="outlined" />
                                   </TableCell>
                                 </TableRow>
                               );
@@ -1142,54 +1493,68 @@ export default function CreationODGenerique() {
                         {/* Mode CRÉDIT */}
                         {formData.sens_operation === "CREDIT" && (
                           <>
-                            {/* Ligne du compte crédit */}
-                            {formData.compte_credit_id && (
-                              <TableRow sx={{ bgcolor: '#f8fff5' }}>
-                                <TableCell>
-                                  <strong>
-                                    {comptesPlan.find(c => c.id === formData.compte_credit_id)?.code || "..."}
-                                  </strong>
-                                </TableCell>
-                                <TableCell>{formData.libelle || "..."}</TableCell>
-                                <TableCell>
-                                  {getCompteIntitule(formData.compte_credit_id)}
-                                </TableCell>
-                                <TableCell align="right">-</TableCell>
-                                <TableCell align="right">
-                                  <strong style={{ color: green[600] }}>
-                                    {formData.montant_total ? new Intl.NumberFormat().format(Number(formData.montant_total)) : "0"}
-                                  </strong>
-                                </TableCell>
-                                <TableCell>
-                                  <Chip label="CRÉDIT" size="small" color="success" variant="outlined" />
-                                </TableCell>
-                              </TableRow>
-                            )}
+                            {/* Lignes des comptes crédits */}
+                            {formData.comptes_credits.map((compteCredit, index) => {
+                              const intitule = getCompteIntitule(compteCredit);
+                              if (!compteCredit.montant || Number(compteCredit.montant) <= 0) return null;
+                              
+                              return (
+                                <TableRow key={`credit-${index}`} sx={{ 
+                                  bgcolor: '#f8fff5',
+                                  borderLeft: `4px solid ${green[100]}`
+                                }}>
+                                  <TableCell>
+                                    <Chip 
+                                      label={compteCredit.type === 'client' ? 'Client' : 'Plan'} 
+                                      size="small" 
+                                      color={compteCredit.type === 'client' ? 'primary' : 'secondary'} 
+                                      variant="outlined"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <strong>{compteCredit.type === 'client' ? compteCredit.compte_client_id : compteCredit.compte_id}</strong>
+                                  </TableCell>
+                                  <TableCell>{formData.libelle || "..."}</TableCell>
+                                  <TableCell>{intitule}</TableCell>
+                                  <TableCell align="right">-</TableCell>
+                                  <TableCell align="right">
+                                    <strong style={{ color: green[600] }}>
+                                      {compteCredit.montant ? new Intl.NumberFormat().format(Number(compteCredit.montant)) : "0"}
+                                    </strong>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
 
                             {/* Lignes des comptes débits */}
                             {formData.comptes_debits.map((compteDebit, index) => {
-                              const compte = comptesPlan.find(c => c.id === compteDebit.compte_id);
-                              if (!compte || !compteDebit.montant || Number(compteDebit.montant) <= 0) return null;
+                              const intitule = getCompteIntitule(compteDebit);
+                              if (!compteDebit.montant || Number(compteDebit.montant) <= 0) return null;
                               
                               return (
-                                <TableRow key={index} sx={{ 
-                                  bgcolor: index % 2 === 0 ? '#fff5f5' : 'white',
+                                <TableRow key={`debit-${index}`} sx={{ 
+                                  bgcolor: '#fff5f5',
                                   borderLeft: `4px solid ${red[100]}`
                                 }}>
                                   <TableCell>
-                                    <strong>{compte.code}</strong>
+                                    <Chip 
+                                      label={compteDebit.type === 'client' ? 'Client' : 'Plan'} 
+                                      size="small" 
+                                      color={compteDebit.type === 'client' ? 'primary' : 'secondary'} 
+                                      variant="outlined"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <strong>{compteDebit.type === 'client' ? compteDebit.compte_client_id : compteDebit.compte_id}</strong>
                                   </TableCell>
                                   <TableCell>{formData.libelle || "..."}</TableCell>
-                                  <TableCell>{compte.libelle}</TableCell>
+                                  <TableCell>{intitule}</TableCell>
                                   <TableCell align="right">
                                     <strong style={{ color: red[600] }}>
                                       {compteDebit.montant ? new Intl.NumberFormat().format(Number(compteDebit.montant)) : "0"}
                                     </strong>
                                   </TableCell>
                                   <TableCell align="right">-</TableCell>
-                                  <TableCell>
-                                    <Chip label="DÉBIT" size="small" color="error" variant="outlined" />
-                                  </TableCell>
                                 </TableRow>
                               );
                             })}
@@ -1198,7 +1563,7 @@ export default function CreationODGenerique() {
 
                         {/* Ligne de total */}
                         <TableRow sx={{ bgcolor: '#f0f0f0', fontWeight: 'bold' }}>
-                          <TableCell colSpan={3} align="right">
+                          <TableCell colSpan={4} align="right">
                             <strong>TOTAL</strong>
                           </TableCell>
                           <TableCell align="right">
@@ -1206,14 +1571,6 @@ export default function CreationODGenerique() {
                           </TableCell>
                           <TableCell align="right">
                             <strong>{new Intl.NumberFormat().format(montantTotal)}</strong>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="caption" sx={{ 
-                              color: montantTotal > 0 ? "success.main" : "text.secondary",
-                              fontWeight: 'bold'
-                            }}>
-                              {montantTotal > 0 ? "✓ Équilibré" : "En attente"}
-                            </Typography>
                           </TableCell>
                         </TableRow>
                       </TableBody>
@@ -1231,12 +1588,12 @@ export default function CreationODGenerique() {
                       <Typography variant="caption">Compte crédit</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Box sx={{ width: 16, height: 4, bgcolor: green[100] }} />
-                      <Typography variant="caption">Bordure compte crédit</Typography>
+                      <Chip label="Client" size="small" color="primary" variant="outlined" />
+                      <Typography variant="caption">Compte client</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Box sx={{ width: 16, height: 4, bgcolor: red[100] }} />
-                      <Typography variant="caption">Bordure compte débit</Typography>
+                      <Chip label="Plan" size="small" color="secondary" variant="outlined" />
+                      <Typography variant="caption">Compte plan comptable</Typography>
                     </Box>
                   </Box>
                 </Grid>

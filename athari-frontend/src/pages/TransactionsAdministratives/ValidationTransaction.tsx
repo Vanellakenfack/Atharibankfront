@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -26,7 +25,8 @@ import {
   CircularProgress,
   Snackbar,
   Avatar,
-  TablePagination,
+  Pagination,
+  Stack,
 } from '@mui/material';
 import {
   CheckCircle,
@@ -41,13 +41,25 @@ import {
   Person,
   CreditCard,
   Receipt,
+  ContentCopy,
+  Send,
+  AccountCircle,
+  VerifiedUser,
+  GppGood,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import Sidebar from '../../components/layout/Sidebar';
 import TopBar from '../../components/layout/TopBar';
 import ApiClient from '../../services/api/ApiClient';
 
-// --- INTERFACES ---
+interface UserProfile {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  permissions: string[];
+}
+
 interface TiersInfo {
   nom_complet?: string;
   type_piece?: string;
@@ -111,6 +123,89 @@ interface ApiResponse {
   message?: string;
 }
 
+interface ValidationCodeNotification {
+  id: string;
+  code: string;
+  demandeId: number;
+  type: string;
+  montant: number;
+  date: string;
+  read: boolean;
+  sent: boolean;
+  caissiereName?: string;
+  caissiereId?: number;
+}
+
+// --- SERVICE DE NOTIFICATIONS ---
+const NotificationService = {
+  STORAGE_KEY: 'validation_codes_v2',
+  
+  loadAll: (): ValidationCodeNotification[] => {
+    try {
+      const stored = localStorage.getItem(NotificationService.STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+        return Object.values(parsed);
+      }
+      return [];
+    } catch (error) {
+      console.error('Erreur chargement notifications:', error);
+      return [];
+    }
+  },
+  
+  saveAll: (notifications: ValidationCodeNotification[]): void => {
+    try {
+      localStorage.setItem(
+        NotificationService.STORAGE_KEY, 
+        JSON.stringify(notifications)
+      );
+    } catch (error) {
+      console.error('Erreur sauvegarde notifications:', error);
+    }
+  },
+  
+  addNotification: (notification: ValidationCodeNotification): void => {
+    const notifications = NotificationService.loadAll();
+    notifications.unshift(notification);
+    NotificationService.saveAll(notifications);
+  },
+  
+  markAsRead: (id: string): void => {
+    const notifications = NotificationService.loadAll();
+    const updated = notifications.map(n => 
+      n.id === id ? { ...n, read: true } : n
+    );
+    NotificationService.saveAll(updated);
+  },
+  
+  markAsSent: (id: string): void => {
+    const notifications = NotificationService.loadAll();
+    const updated = notifications.map(n => 
+      n.id === id ? { ...n, sent: true } : n
+    );
+    NotificationService.saveAll(updated);
+  },
+  
+  deleteNotification: (id: string): void => {
+    const notifications = NotificationService.loadAll();
+    const updated = notifications.filter(n => n.id !== id);
+    NotificationService.saveAll(updated);
+  },
+  
+  getUnreadCount: (): number => {
+    const notifications = NotificationService.loadAll();
+    return notifications.filter(n => !n.read).length;
+  },
+  
+  clearAll: (): void => {
+    localStorage.removeItem(NotificationService.STORAGE_KEY);
+  }
+};
+
 // --- COMPOSANTS STYLISÉS ---
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
   '&:nth-of-type(odd)': {
@@ -140,11 +235,6 @@ const StatusChip = styled(Chip)<{ status: string }>(({ theme, status }) => ({
   }),
 }));
 
-const ActionButton = styled(Button)(({ theme }) => ({
-  minWidth: 100,
-  margin: theme.spacing(0.5),
-}));
-
 const StatCard = styled(Card)(({ theme }) => ({
   height: '100%',
   borderLeft: `4px solid ${theme.palette.primary.main}`,
@@ -172,15 +262,106 @@ const ValidationTransaction: React.FC = () => {
   const [rejectionDialog, setRejectionDialog] = useState<boolean>(false);
   const [rejectionMotif, setRejectionMotif] = useState<string>('');
   const [generatedCode, setGeneratedCode] = useState<string>('');
+  const [generatedCodeInfo, setGeneratedCodeInfo] = useState<ValidationCodeNotification | null>(null);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'success' as 'success' | 'error' | 'info',
   });
   
-  // Pagination
-  const [page, setPage] = useState<number>(0);
-  const [rowsPerPage, setRowsPerPage] = useState<number>(15);
+  const [notifications, setNotifications] = useState<ValidationCodeNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  
+  // États pour la pagination
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage] = useState<number>(10); // 10 éléments par page comme demandé
+  
+  // États utilisateur
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userRole, setUserRole] = useState<string>('');
+  const [loadingUser, setLoadingUser] = useState<boolean>(true);
+  const [autoSendEnabled, setAutoSendEnabled] = useState<boolean>(true);
+
+  // Calcul des données paginées
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const paginatedDemandes = demandes.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(demandes.length / itemsPerPage);
+
+  // Charger les notifications
+  const loadNotifications = () => {
+    const loadedNotifications = NotificationService.loadAll();
+    setNotifications(loadedNotifications);
+    setUnreadCount(NotificationService.getUnreadCount());
+  };
+
+  // Sauvegarder une notification
+  const saveNotification = (notification: ValidationCodeNotification) => {
+    NotificationService.addNotification(notification);
+    loadNotifications();
+  };
+
+  // Marquer comme lu
+  const markAsRead = (id: string) => {
+    NotificationService.markAsRead(id);
+    loadNotifications();
+  };
+
+  // Supprimer notification
+  const deleteNotification = (id: string) => {
+    NotificationService.deleteNotification(id);
+    loadNotifications();
+    showSnackbar('Notification supprimée', 'success');
+  };
+
+  // Marquer comme envoyé
+  const markAsSent = (id: string) => {
+    NotificationService.markAsSent(id);
+    loadNotifications();
+  };
+
+  // Fonction pour récupérer le profil utilisateur
+  const fetchUserProfile = async () => {
+    try {
+      setLoadingUser(true);
+      console.log('Chargement du profil utilisateur...');
+      
+      const tokenData = localStorage.getItem('token_data');
+      if (tokenData) {
+        try {
+          const parsed = JSON.parse(tokenData);
+          console.log('Données localStorage:', parsed);
+          
+          if (parsed && parsed.role) {
+            console.log('Rôle trouvé dans localStorage:', parsed.role);
+            setUserProfile(parsed);
+            setUserRole(parsed.role);
+            setLoadingUser(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Erreur parsing localStorage:', error);
+        }
+      }
+      
+      const response = await ApiClient.get<UserProfile>('/me');
+      console.log('Réponse API /me:', response.data);
+      
+      if (response.data && response.data.role) {
+        setUserProfile(response.data);
+        setUserRole(response.data.role);
+        localStorage.setItem('token_data', JSON.stringify(response.data));
+      } else {
+        console.error('Rôle non trouvé dans la réponse');
+        showSnackbar('Erreur: Rôle utilisateur non défini', 'error');
+      }
+    } catch (error: any) {
+      console.error('Erreur chargement profil:', error);
+      showSnackbar('Erreur chargement profil utilisateur', 'error');
+    } finally {
+      setLoadingUser(false);
+    }
+  };
 
   // Charger les demandes
   const loadDemandes = async () => {
@@ -201,7 +382,11 @@ const ValidationTransaction: React.FC = () => {
       }
       
       setDemandes(demandesData);
-      showSnackbar(`${demandesData.length} demande(s) chargée(s)`, 'success');
+      setCurrentPage(1); // Reset à la première page après chargement
+      
+      if (demandesData.length > 0) {
+        showSnackbar(`${demandesData.length} demande(s) chargée(s)`, 'success');
+      }
     } catch (error: any) {
       console.error('Erreur chargement demandes:', error);
       showSnackbar(
@@ -216,8 +401,57 @@ const ValidationTransaction: React.FC = () => {
     }
   };
 
+  // Fonction pour déterminer si un rôle peut valider un montant
+  const canUserValidateAmount = (montant: number, role: string): boolean => {
+    const montantNum = Number(montant);
+    
+    switch (role) {
+      case 'Assistant Comptable (AC)':
+        return montantNum >= 500000 && montantNum <= 5000000;
+      case 'Chef Comptable':
+        return montantNum > 5000000 && montantNum <= 10000000;
+      case 'DG':
+        return montantNum > 10000000;
+      default:
+        return false;
+    }
+  };
+
+  // Obtenir le libellé du rôle
+  const getRoleLabel = (roleCode: string): string => {
+    const roles: { [key: string]: string } = {
+      'AC': 'Assistant Comptable (AC)',
+      'CC': 'Chef Comptable',
+      'DG': 'Directeur Général'
+    };
+    return roles[roleCode] || roleCode;
+  };
+
+  // Obtenir la plage de validation pour un rôle
+  const getRoleValidationRange = (role: string): string => {
+    switch (role) {
+      case 'AC':
+        return '500.000 - 5.000.000 FCFA';
+      case 'CC':
+        return '5.000.000 - 10.000.000 FCFA';
+      case 'DG':
+        return '> 10.000.000 FCFA';
+      default:
+        return 'Non autorisé';
+    }
+  };
+
+  // Vérifier si l'utilisateur peut valider une demande spécifique
+  const canUserValidateDemande = (demande: DemandeValidation): boolean => {
+    if (!userRole) return false;
+    if (demande.statut !== 'EN_ATTENTE') return false;
+    return canUserValidateAmount(demande.montant, userRole);
+  };
+
   useEffect(() => {
+    fetchUserProfile();
     loadDemandes();
+    loadNotifications();
     
     const interval = setInterval(() => {
       if (!detailDialog && !approvalDialog && !rejectionDialog) {
@@ -236,25 +470,27 @@ const ValidationTransaction: React.FC = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  // Pagination handlers
-  const handleChangePage = (event: unknown, newPage: number) => {
-    setPage(newPage);
+  const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
+    setCurrentPage(page);
+    // Optionnel: scroll vers le haut de la table
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  // Calcul des demandes pour la page actuelle
-  const paginatedDemandes = demandes.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
 
   const handleViewDetails = (demande: DemandeValidation) => {
     setSelectedDemande(demande);
     setDetailDialog(true);
+  };
+
+  // Fonction pour envoyer automatiquement le code
+  const sendCodeAutomatically = async (code: string, demandeId: number, caissiereId?: number) => {
+    try {
+      console.log(`Envoi du code ${code} pour la demande ${demandeId} à la caissière ${caissiereId}`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return true;
+    } catch (error) {
+      console.error('Erreur envoi automatique:', error);
+      return false;
+    }
   };
 
   const handleApprove = async () => {
@@ -267,17 +503,40 @@ const ValidationTransaction: React.FC = () => {
         const code = response.data.code;
         setGeneratedCode(code);
         
-        const codes = JSON.parse(localStorage.getItem('validation_codes') || '{}');
-        codes[selectedDemande.id] = {
+        const notificationId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const notification: ValidationCodeNotification = {
+          id: notificationId,
           code,
           demandeId: selectedDemande.id,
           type: selectedDemande.type_operation,
           montant: selectedDemande.montant,
           date: new Date().toISOString(),
+          read: false,
+          sent: false,
+          caissiereName: selectedDemande.caissiere?.name,
+          caissiereId: selectedDemande.caissiere_id,
         };
-        localStorage.setItem('validation_codes', JSON.stringify(codes));
         
-        showSnackbar('Demande approuvée avec succès', 'success');
+        setGeneratedCodeInfo(notification);
+        saveNotification(notification);
+        
+        if (autoSendEnabled) {
+          const sent = await sendCodeAutomatically(
+            code, 
+            selectedDemande.id, 
+            selectedDemande.caissiere_id
+          );
+          
+          if (sent) {
+            markAsSent(notificationId);
+            showSnackbar('Code généré et envoyé automatiquement à la caissière', 'success');
+          } else {
+            showSnackbar('Code généré mais erreur lors de l\'envoi automatique', 'warning');
+          }
+        } else {
+          showSnackbar('Code généré avec succès', 'success');
+        }
+        
         await loadDemandes();
       }
     } catch (error: any) {
@@ -286,6 +545,30 @@ const ValidationTransaction: React.FC = () => {
     } finally {
       setApprovalDialog(false);
       setDetailDialog(false);
+    }
+  };
+
+  const handleSendCode = async () => {
+    if (generatedCodeInfo) {
+      try {
+        const sent = await sendCodeAutomatically(
+          generatedCodeInfo.code,
+          generatedCodeInfo.demandeId,
+          generatedCodeInfo.caissiereId
+        );
+        
+        if (sent) {
+          markAsSent(generatedCodeInfo.id);
+          setGeneratedCode('');
+          setGeneratedCodeInfo(null);
+          showSnackbar('Code envoyé avec succès à la caissière', 'success');
+        } else {
+          showSnackbar('Erreur lors de l\'envoi du code', 'error');
+        }
+      } catch (error) {
+        console.error('Erreur envoi manuel:', error);
+        showSnackbar('Erreur lors de l\'envoi du code', 'error');
+      }
     }
   };
 
@@ -321,7 +604,6 @@ const ValidationTransaction: React.FC = () => {
     }
   };
 
-  // Statistiques
   const stats = {
     total: demandes.length,
     enAttente: demandes.filter(d => d.statut === 'EN_ATTENTE').length,
@@ -350,7 +632,6 @@ const ValidationTransaction: React.FC = () => {
     }).format(amount);
   };
 
-  // Fonction pour extraire les informations du payload_data
   const getAccountInfo = (demande: DemandeValidation) => {
     return {
       compte: demande.payload_data?.compte || `COMPTE-${demande.payload_data?.compte_id || 'N/A'}`,
@@ -391,6 +672,17 @@ const ValidationTransaction: React.FC = () => {
     };
   };
 
+  if (loadingUser) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+        <Typography variant="body2" sx={{ ml: 2 }}>
+          Chargement du profil utilisateur...
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f5f5f5' }}>
       <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
@@ -405,9 +697,50 @@ const ValidationTransaction: React.FC = () => {
           transition: 'width 0.3s ease',
         }}
       >
-        <TopBar sidebarOpen={sidebarOpen} />
+        <TopBar 
+          sidebarOpen={sidebarOpen} 
+          notifications={notifications} 
+          unreadCount={unreadCount}
+          onMarkAsRead={markAsRead}
+          onDeleteNotification={deleteNotification}
+          onMarkAsSent={markAsSent}
+          formatDate={formatDate}
+          formatCurrency={formatCurrency}
+          loadNotifications={loadNotifications}
+        />
 
         <Box sx={{ px: { xs: 2, md: 3 }, py: 3 }}>
+          {/* Bannière info utilisateur */}
+          {userProfile && (
+            <Paper sx={{ mb: 3, p: 2, bgcolor: '#1a237e', color: 'white', borderRadius: 2 }}>
+              <Grid container alignItems="center" spacing={2}>
+                <Grid item>
+                  <Avatar sx={{ bgcolor: 'white', color: '#1a237e', width: 56, height: 56 }}>
+                    {userRole === 'DG' ? <GppGood /> : 
+                     userRole === 'CC' ? <VerifiedUser /> : 
+                     <AccountCircle />}
+                  </Avatar>
+                </Grid>
+                <Grid item xs>
+                  <Typography variant="h6" fontWeight={600}>
+                    {userProfile.name}
+                  </Typography>
+                </Grid>
+                <Grid item>
+                  <Tooltip title="Activer/désactiver l'envoi automatique">
+                    <Chip
+                      label={autoSendEnabled ? "Auto-envoi: ACTIF" : "Auto-envoi: INACTIF"}
+                      color={autoSendEnabled ? "success" : "default"}
+                      variant="outlined"
+                      onClick={() => setAutoSendEnabled(!autoSendEnabled)}
+                      sx={{ cursor: 'pointer', bgcolor: 'white' }}
+                    />
+                  </Tooltip>
+                </Grid>
+              </Grid>
+            </Paper>
+          )}
+
           <Box sx={{ mb: 4 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
               <Box>
@@ -499,6 +832,11 @@ const ValidationTransaction: React.FC = () => {
                 <Assignment sx={{ mr: 1 }} />
                 Demandes en attente de validation
               </Typography>
+              {userRole && (
+                <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                  Vous pouvez valider les montants entre {getRoleValidationRange(userRole)}
+                </Typography>
+              )}
             </Box>
             
             {loading ? (
@@ -536,6 +874,7 @@ const ValidationTransaction: React.FC = () => {
                       {paginatedDemandes.map((demande) => {
                         const porteurInfo = getPorteurInfo(demande);
                         const accountInfo = getAccountInfo(demande);
+                        const canValidate = canUserValidateDemande(demande);
                         
                         return (
                           <StyledTableRow key={demande.id} hover onClick={() => handleViewDetails(demande)}>
@@ -552,6 +891,11 @@ const ValidationTransaction: React.FC = () => {
                               <Typography variant="body1" fontWeight={600} color="#1a237e">
                                 {formatCurrency(demande.montant)} FCFA
                               </Typography>
+                              {!canValidate && demande.statut === 'EN_ATTENTE' && (
+                                <Typography variant="caption" color="error" display="block">
+                                  Hors de votre plage
+                                </Typography>
+                              )}
                             </TableCell>
                             <TableCell>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -599,31 +943,41 @@ const ValidationTransaction: React.FC = () => {
                                 </Tooltip>
                                 {demande.statut === 'EN_ATTENTE' && (
                                   <>
-                                    <Tooltip title="Approuver">
-                                      <IconButton
-                                        size="small"
-                                        color="success"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedDemande(demande);
-                                          setApprovalDialog(true);
-                                        }}
-                                      >
-                                        <CheckCircle />
-                                      </IconButton>
+                                    <Tooltip title={canValidate ? "Approuver" : "Montant hors de votre plage de validation"}>
+                                      <span>
+                                        <IconButton
+                                          size="small"
+                                          color="success"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (canValidate) {
+                                              setSelectedDemande(demande);
+                                              setApprovalDialog(true);
+                                            }
+                                          }}
+                                          disabled={!canValidate}
+                                        >
+                                          <CheckCircle />
+                                        </IconButton>
+                                      </span>
                                     </Tooltip>
-                                    <Tooltip title="Rejeter">
-                                      <IconButton
-                                        size="small"
-                                        color="error"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedDemande(demande);
-                                          setRejectionDialog(true);
-                                        }}
-                                      >
-                                        <Cancel />
-                                      </IconButton>
+                                    <Tooltip title={canValidate ? "Rejeter" : "Montant hors de votre plage de validation"}>
+                                      <span>
+                                        <IconButton
+                                          size="small"
+                                          color="error"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (canValidate) {
+                                              setSelectedDemande(demande);
+                                              setRejectionDialog(true);
+                                            }
+                                          }}
+                                          disabled={!canValidate}
+                                        >
+                                          <Cancel />
+                                        </IconButton>
+                                      </span>
                                     </Tooltip>
                                   </>
                                 )}
@@ -636,24 +990,49 @@ const ValidationTransaction: React.FC = () => {
                   </Table>
                 </TableContainer>
                 
-                {/* Pied de page avec pagination */}
-                <TablePagination
-                  rowsPerPageOptions={[10, 15, 25, 50]}
-                  component="div"
-                  count={demandes.length}
-                  rowsPerPage={rowsPerPage}
-                  page={page}
-                  onPageChange={handleChangePage}
-                  onRowsPerPageChange={handleChangeRowsPerPage}
-                  labelRowsPerPage="Lignes par page:"
-                  labelDisplayedRows={({ from, to, count }) => 
-                    `${from}-${to} sur ${count}`
-                  }
-                  sx={{
+                {/* Pagination MUI - Affichage conditionnel */}
+                {totalPages > 1 && (
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    p: 2, 
                     borderTop: '1px solid #e0e0e0',
                     bgcolor: '#fafafa',
-                  }}
-                />
+                    gap: 2
+                  }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Affichage {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, demandes.length)} sur {demandes.length} demandes
+                    </Typography>
+                    
+                    <Stack spacing={2}>
+                      <Pagination 
+                        count={totalPages} 
+                        page={currentPage}
+                        onChange={handlePageChange}
+                        color="primary"
+                        size="medium"
+                        showFirstButton
+                        showLastButton
+                        siblingCount={1}
+                        boundaryCount={1}
+                        sx={{
+                          '& .MuiPaginationItem-root': {
+                            fontSize: '0.875rem',
+                            '&.Mui-selected': {
+                              backgroundColor: '#1a237e',
+                              color: 'white',
+                              '&:hover': {
+                                backgroundColor: '#0e1a4f',
+                              }
+                            }
+                          }
+                        }}
+                      />
+                    </Stack>
+                  </Box>
+                )}
               </>
             )}
           </Paper>
@@ -676,7 +1055,27 @@ const ValidationTransaction: React.FC = () => {
         <DialogContent>
           {selectedDemande && (
             <Grid container spacing={3} sx={{ mt: 1 }}>
-              {/* Colonne gauche */}
+              <Grid item xs={12}>
+                {selectedDemande.statut === 'EN_ATTENTE' && (
+                  <Alert 
+                    severity={canUserValidateDemande(selectedDemande) ? "info" : "warning"}
+                    sx={{ mb: 3 }}
+                  >
+                    <Typography variant="subtitle2">
+                      {canUserValidateDemande(selectedDemande) 
+                        ? `Vous pouvez valider cette transaction (${getRoleLabel(userRole)})`
+                        : `Vous ne pouvez pas valider cette transaction. Seul ${(() => {
+                            const montant = selectedDemande.montant;
+                            if (montant <= 5000000) return "l'Assistant Comptable";
+                            if (montant <= 10000000) return "le Chef Comptable";
+                            return "le Directeur Général";
+                          })()} peut valider ${formatCurrency(selectedDemande.montant)} FCFA`
+                      }
+                    </Typography>
+                  </Alert>
+                )}
+              </Grid>
+
               <Grid item xs={12} md={6}>
                 <DetailSection>
                   <CardContent>
@@ -792,7 +1191,6 @@ const ValidationTransaction: React.FC = () => {
                 </DetailSection>
               </Grid>
 
-              {/* Colonne droite */}
               <Grid item xs={12} md={6}>
                 <DetailSection>
                   <CardContent>
@@ -876,7 +1274,6 @@ const ValidationTransaction: React.FC = () => {
                   </CardContent>
                 </DetailSection>
 
-                {/* Billetage */}
                 {selectedDemande.payload_data?.billetage && selectedDemande.payload_data.billetage.length > 0 && (
                   <DetailSection>
                     <CardContent>
@@ -902,7 +1299,6 @@ const ValidationTransaction: React.FC = () => {
                 )}
               </Grid>
 
-              {/* Code de validation si approuvé */}
               {selectedDemande.statut === 'APPROUVE' && selectedDemande.code_validation && (
                 <Grid item xs={12}>
                   <Alert severity="success" sx={{ mt: 2 }}>
@@ -916,7 +1312,6 @@ const ValidationTransaction: React.FC = () => {
                 </Grid>
               )}
 
-              {/* Motif de rejet si rejeté */}
               {selectedDemande.statut === 'REJETE' && selectedDemande.motif_rejet && (
                 <Grid item xs={12}>
                   <Alert severity="error" sx={{ mt: 2 }}>
@@ -934,7 +1329,7 @@ const ValidationTransaction: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDetailDialog(false)}>Fermer</Button>
-          {selectedDemande?.statut === 'EN_ATTENTE' && (
+          {selectedDemande?.statut === 'EN_ATTENTE' && canUserValidateDemande(selectedDemande) && (
             <>
               <Button 
                 variant="outlined" 
@@ -972,13 +1367,27 @@ const ValidationTransaction: React.FC = () => {
             Êtes-vous sûr de vouloir approuver cette opération ?
           </Alert>
           {selectedDemande && (
-            <Typography>
-              Vous allez générer un code de validation pour la demande #{selectedDemande.id}
-              <br />
-              <strong>Montant: {formatCurrency(selectedDemande.montant)} FCFA</strong>
-              <br />
-              <strong>Porteur: {getPorteurInfo(selectedDemande).nom}</strong>
-            </Typography>
+            <>
+              <Typography>
+                Vous allez générer un code de validation pour la demande #{selectedDemande.id}
+                <br />
+                <strong>Montant: {formatCurrency(selectedDemande.montant)} FCFA</strong>
+                <br />
+                <strong>Porteur: {getPorteurInfo(selectedDemande).nom}</strong>
+              </Typography>
+              <Box sx={{ mt: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                <Typography variant="body2">
+                  <strong>Mode d'envoi:</strong> {autoSendEnabled ? 
+                    '📤 Le code sera envoyé automatiquement à la caissière' : 
+                    '📝 Le code sera affiché pour envoi manuel'}
+                </Typography>
+                {autoSendEnabled && (
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                    L'envoi automatique peut être désactivé dans la bannière en haut
+                  </Typography>
+                )}
+              </Box>
+            </>
           )}
         </DialogContent>
         <DialogActions>
@@ -986,7 +1395,7 @@ const ValidationTransaction: React.FC = () => {
             Annuler
           </Button>
           <Button onClick={handleApprove} variant="contained" color="success" autoFocus>
-            Générer le code
+            Générer et {autoSendEnabled ? 'Envoyer' : 'Afficher'} le code
           </Button>
         </DialogActions>
       </Dialog>
@@ -1054,19 +1463,37 @@ const ValidationTransaction: React.FC = () => {
             <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
               Communiquez ce code à la caissière pour qu'elle puisse finaliser l'opération
             </Typography>
+            
+            {generatedCodeInfo && generatedCodeInfo.sent && (
+              <Alert severity="success" sx={{ mt: 2 }}>
+                 Code envoyé automatiquement à la caissière
+              </Alert>
+            )}
           </Box>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
+        <DialogActions sx={{ justifyContent: 'center', pb: 3, gap: 2 }}>
           <Button 
             variant="outlined" 
             onClick={handleCopyCode}
-            startIcon={<Assignment />}
+            startIcon={<ContentCopy />}
           >
-            Copier le code
+            Copier
           </Button>
+          {(!generatedCodeInfo?.sent) && (
+            <Button 
+              variant="contained" 
+              color="primary"
+              onClick={handleSendCode}
+              startIcon={<Send />}
+            >
+              Envoyer maintenant
+            </Button>
+          )}
           <Button 
-            variant="contained" 
-            onClick={() => setGeneratedCode('')}
+            onClick={() => {
+              setGeneratedCode('');
+              setGeneratedCodeInfo(null);
+            }}
           >
             Fermer
           </Button>

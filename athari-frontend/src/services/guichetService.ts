@@ -14,11 +14,24 @@ const guichetService = {
     return response.data.data || response.data;
   },
 
-  // Récupérer les guichets disponibles pour une session agence
-  getGuichetsDisponibles: async (agenceSessionId: number) => {
-    const response = await ApiClient.get(`/guichets/disponibles/${agenceSessionId}`);
-    return response.data.data || response.data;
-  },
+// Récupérer les guichets disponibles pour une session agence
+getGuichetsDisponibles: async (agenceSessionId: number) => {
+  console.log('🔗 Appel API: GET /sessions/guichets/disponibles/' + agenceSessionId);
+  
+  try {
+    const response = await ApiClient.get(`/sessions/guichets/disponibles/${agenceSessionId}`);
+    
+    console.log('📡 Réponse API:', {
+      status: response.status,
+      data: response.data
+    });
+    
+    return response.data;
+  } catch (error) {
+    console.error('❌ Erreur API getGuichetsDisponibles:', error);
+    throw error;
+  }
+},
 
   // Récupérer les caisses d'un guichet
   getCaissesByGuichet: async (guichetId: number) => {

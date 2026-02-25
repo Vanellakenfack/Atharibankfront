@@ -1,4 +1,3 @@
-// src/pages/compte/etape/Step3Mandataires.tsx
 import React, { useState, useEffect } from 'react';
 import {
   Grid,
@@ -262,43 +261,19 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
 
   // Valider l'étape 3
   const handleValidateStep3 = async () => {
+    const agencyId = localStorage.getItem('agence_id') || localStorage.getItem('current_agency_id');
+
     console.log('Validating step 3 with data:', {
       mandataire1: localMandataire1,
       mandataire2: localMandataire2,
       mandataire3: localMandataire3,
       signataire: localSignataire
     });
+    console.log('Agence ID utilisé pour validation:', agencyId);
     
-    // Vérifier les champs obligatoires pour le mandataire 1
-    const requiredFields = [
-      'sexe', 'noms', 'prenoms', 'date_naissance', 'lieu_naissance',
-      'telephone', 'adresse', 'nationalite', 'profession', 'situation_familiale', 'cni'
-    ];
-
-    const missingFields = requiredFields.filter(field => {
-      const value = (localMandataire1 as any)[field];
-      return !value && value !== 0 && value !== false;
-    });
-
-    if (missingFields.length > 0) {
-      setError(`Veuillez remplir tous les champs obligatoires pour le mandataire 1. Champs manquants: ${missingFields.join(', ')}`);
-      return;
-    }
-
-    // Vérification des champs du conjoint si marié
-    if (localMandataire1.situation_familiale === 'marie') {
-      const conjointFields = ['nom_conjoint', 'date_naissance_conjoint', 'lieu_naissance_conjoint', 'cni_conjoint'];
-      const missingConjointFields = conjointFields.filter(field => {
-        const value = (localMandataire1 as any)[field];
-        return !value && value !== 0 && value !== false;
-      });
-
-      if (missingConjointFields.length > 0) {
-        setError(`Veuillez remplir tous les champs concernant le conjoint pour le mandataire 1. Champs manquants: ${missingConjointFields.join(', ')}`);
-        return;
-      }
-    }
-
+    // RETIRÉ: Vérification des champs obligatoires
+    // Maintenant aucun champ n'est obligatoire
+    
     try {
       setValidating(true);
       setError('');
@@ -335,7 +310,7 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
           profession: data.profession || '',
           nom_jeune_fille_mere: data.nom_jeune_fille_mere || '',
           cni: data.cni || '',
-          signature: data.signature || null
+          signature: data.signature || null,
         };
         
         if (!isSignataire) {
@@ -349,7 +324,9 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
         return formattedData;
       };
 
+      // Créer le payload avec agency_id au niveau racine
       const etape3Data: any = {
+        agency_id: agencyId, // Agency ID au niveau racine
         mandataire_1: formatMandataireData(localMandataire1),
       };
 
@@ -369,6 +346,16 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
       }
 
       console.log('Données envoyées à l\'API (étape 3):', etape3Data);
+      console.log('Structure du payload:', {
+        racine: {
+          agency_id: etape3Data.agency_id,
+          mandataire_1: 'Object',
+          mandataire_2: etape3Data.mandataire_2 ? 'Object' : 'Non défini',
+          mandataire_3: etape3Data.mandataire_3 ? 'Object' : 'Non défini',
+          signataire: etape3Data.signataire ? 'Object' : 'Non défini'
+        }
+      });
+      
       await onNext(etape3Data);
 
     } catch (err: any) {
@@ -421,8 +408,8 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
 
         {/* Sexe */}
         <Grid item xs={12} sm={6}>
-          <FormControl component="fieldset" required={isMandataire1}>
-            <FormLabel component="legend">Sexe {isMandataire1 && '*'}</FormLabel>
+          <FormControl component="fieldset">
+            <FormLabel component="legend">Sexe</FormLabel>
             <RadioGroup
               row
               value={data.sexe || ''}
@@ -438,12 +425,9 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label={`Noms ${isMandataire1 ? '*' : ''}`}
+            label="Noms"
             value={data.noms || ''}
             onChange={(e) => updateMandataire(mandataireNumber, { noms: e.target.value })}
-            required={isMandataire1}
-            error={isMandataire1 && !data.noms}
-            helperText={isMandataire1 && !data.noms ? "Ce champ est requis" : ""}
           />
         </Grid>
 
@@ -451,12 +435,9 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label={`Prénoms ${isMandataire1 ? '*' : ''}`}
+            label="Prénoms"
             value={data.prenoms || ''}
             onChange={(e) => updateMandataire(mandataireNumber, { prenoms: e.target.value })}
-            required={isMandataire1}
-            error={isMandataire1 && !data.prenoms}
-            helperText={isMandataire1 && !data.prenoms ? "Ce champ est requis" : ""}
           />
         </Grid>
 
@@ -464,15 +445,12 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
         <Grid item xs={12} sm={6}>
           <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={fr}>
             <DatePicker
-              label={`Date de naissance ${isMandataire1 ? '*' : ''}`}
+              label="Date de naissance"
               value={data.date_naissance}
               onChange={(date) => updateMandataire(mandataireNumber, { date_naissance: date })}
               slotProps={{
                 textField: {
                   fullWidth: true,
-                  required: isMandataire1,
-                  error: isMandataire1 && !data.date_naissance,
-                  helperText: isMandataire1 && !data.date_naissance ? "Ce champ est requis" : ""
                 }
               }}
             />
@@ -483,12 +461,9 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label={`Lieu de naissance ${isMandataire1 ? '*' : ''}`}
+            label="Lieu de naissance"
             value={data.lieu_naissance || ''}
             onChange={(e) => updateMandataire(mandataireNumber, { lieu_naissance: e.target.value })}
-            required={isMandataire1}
-            error={isMandataire1 && !data.lieu_naissance}
-            helperText={isMandataire1 && !data.lieu_naissance ? "Ce champ est requis" : ""}
           />
         </Grid>
 
@@ -496,13 +471,10 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label={`Téléphone ${isMandataire1 ? '*' : ''}`}
+            label="Téléphone"
             value={data.telephone || ''}
             onChange={(e) => updateMandataire(mandataireNumber, { telephone: e.target.value })}
-            required={isMandataire1}
             type="tel"
-            error={isMandataire1 && !data.telephone}
-            helperText={isMandataire1 && !data.telephone ? "Ce champ est requis" : ""}
           />
         </Grid>
 
@@ -510,14 +482,11 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
         <Grid item xs={12}>
           <TextField
             fullWidth
-            label={`Adresse complète ${isMandataire1 ? '*' : ''}`}
+            label="Adresse complète"
             value={data.adresse || ''}
             onChange={(e) => updateMandataire(mandataireNumber, { adresse: e.target.value })}
-            required={isMandataire1}
             multiline
             rows={2}
-            error={isMandataire1 && !data.adresse}
-            helperText={isMandataire1 && !data.adresse ? "Ce champ est requis" : ""}
           />
         </Grid>
 
@@ -525,12 +494,9 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label={`Nationalité ${isMandataire1 ? '*' : ''}`}
+            label="Nationalité"
             value={data.nationalite || ''}
             onChange={(e) => updateMandataire(mandataireNumber, { nationalite: e.target.value })}
-            required={isMandataire1}
-            error={isMandataire1 && !data.nationalite}
-            helperText={isMandataire1 && !data.nationalite ? "Ce champ est requis" : ""}
           />
         </Grid>
 
@@ -538,12 +504,9 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label={`Profession ${isMandataire1 ? '*' : ''}`}
+            label="Profession"
             value={data.profession || ''}
             onChange={(e) => updateMandataire(mandataireNumber, { profession: e.target.value })}
-            required={isMandataire1}
-            error={isMandataire1 && !data.profession}
-            helperText={isMandataire1 && !data.profession ? "Ce champ est requis" : ""}
           />
         </Grid>
 
@@ -561,19 +524,16 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label={`Numéro CNI ${isMandataire1 ? '*' : ''}`}
+            label="Numéro CNI"
             value={data.cni || ''}
             onChange={(e) => updateMandataire(mandataireNumber, { cni: e.target.value })}
-            required={isMandataire1}
-            error={isMandataire1 && !data.cni}
-            helperText={isMandataire1 && !data.cni ? "Ce champ est requis" : ""}
           />
         </Grid>
 
         {/* Situation familiale */}
         <Grid item xs={12}>
-          <FormControl component="fieldset" required={isMandataire1}>
-            <FormLabel component="legend">Situation familiale {isMandataire1 && '*'}</FormLabel>
+          <FormControl component="fieldset">
+            <FormLabel component="legend">Situation familiale</FormLabel>
             <RadioGroup
               row
               value={data.situation_familiale || ''}
@@ -605,9 +565,6 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
                 label="Nom du conjoint"
                 value={data.nom_conjoint || ''}
                 onChange={(e) => updateMandataire(mandataireNumber, { nom_conjoint: e.target.value })}
-                required={isMandataire1}
-                error={isMandataire1 && !data.nom_conjoint}
-                helperText={isMandataire1 && !data.nom_conjoint ? "Ce champ est requis" : ""}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -619,9 +576,6 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
                   slotProps={{
                     textField: {
                       fullWidth: true,
-                      required: isMandataire1,
-                      error: isMandataire1 && !data.date_naissance_conjoint,
-                      helperText: isMandataire1 && !data.date_naissance_conjoint ? "Ce champ est requis" : ""
                     }
                   }}
                 />
@@ -633,9 +587,6 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
                 label="Lieu de naissance du conjoint"
                 value={data.lieu_naissance_conjoint || ''}
                 onChange={(e) => updateMandataire(mandataireNumber, { lieu_naissance_conjoint: e.target.value })}
-                required={isMandataire1}
-                error={isMandataire1 && !data.lieu_naissance_conjoint}
-                helperText={isMandataire1 && !data.lieu_naissance_conjoint ? "Ce champ est requis" : ""}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -644,9 +595,6 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
                 label="CNI du conjoint"
                 value={data.cni_conjoint || ''}
                 onChange={(e) => updateMandataire(mandataireNumber, { cni_conjoint: e.target.value })}
-                required={isMandataire1}
-                error={isMandataire1 && !data.cni_conjoint}
-                helperText={isMandataire1 && !data.cni_conjoint ? "Ce champ est requis" : ""}
               />
             </Grid>
           </>
@@ -1035,7 +983,7 @@ const Step3Mandataires: React.FC<Step3MandatairesProps> = ({
             <Button
               variant="contained"
               onClick={handleValidateStep3}
-              disabled={validating || !localMandataire1.noms}
+              disabled={validating}
               sx={{
                 background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
                 color: 'white',

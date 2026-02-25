@@ -1,4 +1,3 @@
-// src/services/api/journalCaisseService.ts
 import ApiClient from './ApiClient';
 import { format } from 'date-fns';
 
@@ -86,21 +85,80 @@ class JournalCaisseService {
           if (groupe.operations && Array.isArray(groupe.operations)) {
             groupe.operations.forEach((operation: any, opIndex: number) => {
               console.log(`Opération ${opIndex + 1}:`, operation);
-              
+
+              // Normaliser les montants débit/crédit en tenant compte de
+              // différents formats possibles renvoyés par l'API (entree/sortie,
+              // montant + sens, ou champs déjà séparés).
+              const rawMontant = operation.montant ?? operation.montant_operation ?? null;
+              const rawSens = (operation.sens || operation.type_mouvement || operation.sens_mouvement || operation.type || '').toString();
+
+              let montant_debit = 0;
+              let montant_credit = 0;
+
+              if (rawMontant !== null && rawMontant !== undefined && rawMontant !== '') {
+                const val = parseFloat(rawMontant) || 0;
+                const sens = rawSens.toString().toLowerCase();
+
+                // Heuristiques supplémentaires basées sur le libellé / référence
+                const libelleLower = (operation.libelle || operation.libelle_mouvement || '').toString().toLowerCase();
+                const refLower = (operation.ref || operation.reference_operation || '').toString().toLowerCase();
+
+                // Cas explicites: si le libellé ou la référence indique un retrait/sortie,
+                // il s'agit d'une sortie de caisse => crédit
+                const looksLikeRetrait = libelleLower.includes('retrait') || libelleLower.includes('retrait -') || refLower.startsWith('ret') || refLower.includes('ret-') || sens.includes('sortie');
+
+                if (looksLikeRetrait) {
+                  montant_credit = val >= 0 ? val : Math.abs(val);
+                } else if (sens.includes('d') || sens.includes('debit')) {
+                  montant_debit = val >= 0 ? val : Math.abs(val);
+                } else if (sens.includes('c') || sens.includes('credit')) {
+                  montant_credit = val >= 0 ? val : Math.abs(val);
+                } else {
+                  // Si pas de sens explicite, déduire par le signe: négatif => crédit
+                  if (val < 0) {
+                    montant_credit = Math.abs(val);
+                  } else {
+                    montant_debit = val;
+                  }
+                }
+              } else {
+                // Fallback aux champs entree/sortie ou montant_debit/montant_credit
+                montant_debit = parseFloat(operation.entree ?? operation.montant_debit) || 0;
+                montant_credit = parseFloat(operation.sortie ?? operation.montant_credit) || 0;
+                // Si un des deux est négatif, normaliser en valeur absolue
+                if (montant_debit < 0) {
+                  montant_debit = Math.abs(montant_debit);
+                }
+                if (montant_credit < 0) {
+                  montant_credit = Math.abs(montant_credit);
+                }
+
+                // Appliquer heuristique: si le libellé ou la référence indique un retrait/sortie
+                // mais les données sont dans `entree`, basculer vers crédit.
+                const libelleLowerFallback = (operation.libelle || operation.libelle_mouvement || '').toString().toLowerCase();
+                const refLowerFallback = (operation.ref || operation.reference_operation || '').toString().toLowerCase();
+                const looksLikeRetraitFallback = libelleLowerFallback.includes('retrait') || libelleLowerFallback.includes('sortie') || refLowerFallback.startsWith('ret') || refLowerFallback.includes('ret-');
+
+                if (looksLikeRetraitFallback && montant_debit > 0 && montant_credit === 0) {
+                  montant_credit = montant_debit;
+                  montant_debit = 0;
+                }
+              }
+
               // Créer un mouvement pour chaque opération
               const mouvement: CaisseMovement = {
                 numero_compte: operation.numero_compte || '',
                 tiers_nom: operation.tiers || operation.tiers_nom || '',
                 libelle_mouvement: operation.libelle || operation.libelle_mouvement || '',
                 reference_operation: operation.ref || operation.reference_operation || '',
-                montant_debit: parseFloat(operation.entree || operation.montant_debit) || 0,
-                montant_credit: parseFloat(operation.sortie || operation.montant_credit) || 0,
+                montant_debit: montant_debit,
+                montant_credit: montant_credit,
                 type_versement: groupe.type || operation.type_versement || 'ESPECE',
                 code_caisse: operation.code_caisse || '',
                 code_agence: filters.code_agence,
                 date_mouvement: operation.date || operation.date_mouvement || ''
               };
-              
+
               console.log(`Mouvement ${opIndex + 1} transformé:`, mouvement);
               mouvements.push(mouvement);
             });

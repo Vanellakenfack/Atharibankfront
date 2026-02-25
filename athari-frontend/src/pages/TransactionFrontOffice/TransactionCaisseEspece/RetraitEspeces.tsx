@@ -39,6 +39,7 @@ import {
   Radio,
   RadioGroup,
   FormLabel,
+  Tooltip,
 } from '@mui/material';
 import {
   CheckCircle,
@@ -66,15 +67,12 @@ import {
 } from '@mui/icons-material';
 
 import logo from '../../../assets/img/logo.png';
-// Import pour génération PDF
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
-// --- IMPORT DES COMPOSANTS DE LAYOUT ---
 import Sidebar from '../../../components/layout/Sidebar';
 import TopBar from '../../../components/layout/TopBar';
 
-// --- IMPORT DES SERVICES ---
 import retraitService, { 
   RetraitService,
   type BilletageItem, 
@@ -86,9 +84,31 @@ import agenceService, { type Agence as AgenceApi } from '../../../services/agenc
 import guichetService from '../../../services/guichetService';
 import caisseService from '../../../services/caisseService';
 import ApiClient from '../../../services/api/ApiClient';
-import type { color } from 'html2canvas/dist/types/css/types/color';
 
-// --- INTERFACES ---
+// --- INTERFACES AJOUTÉES POUR LA VALIDATION ---
+interface DemandeValidationData {
+  compte_id: number;
+  montant: number;
+  motif?: string;
+  caisse_id: number;
+  agence_id: number;
+  guichet_id: number;
+}
+
+interface ValidationResponse {
+  success: boolean;
+  demande_id: number;
+  message: string;
+  code_expiration?: string;
+}
+
+interface VerificationResponse {
+  valid: boolean;
+  message: string;
+  demande_id?: number;
+}
+
+// --- INTERFACES EXISTANTES ---
 interface Guichet {
   id: number;
   agence_id: number;
@@ -194,7 +214,6 @@ interface Mandataire {
   lieu_delivrance_piece?: string;
 }
 
-// Interface pour les données du reçu
 interface ReceiptData {
   reference: string;
   date: string;
@@ -211,31 +230,10 @@ interface ReceiptData {
   billetage?: BilletageItem[];
 }
 
-// Interface pour le retrait à distance
-interface RetraitDistanceData {
-  numeroCompte: string;
-  montant: string;
-  procurationFile: File | null;
-  demandeRetraitFile: File | null;
-  nomGestionnaire: string;
-  prenomGestionnaire: string;
-  codeGestionnaire: string;
+interface SuccessModalData {
+  open: boolean;
+  transactionData?: ReceiptData;
 }
-
-// Fonction utilitaire pour obtenir le nom complet du mandataire
-const getMandataireNomComplet = (mandataire: Mandataire): string => {
-  return `${mandataire.prenom || ''} ${mandataire.nom || ''}`.trim();
-};
-
-// Fonction utilitaire pour obtenir le type de pièce (par défaut CNI)
-const getMandataireTypePiece = (mandataire: Mandataire): string => {
-  return mandataire.type_piece || 'CNI';
-};
-
-// Fonction utilitaire pour obtenir le numéro de pièce
-const getMandataireNumeroPiece = (mandataire: Mandataire): string => {
-  return mandataire.numero_piece || mandataire.numero_cni || '';
-};
 
 interface PlanComptable {
   id: number;
@@ -261,9 +259,7 @@ interface Compte {
   };
 }
 
-// Interface pour retrait
 interface RetraitFormData {
-  // Onglet Retrait Espèces
   agenceCode: string;
   selectedAgence: string;
   guichet: string;
@@ -283,24 +279,16 @@ interface RetraitFormData {
   commissions: string;
   taxes: string;
   refLettrage: string;
-  
-  // Bordereau pour retrait
   numero_bordereau: string;
   type_bordereau: string;
-  
-  // Onglet Porteur - Type de porteur
   typePorteur: 'client' | 'mandataire' | 'autre';
   selectedMandataireId: string;
-  
-  // Informations porteur
   nomPorteur: string;
   adresse: string;
   typeId: string;
   numeroId: string;
   delivreLe: string;
   delivreA: string;
-  
-  // Calculs
   soldeComptable: string;
   indisponible: string;
   netAEncaisser: string;
@@ -311,12 +299,6 @@ interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
   value: number;
-}
-
-// Interface pour les données de la modal de succès
-interface SuccessModalData {
-  open: boolean;
-  transactionData?: ReceiptData;
 }
 
 // --- COMPOSANTS STYLISÉS ---
@@ -407,22 +389,6 @@ const SignatureContainer = styled(Box)({
   minHeight: 100,
 });
 
-// Composant pour l'upload de fichiers
-const FileUploadBox = styled(Box)({
-  border: '2px dashed #1976D2',
-  borderRadius: 8,
-  padding: 24,
-  textAlign: 'center',
-  backgroundColor: '#f8f9fa',
-  cursor: 'pointer',
-  transition: 'all 0.3s ease',
-  '&:hover': {
-    backgroundColor: '#e3f2fd',
-    borderColor: '#0D47A1',
-  },
-});
-
-// Constante pour l'URL de l'API
 const API_BASE_URL = ApiClient;
 
 // --- FONCTIONS UTILITAIRES ---
@@ -446,7 +412,6 @@ const formatDateTime = (dateString: string) => {
   return date.toLocaleDateString('fr-FR') + ' ' + date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 };
 
-// Fonction pour générer une référence unique
 const generateReference = (type: 'RET' | 'VER' = 'RET'): string => {
   const now = new Date();
   const year = now.getFullYear();
@@ -455,14 +420,11 @@ const generateReference = (type: 'RET' | 'VER' = 'RET'): string => {
   const hours = String(now.getHours()).padStart(2, '0');
   const minutes = String(now.getMinutes()).padStart(2, '0');
   const seconds = String(now.getSeconds()).padStart(2, '0');
-  
-  // Générer un identifiant aléatoire de 4 caractères
   const randomId = Math.random().toString(36).substring(2, 6).toUpperCase();
   
   return `${type}-${year}${month}${day}${hours}${minutes}${seconds}-${randomId}`;
 };
 
-// Fonction pour convertir un nombre en lettres (français)
 const numberToFrenchWords = (num: number): string => {
   const units = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf'];
   const teens = ['dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'dix-sept', 'dix-huit', 'dix-neuf'];
@@ -472,7 +434,6 @@ const numberToFrenchWords = (num: number): string => {
   
   let result = '';
   
-  // Convertir les millions
   if (num >= 1000000) {
     const millions = Math.floor(num / 1000000);
     result += numberToFrenchWords(millions) + ' million';
@@ -481,7 +442,6 @@ const numberToFrenchWords = (num: number): string => {
     if (num > 0) result += ' ';
   }
   
-  // Convertir les milliers
   if (num >= 1000) {
     const thousands = Math.floor(num / 1000);
     if (thousands === 1) {
@@ -493,7 +453,6 @@ const numberToFrenchWords = (num: number): string => {
     if (num > 0) result += ' ';
   }
   
-  // Convertir les centaines
   if (num >= 100) {
     const hundreds = Math.floor(num / 100);
     if (hundreds === 1) {
@@ -505,7 +464,6 @@ const numberToFrenchWords = (num: number): string => {
     if (num > 0) result += ' ';
   }
   
-  // Convertir les dizaines et unités
   if (num >= 10) {
     if (num >= 10 && num < 20) {
       result += teens[num - 10];
@@ -515,7 +473,6 @@ const numberToFrenchWords = (num: number): string => {
       const unit = num % 10;
       
       if (ten === 7 || ten === 9) {
-        // Soixante-dix ou quatre-vingt-dix
         const base = ten === 7 ? 60 : 80;
         const remainder = num - base;
         if (remainder === 0) {
@@ -541,7 +498,6 @@ const numberToFrenchWords = (num: number): string => {
     }
   }
   
-  // Convertir les unités
   if (num > 0) {
     result += units[num];
   }
@@ -565,7 +521,7 @@ const TabPanel: React.FC<TabPanelProps> = (props) => {
 };
 
 const RetraitEspeces: React.FC = () => {
-  const navigate = useNavigate(); // Ajoutez cette ligne
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
   const [tabValue, setTabValue] = useState<number>(0);
   const [agences, setAgences] = useState<AgenceApi[]>([]);
@@ -583,6 +539,13 @@ const RetraitEspeces: React.FC = () => {
     severity: 'success' as 'success' | 'error' | 'warning' | 'info' 
   });
   
+  // NOUVEAUX ÉTATS
+  const [transactionStatus, setTransactionStatus] = useState<'idle' | 'pending' | 'validating' | 'success' | 'error'>('idle');
+  const [backendMessage, setBackendMessage] = useState<string>('');
+  const [backendError, setBackendError] = useState<string>('');
+  const [validationRequired, setValidationRequired] = useState<boolean>(false);
+  const [needsSupervisorValidation, setNeedsSupervisorValidation] = useState<boolean>(false);
+
   // États pour les comptes
   const [comptes, setComptes] = useState<Compte[]>([]);
   const [loadingComptes, setLoadingComptes] = useState<boolean>(false);
@@ -600,8 +563,6 @@ const RetraitEspeces: React.FC = () => {
   ]);
   
   const [calculating, setCalculating] = useState<boolean>(false);
-  const [billetageError, setBilletageError] = useState<string>('');
-  const [montantADiviser, setMontantADiviser] = useState<string>('0');
   
   // États pour la validation
   const [validationCode, setValidationCode] = useState<string>('');
@@ -614,27 +575,19 @@ const RetraitEspeces: React.FC = () => {
   const [photoUrl, setPhotoUrl] = useState<string>('');
   const [signatureUrl, setSignatureUrl] = useState<string>('');
 
-  // État pour la modal de succès
   const [successModal, setSuccessModal] = useState<SuccessModalData>({
     open: false,
     transactionData: undefined,
   });
 
-  // État pour le chargement du téléchargement
   const [downloading, setDownloading] = useState<boolean>(false);
-
-  // Référence pour le reçu caché
+  const [lastSuccessfulTransaction, setLastSuccessfulTransaction] = useState<ReceiptData | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
-
-  // État pour le retrait à distance
-
-  // États pour la validation du CNI
   const [clientRealCni, setClientRealCni] = useState<string>('');
   const [cniValidationError, setCniValidationError] = useState<string>('');
 
   // Initialisation avec RetraitFormData
   const [formData, setFormData] = useState<RetraitFormData>({
-    // Onglet Retrait Espèces
     agenceCode: '',
     selectedAgence: '',
     guichet: '',
@@ -654,12 +607,8 @@ const RetraitEspeces: React.FC = () => {
     commissions: '0',
     taxes: '0',
     refLettrage: '',
-    
-    // Bordereau pour retrait
     numero_bordereau: '',
     type_bordereau: 'RETRAIT',
-    
-    // Onglet Porteur
     typePorteur: 'client',
     selectedMandataireId: '',
     nomPorteur: '',
@@ -668,203 +617,309 @@ const RetraitEspeces: React.FC = () => {
     numeroId: '',
     delivreLe: '',
     delivreA: '',
-    
-    // Calculs
     soldeComptable: '0',
     indisponible: '0',
     netAEncaisser: '0',
     netADebiter: '0',
   });
 
-  // Fonction pour générer et télécharger le reçu PDF simplifié
+  // --- NOUVELLES FONCTIONS API POUR LA VALIDATION ---
+
+  /**
+   * Route 1: Demander une validation au backend
+   * POST /retraits/demandes-validation
+   */
+  const demanderValidation = async (data: DemandeValidationData): Promise<ValidationResponse> => {
+    try {
+      const response = await ApiClient.post('/retraits/demandes-validation', data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Erreur demande validation:', error);
+      throw error;
+    }
+  };
+
+  /**
+   * Route 2: Vérifier un code de validation
+   * POST /retraits/demandes-validation/{id}/verifier
+   */
+  const verifierCodeValidation = async (demandeId: number, code: string): Promise<VerificationResponse> => {
+    try {
+      const response = await ApiClient.post(`/retraits/demandes-validation/${demandeId}/verifier`, { code });
+      return response.data;
+    } catch (error: any) {
+      console.error('Erreur vérification code:', error);
+      throw error;
+    }
+  };
+
+  // FONCTIONS DE VÉRIFICATION DES PLAFONDS
+  const checkPlafondCaissiere = (): { ok: boolean; message: string } => {
+    if (!formData.selectedAgence || !formData.guichet || !formData.caisse) {
+      return { ok: false, message: 'Veuillez sélectionner une agence, un guichet et une caisse' };
+    }
+    
+    const selectedCaisse = caisses.find(c => c.id.toString() === formData.caisse);
+    if (!selectedCaisse) {
+      return { ok: false, message: 'Caisse non trouvée' };
+    }
+    
+    const montant = parseFloat(formData.montant) || 0;
+    const plafondCaissiere = parseFloat(selectedCaisse.plafond_autonomie_caissiere) || 0;
+    
+    if (montant > plafondCaissiere) {
+      const message = `Le montant (${formatCurrency(formData.montant)} FCFA) dépasse votre plafond d'autonomie (${formatCurrency(plafondCaissiere.toString())} FCFA). Validation requise par l'assistant comptable.`;
+      console.log('Plafond dépassé:', message);
+      return { ok: false, message };
+    }
+    
+    return { ok: true, message: 'Plafond respecté' };
+  };
+
+  const checkSoldeCaisse = (): { ok: boolean; message: string } => {
+    const selectedCaisse = caisses.find(c => c.id.toString() === formData.caisse);
+    if (!selectedCaisse) {
+      return { ok: false, message: 'Caisse non trouvée' };
+    }
+    
+    const montant = parseFloat(formData.montant) || 0;
+    const soldeCaisse = parseFloat(selectedCaisse.solde_actuel) || 0;
+    
+    if (montant > soldeCaisse) {
+      const message = `Solde caisse insuffisant. Disponible: ${formatCurrency(soldeCaisse.toString())} FCFA, Montant demandé: ${formatCurrency(formData.montant)} FCFA`;
+      return { ok: false, message };
+    }
+    
+    return { ok: true, message: 'Solde caisse suffisant' };
+  };
+
+  const checkSoldeCompte = (): { ok: boolean; message: string } => {
+    const soldeCompte = parseFloat(formData.soldeComptable) || 0;
+    const montantTotal = parseFloat(formData.netADebiter) || 0;
+    
+    if (montantTotal > soldeCompte) {
+      const message = `Solde compte insuffisant. Disponible: ${formatCurrency(soldeCompte.toString())} FCFA, Montant à débiter: ${formatCurrency(montantTotal.toString())} FCFA`;
+      return { ok: false, message };
+    }
+    
+    return { ok: true, message: 'Solde compte suffisant' };
+  };
+
+  // Préparer les données du reçu
+  const prepareReceiptData = (): ReceiptData => {
+    const selectedAgence = agences.find(a => a.id.toString() === formData.selectedAgence);
+    const selectedGuichet = guichets.find(g => g.id.toString() === formData.guichet);
+    const caissierId = "Caissier";
+    
+    return {
+      reference: generateReference('RET'),
+      date: formatDateTime(new Date().toISOString()),
+      compte: formData.compte,
+      titulaire: formData.client,
+      porteur: formData.nomPorteur,
+      pieceId: `${formData.typeId} - ${formData.numeroId}`,
+      montant: formData.montant,
+      caissierId: caissierId,
+      typeOperation: 'RETRAIT' as const,
+      agence: selectedAgence?.name,
+      guichet: selectedGuichet?.nom_guichet,
+      motif: formData.motif,
+      billetage: billetage.filter(item => item.quantite > 0),
+    };
+  };
+
+  // Générer le reçu PDF
   const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
     try {
       setDownloading(true);
       
-      // Créer un élément temporaire pour le reçu
       const receiptElement = document.createElement('div');
       receiptElement.style.position = 'absolute';
       receiptElement.style.left = '-9999px';
       receiptElement.style.top = '0';
-      receiptElement.style.width = '210mm'; // A4 width
-      receiptElement.style.minHeight = '150mm'; // Hauteur réduite
+      receiptElement.style.width = '150mm';
+      receiptElement.style.minHeight = 'auto';
+      receiptElement.style.maxWidth = '150mm';
       receiptElement.style.backgroundColor = 'white';
-      receiptElement.style.padding = '10mm';
-      receiptElement.style.fontFamily = "'Arial', sans-serif";
+      receiptElement.style.padding = '5mm';
+      receiptElement.style.fontFamily = "'Courier New', monospace";
       receiptElement.style.color = '#000';
-      receiptElement.style.fontSize = '12px';
-      receiptElement.style.lineHeight = '1.3';
+      receiptElement.style.fontSize = '9px';
+      receiptElement.style.lineHeight = '1.1';
+      receiptElement.style.wordWrap = 'break-word';
+      receiptElement.style.overflowWrap = 'break-word';
       
-      // Convertir le montant en lettres
       const montantNumerique = parseFloat(receiptData.montant.replace(/\s/g, '')) || 0;
       const montantEnLettres = numberToFrenchWords(montantNumerique).toUpperCase();
       
-      // Contenu HTML du reçu simplifié
       receiptElement.innerHTML = `
-        <div style="text-align: center; margin-bottom: 15px; border-bottom: 2px solid #1976d2; padding-bottom: 10px;">
-          <div style="display: inline-block; width: 60px; height: 60px; margin-right: 10px; vertical-align: middle;">
-            <img src="${logo}" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;" />
-          </div>
-          <div style="display: inline-block; vertical-align: middle; text-align: left;">
-            <div style="font-size: 16px; font-weight: bold; color: #1976d2; margin-bottom: 2px;">
-              ATHARI FINANCIAL COOP-CA
+        <div style="text-align: center; margin-bottom: 5px; border-bottom: 1px solid #000; padding-bottom: 3px;">
+          <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 2px;">
+            <div style="width: 20mm; height: 20mm; margin-right: 5mm;">
+              <img src="${logo}" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;" />
             </div>
-            <div style="font-size: 11px; color: #666;">
-              Coopérative d'Épargne et de Crédit
+            <div style="text-align: left;">
+              <div style="font-size: 12px; font-weight: bold; margin-bottom: 1px; text-transform: uppercase;">
+                ATHARI FINANCIAL COOP-CA
+              </div>
+              <div style="font-size: 8px; margin-bottom: 2px;">
+                Coopérative d'Épargne et de Crédit
+              </div>
+              <div style="font-size: 7px; border-top: 1px dashed #ccc; padding-top: 2px; margin-top: 2px;">
+                Tél: XX XX XX XX - Email: contact@athari.bf
+              </div>
             </div>
           </div>
         </div>
         
-        <div style="text-align: center; margin-bottom: 20px;">
-          <div style="font-size: 14px; font-weight: bold; color: #d32f2f; margin-bottom: 5px;">
+        <div style="text-align: center; margin-bottom: 5px;">
+          <div style="font-size: 10px; font-weight: bold; margin-bottom: 2px; text-decoration: underline;">
             REÇU DE RETRAIT D'ESPÈCES
           </div>
-          <div style="font-size: 11px; color: #666;">
-            Référence: <strong>${receiptData.reference}</strong>
-          </div>
-          <div style="font-size: 11px; color: #666;">
-            Date: ${receiptData.date}
+          <div style="display: flex; justify-content: space-between; font-size: 8px; margin-bottom: 1px;">
+            <span>Réf: ${receiptData.reference}</span>
+            <span>${receiptData.date}</span>
           </div>
         </div>
         
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px;">
-          <tr>
-            <td style="width: 35%; padding: 5px 0; font-weight: bold;">Compte:</td>
-            <td style="padding: 5px 0;">${receiptData.compte}</td>
-          </tr>
-          <tr>
-            <td style="width: 35%; padding: 5px 0; font-weight: bold;">Titulaire:</td>
-            <td style="padding: 5px 0;">${receiptData.titulaire}</td>
-          </tr>
-          <tr>
-            <td style="width: 35%; padding: 5px 0; font-weight: bold;">Porteur:</td>
-            <td style="padding: 5px 0;">${receiptData.porteur}</td>
-          </tr>
-          <tr>
-            <td style="width: 35%; padding: 5px 0; font-weight: bold;">Pièce d'identité:</td>
-            <td style="padding: 5px 0;">${receiptData.pieceId}</td>
-          </tr>
-          ${receiptData.agence ? `
-          <tr>
-            <td style="width: 35%; padding: 5px 0; font-weight: bold;">Agence:</td>
-            <td style="padding: 5px 0;">${receiptData.agence}</td>
-          </tr>
-          ` : ''}
-        </table>
-        
-        <div style="border: 2px solid #1976d2; border-radius: 4px; padding: 10px; margin-bottom: 15px; background-color: #f8f9fa;">
-          <div style="text-align: center; font-weight: bold; color: #1976d2; margin-bottom: 10px; font-size: 12px;">
-            DÉTAILS DU MONTANT
+        <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+          <div style="flex: 1; font-size: 8px;">
+            <div style="display: flex; margin-bottom: 1px;">
+              <span style="min-width: 30mm;">Compte:</span>
+              <span style="font-weight: bold;">${receiptData.compte}</span>
+            </div>
+            <div style="display: flex; margin-bottom: 1px;">
+              <span style="min-width: 30mm;">Titulaire:</span>
+              <span>${receiptData.titulaire}</span>
+            </div>
+            ${receiptData.agence ? `
+            <div style="display: flex; margin-bottom: 1px;">
+              <span style="min-width: 30mm;">Agence:</span>
+              <span>${receiptData.agence}</span>
+            </div>
+            ` : ''}
           </div>
-          <div style="text-align: center;">
-            <div style="font-size: 18px; font-weight: bold; color: #d32f2f; margin-bottom: 5px;">
-              ${formatCurrency(receiptData.montant)} FCFA
+          
+          <div style="flex: 1; font-size: 8px;">
+            <div style="display: flex; margin-bottom: 1px;">
+              <span style="min-width: 30mm;">Porteur:</span>
+              <span>${receiptData.porteur}</span>
             </div>
-            <div style="font-size: 11px; font-style: italic; color: #666; margin-bottom: 10px;">
-              ${montantEnLettres} FRANCS CFA
+            <div style="display: flex; margin-bottom: 1px;">
+              <span style="min-width: 30mm;">Pièce:</span>
+              <span>${receiptData.pieceId}</span>
             </div>
+            ${receiptData.guichet ? `
+            <div style="display: flex; margin-bottom: 1px;">
+              <span style="min-width: 30mm;">Guichet:</span>
+              <span>${receiptData.guichet}</span>
+            </div>
+            ` : ''}
+            ${receiptData.motif ? `
+            <div style="display: flex; margin-bottom: 1px;">
+              <span style="min-width: 30mm;">Motif:</span>
+              <span>${receiptData.motif}</span>
+            </div>
+            ` : ''}
           </div>
         </div>
         
-        <!-- Tableau billetage compact -->
+        <div style="border: 1px solid #000; padding: 3px; margin-bottom: 5px; text-align: center;">
+          <div style="font-size: 9px; font-weight: bold; margin-bottom: 2px;">
+            MONTANT DU RETRAIT
+          </div>
+          <div style="font-size: 14px; font-weight: bold; margin-bottom: 2px;">
+            ${formatCurrency(receiptData.montant)} FCFA
+          </div>
+          <div style="font-size: 7px; font-style: italic;">
+            (${montantEnLettres.substring(0, 60)}${montantEnLettres.length > 60 ? '...' : ''})
+          </div>
+        </div>
+        
         ${receiptData.billetage && receiptData.billetage.some(item => item.quantite > 0) ? `
-        <div style="margin-bottom: 15px;">
-          <div style="font-weight: bold; color: #1976d2; margin-bottom: 5px; font-size: 11px; text-align: center;">
+        <div style="margin-bottom: 5px;">
+          <div style="font-size: 8px; font-weight: bold; text-align: center; margin-bottom: 2px; border-bottom: 1px dashed #666; padding-bottom: 1px;">
             COMPOSITION DU BILLETAGE
           </div>
-          <table style="width: 100%; border-collapse: collapse; font-size: 10px; border: 1px solid #ddd;">
-            <thead>
-              <tr style="background-color: #f5f5f5;">
-                <th style="padding: 4px; text-align: left; border-bottom: 1px solid #ddd;">Coupure</th>
-                <th style="padding: 4px; text-align: center; border-bottom: 1px solid #ddd;">Qté</th>
-                <th style="padding: 4px; text-align: right; border-bottom: 1px solid #ddd;">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${receiptData.billetage
-                .filter(item => item.quantite > 0)
-                .map(item => `
-                  <tr>
-                    <td style="padding: 4px; border-bottom: 1px solid #eee;">${item.valeur.toLocaleString()} FCFA</td>
-                    <td style="padding: 4px; text-align: center; border-bottom: 1px solid #eee;">${item.quantite}</td>
-                    <td style="padding: 4px; text-align: right; border-bottom: 1px solid #eee; font-weight: 500;">${(item.valeur * item.quantite).toLocaleString()} FCFA</td>
-                  </tr>
-                `).join('')}
-              <tr style="background-color: #f9f9f9; font-weight: bold;">
-                <td style="padding: 4px; border-top: 2px solid #ddd;" colspan="2">TOTAL:</td>
-                <td style="padding: 4px; text-align: right; border-top: 2px solid #ddd; color: #1976d2;">
-                  ${receiptData.billetage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0).toLocaleString()} FCFA
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div style="font-size: 7px; display: flex; flex-wrap: wrap; gap: 10px;">
+            ${receiptData.billetage
+              .filter(item => item.quantite > 0)
+              .map(item => `
+                <div style="flex: 1; min-width: 45mm; display: flex; justify-content: space-between; margin-bottom: 1px;">
+                  <span>${item.valeur.toLocaleString()} FCFA × ${item.quantite}</span>
+                  <span>${(item.valeur * item.quantite).toLocaleString()} FCFA</span>
+                </div>
+              `).join('')}
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 2px; border-top: 1px dashed #666; padding-top: 2px; font-weight: bold; font-size: 8px;">
+            <span>TOTAL BILLETAGE:</span>
+            <span>${receiptData.billetage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0).toLocaleString()} FCFA</span>
+          </div>
         </div>
         ` : ''}
         
-        <!-- Signatures -->
-        <div style="margin-top: 25px; padding-top: 10px; border-top: 1px solid #ddd;">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-            <div style="text-align: center; flex: 1;">
-              <div style="height: 40px; margin-bottom: 5px; border-bottom: 1px solid #999; position: relative;">
-                <div style="position: absolute; bottom: 5px; left: 0; right: 0; height: 1px; background-color: #999;"></div>
-              </div>
-              <div style="font-size: 10px; font-weight: bold; color: #333;">Signature du porteur</div>
-            </div>
-            <div style="width: 30px;"></div>
-            <div style="text-align: center; flex: 1;">
-              <div style="height: 40px; margin-bottom: 5px; border-bottom: 1px solid #999; position: relative;">
-                <div style="position: absolute; bottom: 5px; left: 0; right: 0; height: 1px; background-color: #999;"></div>
-              </div>
-              <div style="font-size: 10px; font-weight: bold; color: #333;">Signature & cachet</div>
-            </div>
-          </div>
-          
-          <div style="text-align: center; font-size: 10px; color: #666; margin-top: 10px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 7px;">
+          <div>
             <div>Caissier: ${receiptData.caissierId}</div>
-            <div style="margin-top: 5px; font-size: 9px;">
-              Document généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-            </div>
+          </div>
+          <div>
+            <div>Généré le: ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div>
           </div>
         </div>
         
-        <!-- Note -->
-        <div style="margin-top: 15px; padding: 8px; background-color: #f5f5f5; border-radius: 3px; border-left: 3px solid #1976d2; font-size: 9px; color: #666;">
-          <strong>NOTE:</strong> Ce reçu fait foi de transaction. Conservez-le précieusement.
+        <div style="border-top: 1px dashed #000; margin: 5px 0; padding-top: 3px; text-align: center; font-size: 6px;">
+          --------------------------------
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+          <div style="text-align: center; width: 48%;">
+            <div style="border-bottom: 1px solid #000; height: 20px; margin-bottom: 2px;"></div>
+            <div style="font-size: 7px;">Signature du porteur</div>
+          </div>
+          <div style="text-align: center; width: 48%;">
+            <div style="border-bottom: 1px solid #000; height: 20px; margin-bottom: 2px;"></div>
+            <div style="font-size: 7px;">Signature & cachet</div>
+          </div>
+        </div>
+        
+        <div style="text-align: center; font-size: 6px; color: #666; border-top: 1px dashed #ccc; padding-top: 2px;">
+          <div>Conservez ce reçu comme preuve de transaction</div>
+          <div>Merci de votre confiance !</div>
         </div>
       `;
       
-      // Ajouter l'élément au DOM
       document.body.appendChild(receiptElement);
       
-      // Générer le PDF
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: [150, 100],
+      });
+      
       const canvas = await html2canvas(receiptElement, {
-        scale: 2,
+        scale: 3,
         useCORS: true,
         logging: false,
         backgroundColor: '#FFFFFF',
+        width: 150 * 3.78,
+        height: receiptElement.scrollHeight,
       });
       
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
       
-      const imgWidth = 190; // Largeur réduite pour marges
+      const pageWidth = 150;
+      const pageHeight = 100;
+      const imgWidth = pageWidth - 10;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       
-      // Positionner l'image au centre de la page
-      const xPos = (210 - imgWidth) / 2; // Centrer horizontalement
-      const yPos = 10; // Marge supérieure réduite
+      const xPos = 5;
+      const yPos = 5;
       
       pdf.addImage(imgData, 'PNG', xPos, yPos, imgWidth, imgHeight);
       
-      // Télécharger le PDF
       const fileName = `Retrait-${receiptData.reference}.pdf`;
       pdf.save(fileName);
       
-      // Nettoyer
       document.body.removeChild(receiptElement);
       
       showSnackbar('Reçu PDF généré avec succès', 'success');
@@ -877,9 +932,35 @@ const RetraitEspeces: React.FC = () => {
     }
   };
 
-  // Fonction pour télécharger le reçu
   const downloadReceipt = async (receiptData: ReceiptData) => {
     await generateAndDownloadReceipt(receiptData);
+  };
+
+  const openPrintModal = () => {
+    if (lastSuccessfulTransaction) {
+      setSuccessModal({
+        open: true,
+        transactionData: lastSuccessfulTransaction,
+      });
+    } else {
+      showSnackbar('Aucune transaction récente à imprimer', 'warning');
+    }
+  };
+
+  const openSuccessModal = (transactionData: any) => {
+    const receiptData = prepareReceiptData();
+    setLastSuccessfulTransaction(receiptData);
+    setSuccessModal({
+      open: true,
+      transactionData: receiptData,
+    });
+  };
+
+  const closeSuccessModal = () => {
+    setSuccessModal({
+      open: false,
+      transactionData: undefined,
+    });
   };
 
   // Fonction pour charger les informations du client
@@ -911,16 +992,13 @@ const RetraitEspeces: React.FC = () => {
       const morale = client.morale;
       nomClient = morale.raison_sociale || client.nom_complet;
       adresse = `${client.adresse_quartier || ''}, ${client.adresse_ville || ''}`;
-      // Pour les clients moraux, on prend le nom du représentant comme porteur par défaut
       if (formData.typePorteur === 'client' && morale.nom_representant) {
         nomClient = morale.nom_representant;
       }
     }
     
-    // Stocker le vrai CNI dans l'état
     setClientRealCni(realCni);
     
-    // Mise à jour des informations du porteur si c'est le client
     if (formData.typePorteur === 'client') {
       setFormData(prev => ({
         ...prev,
@@ -932,12 +1010,10 @@ const RetraitEspeces: React.FC = () => {
         delivreA: delivreA,
       }));
       
-      // Charger la photo si disponible
       if (photo) {
         setPhotoUrl(photo);
       }
       
-      // Charger la signature du compte si disponible
       if (compte.signature_path) {
         const fullSignatureUrl = compte.signature_path.startsWith('http') 
           ? compte.signature_path 
@@ -954,18 +1030,10 @@ const RetraitEspeces: React.FC = () => {
     const mandataire = compteDetails.mandataires.find(m => m.id.toString() === mandataireId);
     if (!mandataire) return;
     
-    console.log('Chargement mandataire:', mandataire);
-    
-    // Utiliser les fonctions utilitaires pour obtenir les informations
     const nomComplet = getMandataireNomComplet(mandataire);
     const typePiece = getMandataireTypePiece(mandataire);
     const numeroPiece = getMandataireNumeroPiece(mandataire);
     
-    console.log('Nom complet mandataire:', nomComplet);
-    console.log('Type pièce:', typePiece);
-    console.log('Numéro pièce:', numeroPiece);
-    
-    // Stocker le vrai numéro de pièce
     setClientRealCni(numeroPiece);
     
     setFormData(prev => ({
@@ -978,7 +1046,6 @@ const RetraitEspeces: React.FC = () => {
       delivreA: mandataire.lieu_delivrance_piece || mandataire.lieu_naissance || '',
     }));
     
-    // Charger la photo du mandataire si disponible
     if (mandataire.photo_url) {
       setPhotoUrl(mandataire.photo_url);
     } else if (mandataire.photo) {
@@ -990,7 +1057,6 @@ const RetraitEspeces: React.FC = () => {
       setPhotoUrl('');
     }
     
-    // Charger la signature du mandataire si disponible
     if (mandataire.signature_url) {
       setSignatureUrl(mandataire.signature_url);
     } else if (mandataire.signature_path) {
@@ -1005,22 +1071,18 @@ const RetraitEspeces: React.FC = () => {
 
   // Fonction pour valider le CNI saisi
   const validateCni = (): boolean => {
-    // Réinitialiser l'erreur
     setCniValidationError('');
     
-    // Si on n'a pas de vrai CNI stocké, on ne peut pas valider
     if (!clientRealCni || clientRealCni.trim() === '') {
       console.log('Aucun CNI stocké pour validation');
-      return true; // Pas de validation nécessaire
+      return true;
     }
     
-    // Si l'utilisateur n'a rien saisi
     if (!formData.numeroId || formData.numeroId.trim() === '') {
       setCniValidationError('Veuillez saisir le numéro de pièce');
       return false;
     }
     
-    // Comparer les deux valeurs (sans tenir compte de la casse et des espaces)
     const enteredCni = formData.numeroId.trim();
     const storedCni = clientRealCni.trim();
     
@@ -1039,29 +1101,38 @@ const RetraitEspeces: React.FC = () => {
     return true;
   };
 
+  // Fonction utilitaire pour obtenir le nom complet du mandataire
+  const getMandataireNomComplet = (mandataire: Mandataire): string => {
+    return `${mandataire.prenom || ''} ${mandataire.nom || ''}`.trim();
+  };
+
+  // Fonction utilitaire pour obtenir le type de pièce
+  const getMandataireTypePiece = (mandataire: Mandataire): string => {
+    return mandataire.type_piece || 'CNI';
+  };
+
+  // Fonction utilitaire pour obtenir le numéro de pièce
+  const getMandataireNumeroPiece = (mandataire: Mandataire): string => {
+    return mandataire.numero_piece || mandataire.numero_cni || '';
+  };
+
   // Effet pour charger les informations quand le type de porteur change
   useEffect(() => {
     console.log('Type porteur changé:', formData.typePorteur);
-    console.log('Compte details:', compteDetails);
-    console.log('Mandataires disponibles:', compteDetails?.mandataires);
     
     if (!compteDetails) return;
     
-    // Réinitialiser la validation du CNI
     setCniValidationError('');
     setClientRealCni('');
     
     if (formData.typePorteur === 'client') {
-      // Réinitialiser les infos manuelles et charger les infos du client
       loadClientInfo(compteDetails);
     } else if (formData.typePorteur === 'mandataire') {
       console.log('Sélection mandataire ID:', formData.selectedMandataireId);
       
-      // Si un mandataire est sélectionné, charger ses infos
       if (formData.selectedMandataireId) {
         loadMandataireInfo(formData.selectedMandataireId);
       } else if (compteDetails.mandataires && compteDetails.mandataires.length > 0) {
-        // Sélectionner le premier mandataire par défaut
         const firstMandataire = compteDetails.mandataires[0];
         console.log('Premier mandataire par défaut:', firstMandataire);
         
@@ -1071,7 +1142,6 @@ const RetraitEspeces: React.FC = () => {
         }));
         loadMandataireInfo(firstMandataire.id.toString());
       } else {
-        // Pas de mandataire disponible
         console.log('Aucun mandataire disponible');
         setFormData(prev => ({
           ...prev,
@@ -1086,7 +1156,6 @@ const RetraitEspeces: React.FC = () => {
         setSignatureUrl('');
       }
     } else if (formData.typePorteur === 'autre') {
-      // Réinitialiser les champs pour saisie manuelle
       setFormData(prev => ({
         ...prev,
         selectedMandataireId: '',
@@ -1260,9 +1329,8 @@ const RetraitEspeces: React.FC = () => {
     
     const totalFrais = commissions + taxes;
     
-    // Pour un retrait, les frais sont ajoutés au montant à débiter
     const montantTotalADebiter = formData.fraisEnCompte ? montant : montant + totalFrais;
-    const netAEncaisser = montant; // Le porteur reçoit le montant brut
+    const netAEncaisser = montant;
     
     setFormData(prev => ({
       ...prev,
@@ -1328,7 +1396,7 @@ const RetraitEspeces: React.FC = () => {
         client: '',
         chapitre: '',
         soldeComptable: '0',
-        typePorteur: 'client', // Réinitialiser au client par défaut
+        typePorteur: 'client',
         selectedMandataireId: '',
       }));
       setPhotoUrl('');
@@ -1342,7 +1410,6 @@ const RetraitEspeces: React.FC = () => {
       setCompteDetails(compte);
       
       console.log('Compte sélectionné:', compte);
-      console.log('Mandataires du compte:', compte.mandataires);
       
       const client = compte.client;
       let nomClient = '';
@@ -1363,15 +1430,12 @@ const RetraitEspeces: React.FC = () => {
         client: nomClient,
         chapitre: chapitreLibelle,
         soldeComptable: compte.solde || '0',
-        typePorteur: 'client', // Par défaut le client est le porteur
+        typePorteur: 'client',
         selectedMandataireId: '',
-        numeroId: '', // Réinitialiser le champ de saisie du CNI
+        numeroId: '',
       }));
       
-      // Réinitialiser la validation
       setCniValidationError('');
-      
-      // Charger les infos du client
       loadClientInfo(compte);
       
       showSnackbar('Compte chargé avec succès', 'success');
@@ -1385,7 +1449,6 @@ const RetraitEspeces: React.FC = () => {
   const handleTypePorteurChange = (type: 'client' | 'mandataire' | 'autre') => {
     console.log('Changement type porteur vers:', type);
     
-    // Réinitialiser la validation
     setCniValidationError('');
     setClientRealCni('');
     
@@ -1399,7 +1462,7 @@ const RetraitEspeces: React.FC = () => {
       ...prev,
       typePorteur: type,
       selectedMandataireId: selectedMandataireId,
-      numeroId: '', // Réinitialiser le champ de saisie du CNI
+      numeroId: '',
     }));
   };
 
@@ -1409,46 +1472,38 @@ const RetraitEspeces: React.FC = () => {
     newBilletage[index] = { ...newBilletage[index], [field]: Math.max(0, value) };
     setBilletage(newBilletage);
     
-    // Réinitialiser l'erreur de billetage
-    setBilletageError('');
+    const total = newBilletage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0);
     
-    // Calculer le total du billetage
-    const totalBilletage = newBilletage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0);
-    
-    // Mettre à jour le montant à diviser
-    setMontantADiviser(totalBilletage.toString());
-    
-    // Si le total du billetage correspond au montant saisi, désactiver le champ "Montant à diviser"
-    if (formData.montant && Math.abs(totalBilletage - parseFloat(formData.montant)) < 1) {
-      setMontantADiviser('0');
-    }
+    setFormData(prev => ({
+      ...prev,
+      montant: total.toString()
+    }));
   };
 
-  // Fonction pour vérifier si le billetage correspond au montant
-  const verifyBilletage = () => {
-    const totalBilletage = billetage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0);
-    const montantSaisi = parseFloat(formData.montant) || 0;
+  // Calculer le billetage à partir du montant
+  const calculateBilletageFromAmount = (montantStr: string) => {
+    const montant = parseFloat(montantStr) || 0;
+    if (montant <= 0) return;
     
-    if (montantSaisi <= 0) {
-      setBilletageError('Veuillez d\'abord saisir un montant valide');
-      return false;
-    }
+    setCalculating(true);
     
-    if (totalBilletage === 0) {
-      setBilletageError('Veuillez saisir le billetage (quantité de billets)');
-      return false;
-    }
-    
-    if (Math.abs(totalBilletage - montantSaisi) < 1) {
-      setBilletageError('');
-      setMontantADiviser('0'); // Désactiver le champ car le billetage est correct
-      showSnackbar('Billetage correct !', 'success');
-      return true;
-    } else {
-      setBilletageError(`Le billetage (${totalBilletage.toLocaleString()} FCFA) ne correspond pas au montant saisi (${montantSaisi.toLocaleString()} FCFA)`);
-      showSnackbar(`Billetage incorrect. Différence: ${Math.abs(totalBilletage - montantSaisi).toLocaleString()} FCFA`, 'error');
-      return false;
-    }
+    setTimeout(() => {
+      let remaining = montant;
+      const coupures = [10000, 5000, 2000, 1000, 500, 200, 100];
+      const newBilletage = coupures.map(valeur => {
+        const quantite = Math.floor(remaining / valeur);
+        remaining = remaining % valeur;
+        return { valeur, quantite };
+      });
+      
+      setBilletage(newBilletage);
+      
+      if (remaining > 0) {
+        showSnackbar(`Attention: ${remaining} FCFA non alloués (montant non divisible)`, 'warning');
+      }
+      
+      setCalculating(false);
+    }, 300);
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -1463,99 +1518,209 @@ const RetraitEspeces: React.FC = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  // Vérifier localement le code de validation
-  const handleVerifyCode = () => {
-    const validationResult = retraitService.verifierCodeValidationLocal(validationCode);
-    
-    if (validationResult.valid) {
-      setIsCodeValid(true);
-      setCodeValidationError('');
-      showSnackbar('Code validé localement. Prêt pour soumission.', 'success');
-      
-      // Fermer le modal de validation
-      setValidationDialog(false);
-    } else {
+  // --- FONCTION DE VÉRIFICATION DU CODE (APPEL API RÉEL) ---
+  const handleVerifyCode = async () => {
+    if (validationCode.length !== 6) {
       setIsCodeValid(false);
-      setCodeValidationError(validationResult.message);
-      showSnackbar(validationResult.message, 'error');
+      setCodeValidationError('Le code doit contenir 6 caractères');
+      showSnackbar('Le code doit contenir 6 caractères', 'error');
+      return;
+    }
+    
+    if (!pendingDemandeId) {
+      setCodeValidationError('Aucune demande de validation en cours');
+      showSnackbar('Aucune demande de validation en cours', 'error');
+      return;
+    }
+    
+    try {
+      setTransactionStatus('validating');
+      
+      // Appel API réel pour vérifier le code
+      const result = await verifierCodeValidation(pendingDemandeId, validationCode);
+      
+      if (result.valid) {
+        setIsCodeValid(true);
+        setCodeValidationError('');
+        showSnackbar('Code validé avec succès', 'success');
+        
+        // Fermer le modal et permettre la soumission
+        setValidationDialog(false);
+      } else {
+        setIsCodeValid(false);
+        setCodeValidationError(result.message);
+        showSnackbar(result.message, 'error');
+      }
+    } catch (error: any) {
+      console.error('Erreur validation code:', error);
+      setIsCodeValid(false);
+      const errorMessage = error.response?.data?.message || 'Erreur lors de la validation du code';
+      setCodeValidationError(errorMessage);
+      showSnackbar(errorMessage, 'error');
+    } finally {
+      setTransactionStatus('idle');
     }
   };
 
-  // Fonction pour ouvrir la modal de succès
-  const openSuccessModal = (transactionData: any) => {
-    // Récupérer l'agence et le guichet sélectionnés
-    const selectedAgence = agences.find(a => a.id.toString() === formData.selectedAgence);
-    const selectedGuichet = guichets.find(g => g.id.toString() === formData.guichet);
-    
-    // Récupérer le nom du caissier (à remplacer par les informations réelles de l'utilisateur connecté)
-    const caissierId = "Directeur Général"; // À remplacer par l'utilisateur connecté
-    
-    const receiptData: ReceiptData = {
-      reference: generateReference('RET'),
-      date: formatDateTime(new Date().toISOString()),
-      compte: formData.compte,
-      titulaire: formData.client,
-      porteur: formData.nomPorteur,
-      pieceId: `${formData.typeId} - ${formData.numeroId}`,
-      montant: formData.montant,
-      caissierId: caissierId,
-      typeOperation: 'RETRAIT' as const,
-      agence: selectedAgence?.name,
-      guichet: selectedGuichet?.nom_guichet,
-      motif: formData.motif,
-      billetage: billetage,
-    };
-    
-    setSuccessModal({
-      open: true,
-      transactionData: receiptData,
-    });
+  // Fonction pour soumettre au backend
+  const submitToBackend = async (retraitData: RetraitData, billetageValide: BilletageItem[]) => {
+    try {
+      console.log('=== ENVOI AU BACKEND ===');
+      console.log('RetraitData:', retraitData);
+      console.log('Billetage:', billetageValide);
+      
+      // Appel réel au service de retrait
+      const result = await retraitService.effectuerRetrait(retraitData, billetageValide);
+      
+      console.log('Réponse backend:', result);
+      
+      if (result.success) {
+        // Transaction réussie
+        setBackendMessage(result.message || 'Retrait effectué avec succès');
+        
+        // Préparer et sauvegarder les données du reçu
+        const receiptData = prepareReceiptData();
+        setLastSuccessfulTransaction(receiptData);
+        
+        // Ouvrir la modal de succès avec le reçu
+        openSuccessModal(result.data);
+        
+        // Réinitialiser le formulaire
+        resetForm();
+        
+        return { success: true, data: result.data };
+      } else {
+        // Erreur du backend
+        setBackendError(result.message || 'Erreur lors du retrait');
+        showSnackbar(result.message || 'Erreur lors du retrait', 'error');
+        return { success: false, message: result.message };
+      }
+      
+    } catch (error: any) {
+      console.error('Erreur lors de la soumission au backend:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Erreur de connexion au serveur';
+      setBackendError(errorMessage);
+      showSnackbar(errorMessage, 'error');
+      return { success: false, message: errorMessage };
+    }
   };
 
-  // Fonction pour fermer la modal de succès
-  const closeSuccessModal = () => {
-    setSuccessModal({
-      open: false,
-      transactionData: undefined,
-    });
-  };
-
-  // Traitement principal du retrait
+  // Traitement principal du retrait - VERSION AMÉLIORÉE
   const processRetrait = async () => {
     try {
       console.log('=== DÉBUT SOUMISSION RETRAIT ===');
       
+      setTransactionStatus('pending');
+      setBackendMessage('');
+      setBackendError('');
+      
       // Validation des champs obligatoires
       if (!formData.compte_id) {
         showSnackbar('Veuillez sélectionner un compte', 'error');
+        setTransactionStatus('idle');
         return;
       }
       
       const montant = parseFloat(formData.montant);
       if (!montant || montant <= 0) {
         showSnackbar('Le montant doit être supérieur à 0', 'error');
+        setTransactionStatus('idle');
         return;
       }
       
-      // Vérifier que le compte a suffisamment de solde
-      const soldeCompte = parseFloat(formData.soldeComptable);
-      const montantTotal = parseFloat(formData.netADebiter);
+      // Vérification des plafonds et soldes
+      const plafondCheck = checkPlafondCaissiere();
+      const soldeCaisseCheck = checkSoldeCaisse();
+      const soldeCompteCheck = checkSoldeCompte();
       
-      if (montantTotal > soldeCompte) {
-        showSnackbar(`Solde insuffisant. Solde disponible: ${soldeCompte.toLocaleString()} FCFA`, 'error');
+      console.log('Vérifications:');
+      console.log('- Plafond caissière:', plafondCheck);
+      console.log('- Solde caisse:', soldeCaisseCheck);
+      console.log('- Solde compte:', soldeCompteCheck);
+      
+      // Récupérer les entités sélectionnées
+      const selectedAgence = agences.find(a => a.id.toString() === formData.selectedAgence);
+      const selectedGuichet = guichets.find(g => g.id.toString() === formData.guichet);
+      const selectedCaisse = caisses.find(c => c.id.toString() === formData.caisse);
+      
+      // SI LE MONTANT DÉPASSE LE PLAFOND DE LA CAISSIÈRE
+      if (!plafondCheck.ok) {
+        try {
+          setTransactionStatus('validating');
+          
+          // Activer l'affichage du champ de validation IMMÉDIATEMENT
+          setNeedsSupervisorValidation(true);
+          setValidationRequired(true);
+          setShowValidationInput(true);
+          setValidationDialog(true);
+          setValidationData({
+            demande_id: null, // Sera mis à jour si l'API réussit
+            message: plafondCheck.message,
+            montant: formData.montant,
+            expiration: null
+          });
+          
+          // Tentative de créer une demande de validation (optionnelle)
+          const demandeData: DemandeValidationData = {
+            compte_id: formData.compte_id,
+            montant: montant,
+            motif: formData.motif || 'Retrait espèces',
+            caisse_id: selectedCaisse?.id || 0,
+            agence_id: parseInt(formData.selectedAgence),
+            guichet_id: selectedGuichet?.id || 0,
+          };
+          
+          try {
+            const validationResponse = await demanderValidation(demandeData);
+            
+            if (validationResponse.success) {
+              // Mettre à jour avec les données reçues du backend
+              setPendingDemandeId(validationResponse.demande_id);
+              setValidationData({
+                demande_id: validationResponse.demande_id,
+                message: plafondCheck.message,
+                montant: formData.montant,
+                expiration: validationResponse.code_expiration
+              });
+              
+              showSnackbar('Demande de validation créée avec succès', 'success');
+            } else {
+              // Même si la création échoue, on garde l'interface de validation
+              showSnackbar(validationResponse.message || 'Erreur lors de la demande de validation', 'warning');
+            }
+          } catch (apiError) {
+            console.error('Erreur API validation (non bloquante):', apiError);
+            showSnackbar('Impossible de créer la demande de validation, mais vous pouvez toujours saisir un code', 'warning');
+          }
+          
+          showSnackbar('Validation requise par l\'assistant comptable', 'warning');
+        } catch (error) {
+          console.error('Erreur inattendue:', error);
+          showSnackbar('Erreur lors de la demande de validation', 'error');
+        } finally {
+          setTransactionStatus('idle');
+        }
+        return; // IMPORTANT: Arrêter ici pour la validation
+      }
+      
+      // Vérifier les autres contraintes
+      if (!soldeCaisseCheck.ok) {
+        showSnackbar(soldeCaisseCheck.message, 'error');
+        setTransactionStatus('idle');
         return;
       }
       
-      if (!formData.nomPorteur || !formData.typeId || !formData.numeroId) {
-        showSnackbar('Informations du porteur incomplètes', 'error');
+      if (!soldeCompteCheck.ok) {
+        showSnackbar(soldeCompteCheck.message, 'error');
+        setTransactionStatus('idle');
         return;
       }
       
       // Validation du CNI (uniquement pour client ou mandataire)
       if (formData.typePorteur === 'client' || formData.typePorteur === 'mandataire') {
         if (!validateCni()) {
-          // Le message d'erreur est déjà affiché dans le champ
           showSnackbar('Numéro de pièce incorrect. Veuillez vérifier.', 'error');
+          setTransactionStatus('idle');
           return;
         }
       }
@@ -1564,61 +1729,51 @@ const RetraitEspeces: React.FC = () => {
       const billetageValide = billetage.filter(item => item.quantite > 0);
       if (billetageValide.length === 0) {
         showSnackbar('Veuillez saisir le billetage', 'error');
+        setTransactionStatus('idle');
         return;
       }
       
       const totalBilletage = billetageValide.reduce((sum, item) => sum + (item.valeur * item.quantite), 0);
       if (Math.abs(totalBilletage - montant) > 1) {
         showSnackbar(`Le billetage (${totalBilletage} FCFA) ne correspond pas au montant (${montant} FCFA)`, 'error');
+        setTransactionStatus('idle');
         return;
       }
-      
-      // Récupérer les entités sélectionnées
-      const selectedAgence = agences.find(a => a.id.toString() === formData.selectedAgence);
-      const selectedGuichet = guichets.find(g => g.id.toString() === formData.guichet);
-      const selectedCaisse = caisses.find(c => c.id.toString() === formData.caisse);
       
       // Validation des sélections
       if (!selectedAgence) {
         showSnackbar('Veuillez sélectionner une agence', 'error');
+        setTransactionStatus('idle');
         return;
       }
       
       if (!selectedGuichet) {
         showSnackbar('Veuillez sélectionner un guichet', 'error');
+        setTransactionStatus('idle');
         return;
       }
       
       if (!selectedCaisse) {
         showSnackbar('Veuillez sélectionner une caisse', 'error');
+        setTransactionStatus('idle');
         return;
       }
       
       if (!selectedCaisse.est_active) {
         showSnackbar('La caisse sélectionnée n\'est pas active', 'error');
-        return;
-      }
-      
-      // Vérifier que la caisse a suffisamment de liquidités
-      const soldeCaisse = parseFloat(selectedCaisse.solde_actuel);
-      if (montant > soldeCaisse) {
-        showSnackbar(`Solde caisse insuffisant. Disponible: ${soldeCaisse.toLocaleString()} FCFA`, 'error');
+        setTransactionStatus('idle');
         return;
       }
       
       // Calcul des frais
       const commissions = parseFloat(formData.commissions) || 0;
       const taxes = parseFloat(formData.taxes) || 0;
-      const totalFrais = commissions + taxes;
-      const montantTotalADebiter = formData.fraisEnCompte ? montant : montant + totalFrais;
       
       // PRÉPARER LES DONNÉES POUR RETRAIT
       const retraitData: RetraitData = {
-        // Données obligatoires
         compte_id: formData.compte_id,
         montant_brut: montant,
         
-        // STRUCTURE "tiers" REQUISE (porteur)
         tiers: {
           nom_complet: formData.nomPorteur.trim(),
           type_piece: formData.typeId,
@@ -1628,33 +1783,27 @@ const RetraitEspeces: React.FC = () => {
           lieu_delivrance_piece: formData.delivreA || '',
         },
         
-        // Données de frais
         commissions: commissions,
         taxes: taxes,
         
-        // Contexte de l'opération
         motif: formData.motif?.trim() || 'Retrait espèces',
         ref_lettrage: formData.refLettrage?.trim() || '',
         
-        // Informations de localisation
         agence_code: selectedAgence?.code || '',
         guichet_code: selectedGuichet?.code_guichet || '',
         caisse_code: selectedCaisse?.code_caisse || '',
         caisse_id: selectedCaisse?.id,
         guichet_id: selectedGuichet?.id,
         
-        // CORRECTION ICI : Ajouter les champs bordereau
         numero_bordereau: formData.numero_bordereau || '',
         type_bordereau: formData.type_bordereau || 'RETRAIT',
         
-        // Ajouter les dates
         date_operation: formData.dateOperation,
         date_valeur: formData.dateValeur,
       };
       
-      // AJOUTER LE CODE DE VALIDATION SI DISPONIBLE
-      if (showValidationInput && validationCode && isCodeValid) {
-        // Ajouter le code de validation aux données envoyées
+      // AJOUTER LE CODE DE VALIDATION SI NÉCESSAIRE
+      if (needsSupervisorValidation && validationCode && isCodeValid) {
         retraitData.code_validation = validationCode;
         console.log('Code de validation ajouté aux données:', validationCode);
       }
@@ -1663,48 +1812,70 @@ const RetraitEspeces: React.FC = () => {
       console.log('RetraitData:', retraitData);
       console.log('Billetage:', billetageValide);
       
-      // Appeler le service de RETRAIT
-      const result = await retraitService.effectuerRetrait(retraitData, billetageValide);
+      // Soumettre au backend
+      const result = await submitToBackend(retraitData, billetageValide);
       
-      if (result.requires_validation) {
-        // Cas où une validation est nécessaire
-        setPendingDemandeId(result.demande_id!);
-        setValidationData({
-          demande_id: result.demande_id,
-          message: result.message,
-          montant: formData.montant
-        });
-        setShowValidationInput(true);
-        setValidationDialog(true);
-        showSnackbar(result.message || 'Validation requise par l\'assistant', 'warning');
-      } else if (result.success) {
+      if (result.success) {
         // Transaction réussie
+        setTransactionStatus('success');
         showSnackbar('Retrait effectué avec succès !', 'success');
-        console.log('Référence transaction:', result.data?.reference);
-        console.log('ID transaction:', result.data?.transaction_id);
         
-        // Ouvrir la modal de succès avec les informations de la transaction
-        openSuccessModal(result.data);
-        
-        // Réinitialiser le formulaire
-        resetForm();
+        // Réinitialiser les états de validation
+        setNeedsSupervisorValidation(false);
+        setValidationRequired(false);
+        setShowValidationInput(false);
+        setValidationCode('');
+        setIsCodeValid(false);
+        setPendingDemandeId(null);
         
       } else {
         // Erreur
-        const errorMsg = result.message || 'Erreur lors du retrait';
-        if (result.errors) {
-          const errorDetails = Object.entries(result.errors)
-            .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
-            .join('; ');
-          showSnackbar(`${errorMsg} - Détails: ${errorDetails}`, 'error');
-        } else {
-          showSnackbar(errorMsg, 'error');
+        setTransactionStatus('error');
+        
+        // Si l'erreur nécessite une validation (cas où le backend retourne une demande de validation)
+        if (result.message && (result.message.includes('validation') || result.message.includes('plafond'))) {
+          // Activer l'interface de validation même en cas d'erreur backend
+          setNeedsSupervisorValidation(true);
+          setShowValidationInput(true);
+          setValidationDialog(true);
+          
+          try {
+            // Tenter de créer une demande de validation automatiquement
+            const demandeData: DemandeValidationData = {
+              compte_id: formData.compte_id,
+              montant: montant,
+              motif: formData.motif || 'Retrait espèces',
+              caisse_id: selectedCaisse?.id || 0,
+              agence_id: parseInt(formData.selectedAgence),
+              guichet_id: selectedGuichet?.id || 0,
+            };
+            
+            const validationResponse = await demanderValidation(demandeData);
+            
+            if (validationResponse.success) {
+              setPendingDemandeId(validationResponse.demande_id);
+              setValidationData({
+                demande_id: validationResponse.demande_id,
+                message: result.message,
+                montant: formData.montant,
+                expiration: validationResponse.code_expiration
+              });
+            }
+          } catch (error) {
+            console.error('Erreur création auto validation:', error);
+          }
         }
       }
       
     } catch (error) {
       console.error('Erreur lors de la soumission:', error);
+      setTransactionStatus('error');
       showSnackbar('Erreur technique lors du retrait', 'error');
+    } finally {
+      // Garder le statut 'success' si la transaction a réussi, sinon revenir à 'idle'
+      if (transactionStatus !== 'success') {
+        setTimeout(() => setTransactionStatus('idle'), 2000);
+      }
     }
   };
 
@@ -1747,8 +1918,6 @@ const RetraitEspeces: React.FC = () => {
     });
     
     setBilletage(billetage.map(item => ({ ...item, quantite: 0 })));
-    setMontantADiviser('0');
-    setBilletageError('');
     setCompteDetails(null);
     setGuichets([]);
     setCaisses([]);
@@ -1761,6 +1930,9 @@ const RetraitEspeces: React.FC = () => {
     setSignatureUrl('');
     setClientRealCni('');
     setCniValidationError('');
+    setNeedsSupervisorValidation(false);
+    setValidationRequired(false);
+    setTransactionStatus('idle');
   };
 
   const handleConfirmValidation = () => {
@@ -1772,34 +1944,30 @@ const RetraitEspeces: React.FC = () => {
     if (window.confirm('Êtes-vous sûr de vouloir annuler cette transaction ?')) {
       setDialogOpen(false);
       showSnackbar('Transaction annulée', 'info');
+      setTransactionStatus('idle');
     }
   };
 
-  // Vérifier si les champs doivent être désactivés
   const shouldDisableField = (fieldName: keyof RetraitFormData) => {
     if (formData.typePorteur === 'autre') {
-      return false; // Tout est modifiable pour "autre"
+      return false;
     }
     
-    // Pour "client" ou "mandataire", le champ "typeId" (type de pièce) doit être modifiable
     if (fieldName === 'typeId') {
-      return false; // Le type de pièce est toujours modifiable
+      return false;
     }
     
     if (formData.typePorteur === 'client') {
-      // Pour le client, certains champs sont modifiables
       return !['adresse', 'delivreLe', 'delivreA', 'typeId', 'numeroId'].includes(fieldName);
     }
     
     if (formData.typePorteur === 'mandataire') {
-      // Pour le mandataire, certains champs peuvent être modifiés
       return !['adresse', 'delivreLe', 'delivreA', 'typeId', 'numeroId'].includes(fieldName);
     }
     
     return true;
   };
 
-  // Récupérer le nom du mandataire sélectionné
   const getSelectedMandataireName = () => {
     if (!compteDetails || !compteDetails.mandataires || !formData.selectedMandataireId) {
       return '';
@@ -1809,18 +1977,6 @@ const RetraitEspeces: React.FC = () => {
     if (!mandataire) return '';
     
     return getMandataireNomComplet(mandataire);
-  };
-
-  // Récupérer le numéro CNI du mandataire sélectionné
-  const getSelectedMandataireNumeroCni = () => {
-    if (!compteDetails || !compteDetails.mandataires || !formData.selectedMandataireId) {
-      return '';
-    }
-    
-    const mandataire = compteDetails.mandataires.find(m => m.id.toString() === formData.selectedMandataireId);
-    if (!mandataire) return '';
-    
-    return getMandataireNumeroPiece(mandataire);
   };
 
   return (
@@ -1844,24 +2000,44 @@ const RetraitEspeces: React.FC = () => {
         {/* Zone de travail */}
         <Box sx={{ px: { xs: 2, md: 3 }, py: 3 }}>
           {/* Header */}
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="h5" sx={{ fontWeight: 600, color: '#1E293B', mb: 0.5 }}>
-              Retrait Espèces
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#64748B' }}>
-              Interface de retrait d'espèces - ATHARIbank
-            </Typography>
+          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 600, color: '#1E293B', mb: 0.5 }}>
+                Retrait Espèces
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748B' }}>
+                Interface de retrait d'espèces - ATHARIbank
+              </Typography>
+            </Box>
+            
+            {lastSuccessfulTransaction && (
+              <Tooltip title="Réimprimer le reçu de la dernière transaction">
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  startIcon={<Print />}
+                  onClick={openPrintModal}
+                  sx={{
+                    bgcolor: '#9C27B0',
+                    '&:hover': { bgcolor: '#7B1FA2' },
+                  }}
+                >
+                  Imprimer le dernier reçu
+                </Button>
+              </Tooltip>
+            )}
           </Box>
+
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h4" sx={{ fontWeight: 700, color: '#1a237e' }}>
-              Retrait a distance
+              Retrait espèces
             </Typography>
             
             <Button
               variant="outlined"
               color="primary"
-              startIcon={<CloudDownload />} // Icône symbolisant le retrait à distance
-              onClick={() => navigate('/Retrait-distance')} // Assurez-vous que le chemin correspond à votre Route
+              startIcon={<CloudDownload />}
+              onClick={() => navigate('/Retrait-distance')}
               sx={{ 
                 borderRadius: '8px',
                 textTransform: 'none',
@@ -1873,6 +2049,47 @@ const RetraitEspeces: React.FC = () => {
               Aller au Retrait à Distance
             </Button>
           </Box>
+
+          {/* Indicateur de statut de transaction */}
+          {transactionStatus === 'pending' && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <CircularProgress size={20} sx={{ mr: 2 }} />
+                <Typography>Soumission du retrait en cours...</Typography>
+              </Box>
+            </Alert>
+          )}
+
+          {backendError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              <Typography>{backendError}</Typography>
+            </Alert>
+          )}
+
+          {backendMessage && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              <Typography>{backendMessage}</Typography>
+            </Alert>
+          )}
+
+          {/* Indicateur de validation requise */}
+          {needsSupervisorValidation && !showValidationInput && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Typography>
+                  Validation requise par l'assistant comptable. Montant: {formatCurrency(formData.montant)} FCFA
+                </Typography>
+                <Button 
+                  size="small" 
+                  variant="outlined" 
+                  onClick={() => setValidationDialog(true)}
+                >
+                  Saisir le code
+                </Button>
+              </Box>
+            </Alert>
+          )}
+
           <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #e0e0e0', overflow: 'hidden' }}>
             {/* Barre d'onglets */}
             <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: '#f8f9fa' }}>
@@ -1897,11 +2114,6 @@ const RetraitEspeces: React.FC = () => {
                   icon={<Photo fontSize="small" />} 
                   iconPosition="start"
                 />
-               {/* <Tab 
-                  label="Retrait à distance" 
-                  icon={<CloudDownload fontSize="small" />} 
-                  iconPosition="start"
-                />*/}
               </StyledTabs>
             </Box>
 
@@ -1941,7 +2153,7 @@ const RetraitEspeces: React.FC = () => {
                                 label="Agence *"
                                 onChange={handleSelectChange}
                                 variant="outlined"
-                                disabled={loading}
+                                disabled={loading || transactionStatus === 'pending'}
                               >
                                 <MenuItem value=""><em>Sélectionner une agence</em></MenuItem>
                                 {agences.map((agence) => (
@@ -1954,14 +2166,14 @@ const RetraitEspeces: React.FC = () => {
                           </Grid>
 
                           <Grid item xs={6}>
-                            <FormControl  sx={{minWidth:250}} size="small" sx={{ minWidth: 250 }}>
+                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Guichet *</InputLabel>
                               <Select
                                 name="guichet"
                                 value={formData.guichet}
                                 label="Guichet *"
                                 onChange={handleSelectChange}
-                                disabled={!formData.selectedAgence || loadingGuichets}
+                                disabled={!formData.selectedAgence || loadingGuichets || transactionStatus === 'pending'}
                               >
                                 <MenuItem value=""><em>Sélectionner un guichet</em></MenuItem>
                                 {guichets.map((guichet) => (
@@ -1977,19 +2189,22 @@ const RetraitEspeces: React.FC = () => {
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <FormControl  sx={{minWidth:250}} size="small" sx={{ minWidth: 250 }}>
+                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Caisse *</InputLabel>
                               <Select
                                 name="caisse"
                                 value={formData.caisse}
                                 label="Caisse *"
                                 onChange={handleSelectChange}
-                                disabled={!formData.guichet || loadingCaisses}
+                                disabled={!formData.guichet || loadingCaisses || transactionStatus === 'pending'}
                               >
                                 <MenuItem value=""><em>Sélectionner une caisse</em></MenuItem>
                                 {caisses.map((caisse) => (
                                   <MenuItem key={caisse.id} value={caisse.id.toString()}>
                                     {caisse.libelle} ({caisse.code_caisse})
+                                    <Typography variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
+                                      Plafond: {formatCurrency(caisse.plafond_autonomie_caissiere)} FCFA
+                                    </Typography>
                                   </MenuItem>
                                 ))}
                               </Select>
@@ -2000,13 +2215,14 @@ const RetraitEspeces: React.FC = () => {
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <FormControl  sx={{minWidth:250}} size="small" sx={{ minWidth: 250 }}>
+                            <FormControl fullWidth size="small" sx={{ minWidth: 250 }}>
                               <InputLabel>Type retrait *</InputLabel>
                               <Select
                                 name="typeRetrait"
                                 value={formData.typeRetrait}
                                 label="Type retrait *"
                                 onChange={handleSelectChange}
+                                disabled={transactionStatus === 'pending'}
                               >
                                 <MenuItem value="01">01 - Retrait espèces</MenuItem>
                               </Select>
@@ -2068,6 +2284,7 @@ const RetraitEspeces: React.FC = () => {
                                   value={formData.numero_bordereau}
                                   onChange={handleChange}
                                   placeholder="Ex: BDR-2023-001"
+                                  disabled={transactionStatus === 'pending'}
                                   sx={{ minWidth: 250 }}
                                 />
                               </Grid>
@@ -2079,6 +2296,7 @@ const RetraitEspeces: React.FC = () => {
                                     value={formData.type_bordereau}
                                     label="Type bordereau"
                                     onChange={handleSelectChange}
+                                    disabled={transactionStatus === 'pending'}
                                   >
                                     <MenuItem value="RETRAIT">RETRAIT</MenuItem>
                                     <MenuItem value="VERSEMENT">VERSEMENT</MenuItem>
@@ -2096,6 +2314,7 @@ const RetraitEspeces: React.FC = () => {
                               }
                               loading={loadingComptes}
                               onChange={(event, value) => handleCompteSelect(value)}
+                              disabled={transactionStatus === 'pending'}
                               renderInput={(params) => (
                                 <TextField
                                   {...params}
@@ -2166,6 +2385,7 @@ const RetraitEspeces: React.FC = () => {
                               placeholder="Objet du retrait"
                               multiline
                               rows={2}
+                              disabled={transactionStatus === 'pending'}
                               sx={{ minWidth: 250 }}
                             />
                           </Grid>
@@ -2222,6 +2442,7 @@ const RetraitEspeces: React.FC = () => {
                                     name="smsEnabled"
                                     checked={formData.smsEnabled}
                                     onChange={handleChange}
+                                    disabled={transactionStatus === 'pending'}
                                   />
                                 }
                                 label="SMS"
@@ -2234,6 +2455,7 @@ const RetraitEspeces: React.FC = () => {
                                   value={formData.telephone}
                                   onChange={handleChange}
                                   placeholder="Numéro SMS"
+                                  disabled={transactionStatus === 'pending'}
                                   sx={{ flexGrow: 1, minWidth: 250 }}
                                 />
                               )}
@@ -2249,10 +2471,16 @@ const RetraitEspeces: React.FC = () => {
                                   label="Montant *"
                                   name="montant"
                                   value={formData.montant}
-                                  onChange={handleChange}
+                                  onChange={(e) => {
+                                    handleChange(e);
+                                    if (e.target.value) {
+                                      calculateBilletageFromAmount(e.target.value);
+                                    }
+                                  }}
                                   placeholder="0"
                                   type="number"
                                   required
+                                  disabled={transactionStatus === 'pending'}
                                   sx={{ minWidth: 250 }}
                                   InputProps={{
                                     startAdornment: <InputAdornment position="start">FCFA</InputAdornment>,
@@ -2268,6 +2496,7 @@ const RetraitEspeces: React.FC = () => {
                                   value={formData.commissions}
                                   onChange={handleChange}
                                   type="number"
+                                  disabled={transactionStatus === 'pending'}
                                   sx={{ minWidth: 250 }}
                                 />
                               </Grid>
@@ -2280,6 +2509,7 @@ const RetraitEspeces: React.FC = () => {
                                   value={formData.taxes}
                                   onChange={handleChange}
                                   type="number"
+                                  disabled={transactionStatus === 'pending'}
                                   sx={{ minWidth: 250 }}
                                 />
                               </Grid>
@@ -2291,6 +2521,7 @@ const RetraitEspeces: React.FC = () => {
                                   name="refLettrage"
                                   value={formData.refLettrage}
                                   onChange={handleChange}
+                                  disabled={transactionStatus === 'pending'}
                                   sx={{ minWidth: 250 }}
                                 />
                               </Grid>
@@ -2313,35 +2544,28 @@ const RetraitEspeces: React.FC = () => {
                           <TextField
                             size="small"
                             label="Montant à diviser"
-                            value={montantADiviser}
-                            disabled={montantADiviser === '0'}
-                            InputProps={{
-                              readOnly: montantADiviser === '0',
+                            value={formData.montant}
+                            onChange={(e) => {
+                              setFormData(prev => ({ ...prev, montant: e.target.value }));
+                              calculateBilletageFromAmount(e.target.value);
                             }}
                             type="number"
+                            disabled={transactionStatus === 'pending'}
                             sx={{ minWidth: 250 }}
-                            helperText={montantADiviser === '0' ? "Billetage correct !" : "Total du billetage saisi"}
                           />
-                          
                           <Button
                             variant="outlined"
-                            startIcon={<CalculateIcon />}
-                            onClick={verifyBilletage}
-                            disabled={!formData.montant || parseFloat(formData.montant) <= 0}
+                            startIcon={calculating ? <CircularProgress size={20} /> : <CalculateIcon />}
+                            onClick={() => calculateBilletageFromAmount(formData.montant)}
+                            disabled={calculating || !formData.montant || parseFloat(formData.montant) <= 0 || transactionStatus === 'pending'}
                             sx={{ minWidth: 250 }}
                           >
-                            Vérifier le billetage
+                            Calculer billetage
                           </Button>
                           <Typography variant="caption" color="text.secondary">
-                            Montant saisi: {formatCurrency(formData.montant)} FCFA
+                            Total: {billetage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0).toLocaleString()} FCFA
                           </Typography>
                         </Box>
-                        
-                        {billetageError && (
-                          <Alert severity="error" sx={{ mb: 2 }}>
-                            {billetageError}
-                          </Alert>
-                        )}
                         
                         <TableContainer component={Paper} variant="outlined">
                           <Table size="small">
@@ -2362,6 +2586,7 @@ const RetraitEspeces: React.FC = () => {
                                       <IconButton 
                                         size="small" 
                                         onClick={() => updateBilletage(index, 'quantite', Math.max(0, item.quantite - 1))}
+                                        disabled={transactionStatus === 'pending'}
                                       >
                                         <RemoveIcon fontSize="small" />
                                       </IconButton>
@@ -2373,12 +2598,14 @@ const RetraitEspeces: React.FC = () => {
                                           updateBilletage(index, 'quantite', Math.max(0, val));
                                         }}
                                         type="number"
+                                        disabled={transactionStatus === 'pending'}
                                         sx={{ width: 80 }}
                                         inputProps={{ min: 0 }}
                                       />
                                       <IconButton 
                                         size="small" 
                                         onClick={() => updateBilletage(index, 'quantite', item.quantite + 1)}
+                                        disabled={transactionStatus === 'pending'}
                                       >
                                         <AddIcon fontSize="small" />
                                       </IconButton>
@@ -2391,6 +2618,7 @@ const RetraitEspeces: React.FC = () => {
                                     <Button
                                       size="small"
                                       onClick={() => updateBilletage(index, 'quantite', 0)}
+                                      disabled={transactionStatus === 'pending'}
                                     >
                                       Effacer
                                     </Button>
@@ -2412,13 +2640,13 @@ const RetraitEspeces: React.FC = () => {
                         </TableContainer>
                         
                         <Alert severity="info" sx={{ mt: 2 }}>
-                          Saisissez les quantités de billets pour chaque coupure, puis cliquez sur "Vérifier le billetage"
+                          Le total du billetage doit correspondre au montant du retrait
                         </Alert>
                       </CardContent>
                     </StyledCard>
                   </Grid>
 
-                  {/* Section Validation Code */}
+                  {/* Section Validation Code - S'affiche TOUJOURS quand showValidationInput est true */}
                   {showValidationInput && (
                     <Grid item xs={12}>
                       <StyledCard>
@@ -2428,7 +2656,17 @@ const RetraitEspeces: React.FC = () => {
                             Code de Validation Requis
                           </Typography>
                           <Alert severity="warning" sx={{ mb: 2 }}>
-                            Cette opération nécessite une validation. Veuillez saisir le code fourni par l'assistant comptable.
+                            {validationData?.message || 'Cette opération nécessite une validation. Veuillez saisir le code fourni par l\'assistant comptable.'}
+                            {validationData?.expiration && (
+                              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                                Expire le: {formatDateTime(validationData.expiration)}
+                              </Typography>
+                            )}
+                            {!validationData?.demande_id && (
+                              <Typography variant="caption" display="block" sx={{ mt: 1, color: 'info.main' }}>
+                                Note: La demande de validation n'a pas pu être créée, mais vous pouvez toujours saisir un code de validation existant.
+                              </Typography>
+                            )}
                           </Alert>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                             <ValidationCodeInput
@@ -2446,6 +2684,7 @@ const RetraitEspeces: React.FC = () => {
                               inputProps={{ maxLength: 6 }}
                               error={!!codeValidationError}
                               helperText={codeValidationError || "Code à 6 caractères fourni par l'assistant"}
+                              disabled={transactionStatus === 'pending' || transactionStatus === 'validating'}
                               InputProps={{
                                 startAdornment: (
                                   <InputAdornment position="start">
@@ -2458,11 +2697,11 @@ const RetraitEspeces: React.FC = () => {
                               variant="contained"
                               color="primary"
                               onClick={handleVerifyCode}
-                              disabled={validationCode.length !== 6}
-                              startIcon={<CheckCircle />}
+                              disabled={validationCode.length !== 6 || transactionStatus === 'pending' || transactionStatus === 'validating'}
+                              startIcon={transactionStatus === 'validating' ? <CircularProgress size={20} /> : <CheckCircle />}
                               sx={{ minWidth: 250 }}
                             >
-                              Vérifier le code
+                              {transactionStatus === 'validating' ? 'Vérification...' : 'Vérifier le code'}
                             </Button>
                             {isCodeValid && (
                               <Box sx={{ display: 'flex', alignItems: 'center', color: 'success.main' }}>
@@ -2479,15 +2718,19 @@ const RetraitEspeces: React.FC = () => {
                                 setValidationCode('');
                                 setIsCodeValid(false);
                                 setCodeValidationError('');
+                                setNeedsSupervisorValidation(false);
                               }}
+                              disabled={transactionStatus === 'pending'}
                               sx={{ minWidth: 250 }}
                             >
                               Annuler
                             </Button>
                           </Box>
-                          <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-                            Demande #{pendingDemandeId} - Le code est valable 30 minutes
-                          </Typography>
+                          {pendingDemandeId && (
+                            <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
+                              Demande #{pendingDemandeId}
+                            </Typography>
+                          )}
                         </CardContent>
                       </StyledCard>
                     </Grid>
@@ -2563,6 +2806,7 @@ const RetraitEspeces: React.FC = () => {
                                     <Typography>Je suis le client (titulaire du compte)</Typography>
                                   </Box>
                                 } 
+                                disabled={transactionStatus === 'pending'}
                               />
                               <FormControlLabel 
                                 value="mandataire" 
@@ -2573,9 +2817,9 @@ const RetraitEspeces: React.FC = () => {
                                     <Typography>Je suis le mandataire</Typography>
                                   </Box>
                                 } 
-                                disabled={!compteDetails?.mandataires || compteDetails.mandataires.length === 0}
-                              />{/** 
-                              <FormControlLabel 
+                                disabled={!compteDetails?.mandataires || compteDetails.mandataires.length === 0 || transactionStatus === 'pending'}
+                              />
+                             {/** <FormControlLabel 
                                 value="autre" 
                                 control={<Radio />} 
                                 label={
@@ -2584,7 +2828,8 @@ const RetraitEspeces: React.FC = () => {
                                     <Typography>Autre (remplir manuellement)</Typography>
                                   </Box>
                                 } 
-                              />  */}
+                                disabled={transactionStatus === 'pending'}
+                              /> */}
                             </RadioGroup>
                           </FormControl>
                         </Box>
@@ -2605,6 +2850,7 @@ const RetraitEspeces: React.FC = () => {
                                     selectedMandataireId: value
                                   }));
                                 }}
+                                disabled={transactionStatus === 'pending'}
                               >
                                 <MenuItem value="">
                                   <em>Sélectionner un mandataire</em>
@@ -2639,7 +2885,7 @@ const RetraitEspeces: React.FC = () => {
                               onChange={handleChange}
                               placeholder="Nom complet du porteur"
                               required
-                              disabled={shouldDisableField('nomPorteur')}
+                              disabled={shouldDisableField('nomPorteur') || transactionStatus === 'pending'}
                               helperText={
                                 formData.typePorteur === 'client' ? 'Nom du client chargé automatiquement' :
                                 formData.typePorteur === 'mandataire' ? `Mandataire: ${getSelectedMandataireName()}` :
@@ -2659,7 +2905,7 @@ const RetraitEspeces: React.FC = () => {
                               placeholder="Adresse complète"
                               multiline
                               rows={2}
-                              disabled={shouldDisableField('adresse')}
+                              disabled={shouldDisableField('adresse') || transactionStatus === 'pending'}
                               helperText={formData.typePorteur === 'autre' ? '' : 'Modifiable si nécessaire'}
                               sx={{ minWidth: 250 }}
                             />
@@ -2672,7 +2918,7 @@ const RetraitEspeces: React.FC = () => {
                                 value={formData.typeId || 'CNI'}
                                 label="Type pièce *"
                                 onChange={handleSelectChange}
-                                disabled={shouldDisableField('typeId')}
+                                disabled={shouldDisableField('typeId') || transactionStatus === 'pending'}
                               >
                                 <MenuItem value="CNI">CNI</MenuItem>
                                 <MenuItem value="PASSEPORT">Passeport</MenuItem>
@@ -2700,6 +2946,7 @@ const RetraitEspeces: React.FC = () => {
                               }
                               required
                               error={!!cniValidationError}
+                              disabled={transactionStatus === 'pending'}
                               helperText={
                                 cniValidationError || (
                                   formData.typePorteur === 'client' ? 'Le système a déjà le N° CNI du client. Saisissez-le pour vérification.' :
@@ -2720,7 +2967,7 @@ const RetraitEspeces: React.FC = () => {
                               value={formData.delivreLe}
                               onChange={handleChange}
                               InputLabelProps={{ shrink: true }}
-                              disabled={shouldDisableField('delivreLe')}
+                              disabled={shouldDisableField('delivreLe') || transactionStatus === 'pending'}
                               helperText={formData.typePorteur === 'client' || formData.typePorteur === 'mandataire' ? 'Modifiable si nécessaire' : ''}
                               sx={{ minWidth: 250 }}
                             />
@@ -2734,7 +2981,7 @@ const RetraitEspeces: React.FC = () => {
                               value={formData.delivreA}
                               onChange={handleChange}
                               placeholder="Lieu de délivrance"
-                              disabled={shouldDisableField('delivreA')}
+                              disabled={shouldDisableField('delivreA') || transactionStatus === 'pending'}
                               helperText={formData.typePorteur === 'client' || formData.typePorteur === 'mandataire' ? 'Modifiable si nécessaire' : ''}
                               sx={{ minWidth: 250 }}
                             />
@@ -2979,34 +3226,36 @@ const RetraitEspeces: React.FC = () => {
               </TabPanel>
 
               {/* Boutons d'action */}
-              {tabValue !== 4 && (
-                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                  <SecondaryButton onClick={() => window.history.back()}>
-                    Annuler
-                  </SecondaryButton>
-                  <GradientButton
-                    variant="contained"
-                    onClick={processRetrait}
-                    startIcon={<CheckCircle />}
-                    disabled={
-                      !formData.compte_id || 
-                      !formData.montant || 
-                      parseFloat(formData.montant) <= 0 ||
-                      !formData.nomPorteur ||
-                      !formData.numeroId ||
-                      billetage.every(item => item.quantite === 0) ||
-                      !formData.selectedAgence ||
-                      !formData.guichet ||
-                      !formData.caisse ||
-                      (showValidationInput && !isCodeValid) || // Si validation requise, doit avoir un code valide
-                      montantADiviser !== '0' // Le billetage doit être vérifié et correct
-                    }
-                    sx={{ minWidth: 250 }}
-                  >
-                    {showValidationInput ? 'Valider le retrait avec code' : 'Valider le retrait'}
-                  </GradientButton>
-                </Box>
-              )}
+              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                <SecondaryButton 
+                  onClick={() => window.history.back()}
+                  disabled={transactionStatus === 'pending'}
+                >
+                  Annuler
+                </SecondaryButton>
+                <GradientButton
+                  variant="contained"
+                  onClick={processRetrait}
+                  startIcon={transactionStatus === 'pending' ? <CircularProgress size={20} color="inherit" /> : <CheckCircle />}
+                  disabled={
+                    transactionStatus === 'pending' ||
+                    !formData.compte_id || 
+                    !formData.montant || 
+                    parseFloat(formData.montant) <= 0 ||
+                    !formData.nomPorteur ||
+                    !formData.numeroId ||
+                    billetage.every(item => item.quantite === 0) ||
+                    !formData.selectedAgence ||
+                    !formData.guichet ||
+                    !formData.caisse ||
+                    (needsSupervisorValidation && !isCodeValid)
+                  }
+                  sx={{ minWidth: 250 }}
+                >
+                  {transactionStatus === 'pending' ? 'Traitement en cours...' : 
+                   needsSupervisorValidation ? 'Valider le retrait avec code' : 'Valider le retrait'}
+                </GradientButton>
+              </Box>
             </Box>
           </Paper>
         </Box>
@@ -3060,10 +3309,10 @@ const RetraitEspeces: React.FC = () => {
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setDialogOpen(false)} color="inherit">
+          <Button onClick={() => setDialogOpen(false)} color="inherit" disabled={transactionStatus === 'pending'}>
             Annuler
           </Button>
-          <Button onClick={handleConfirmValidation} variant="contained" color="primary" autoFocus>
+          <Button onClick={handleConfirmValidation} variant="contained" color="primary" autoFocus disabled={transactionStatus === 'pending'}>
             Confirmer le retrait
           </Button>
         </DialogActions>
@@ -3094,6 +3343,16 @@ const RetraitEspeces: React.FC = () => {
             <>
               <Alert severity="info" sx={{ mb: 2 }}>
                 Veuillez demander le code de validation à l'assistant comptable
+                {validationData?.expiration && (
+                  <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                    Ce code expire le: {formatDateTime(validationData.expiration)}
+                  </Typography>
+                )}
+                {!validationData?.demande_id && (
+                  <Typography variant="caption" display="block" sx={{ mt: 1, color: 'info.main' }}>
+                    Note: La demande de validation n'a pas pu être créée, mais vous pouvez toujours saisir un code de validation existant.
+                  </Typography>
+                )}
               </Alert>
               <ValidationCodeInput
                 autoFocus
@@ -3111,15 +3370,17 @@ const RetraitEspeces: React.FC = () => {
                 inputProps={{ maxLength: 6 }}
                 error={!!codeValidationError}
                 helperText={codeValidationError || "Code à 6 caractères"}
+                disabled={transactionStatus === 'pending' || transactionStatus === 'validating'}
               />
               <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
                 <Button 
                   onClick={handleVerifyCode}
                   variant="contained"
                   color="primary"
-                  disabled={validationCode.length !== 6}
+                  disabled={validationCode.length !== 6 || transactionStatus === 'pending' || transactionStatus === 'validating'}
+                  startIcon={transactionStatus === 'validating' ? <CircularProgress size={20} /> : null}
                 >
-                  Vérifier le code
+                  {transactionStatus === 'validating' ? 'Vérification...' : 'Vérifier le code'}
                 </Button>
               </Box>
             </>
@@ -3141,7 +3402,7 @@ const RetraitEspeces: React.FC = () => {
             if (!showValidationInput) {
               setPendingDemandeId(null);
             }
-          }}>
+          }} disabled={transactionStatus === 'pending'}>
             Fermer
           </Button>
         </DialogActions>
@@ -3208,6 +3469,14 @@ const RetraitEspeces: React.FC = () => {
                   {successModal.transactionData?.montant ? formatCurrency(successModal.transactionData.montant) : '0'} FCFA
                 </Typography>
               </Grid>
+              <Grid item xs={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Porteur :
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {successModal.transactionData?.porteur || 'N/A'}
+                </Typography>
+              </Grid>
             </Grid>
           </Box>
           
@@ -3243,6 +3512,13 @@ const RetraitEspeces: React.FC = () => {
               Imprimer le reçu
             </Button>
           </Box>
+          
+          <Alert severity="info" sx={{ mt: 3 }}>
+            <Typography variant="body2">
+              <strong>Astuce :</strong> Vous pourrez réimprimer ce reçu à tout moment en utilisant le bouton 
+              "Imprimer le dernier reçu" dans l'en-tête de la page.
+            </Typography>
+          </Alert>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={closeSuccessModal} color="inherit">
@@ -3251,8 +3527,6 @@ const RetraitEspeces: React.FC = () => {
           <Button 
             onClick={() => {
               closeSuccessModal();
-              // Optionnel: Rediriger vers l'historique des transactions
-              // navigate('/transactions');
             }} 
             variant="contained" 
             color="primary"
@@ -3262,7 +3536,7 @@ const RetraitEspeces: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Élément caché pour le reçu (utilisé pour la génération PDF) */}
+      {/* Élément caché pour le reçu */}
       <div ref={receiptRef} style={{ position: 'absolute', left: '-9999px', top: '0' }}></div>
 
       {/* Snackbar */}

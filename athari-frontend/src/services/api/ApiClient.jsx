@@ -1,13 +1,11 @@
-// src/api/ApiClient.jsx ou où vous l'avez placé
-
 import axios from 'axios'
-// L'import de React n'est pas nécessaire ici
+
 
 const ApiClient = axios.create({
-// *** CORRECTION DE L'URL ***
-    baseURL: 'http://127.0.0.1:8000/api', // Utilisez http, et 127.0.0.1 ou localhost
+
+    baseURL: 'http://127.0.0.1:8000/api', // Utilisez http, 127.0.0.1:8000 et 127.0.0.1 ou localhost
     withCredentials: true, // Important pour les cookies et l'authentification
-    //headers par defaut
+
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -29,4 +27,4 @@ ApiClient.interceptors.request.use(
     }
 )
 
-export default ApiClient; // Exportation correcte
+export default ApiClient;

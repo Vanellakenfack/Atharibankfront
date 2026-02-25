@@ -50,7 +50,6 @@ interface Step4DocumentsProps {
     cni_recto_url: string | null;
     cni_verso_url: string | null;
     autres_documents: File[];
-    // AJOUT DES NOUVEAUX CHAMPS
     demande_ouverture_pdf: File | null;
     formulaire_ouverture_pdf: File | null;
   };
@@ -146,41 +145,26 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
     });
   };
 
+  const handleRemoveCni = () => {
+    onChange('documents', {
+      ...documents,
+      cni_client: null
+    });
+  };
+
   const handleSignatureUpload = (file: File | null) => {
     onChange('clientSignature', file);
   };
 
+  const handleRemoveSignature = () => {
+    onChange('clientSignature', null);
+  };
+
   // Valider et enregistrer le compte
   const handleSaveCompte = async () => {
-    // Validation finale
+    // Seule validation : l'engagement doit être accepté
     if (!engagementAccepted) {
       setError('Vous devez accepter les conditions générales');
-      return;
-    }
-
-    // Vérifier qu'on a soit une CNI uploadée, soit des URLs CNI
-    const hasCniUploaded = !!documents.cni_client;
-    const hasCniUrls = !!documents.cni_recto_url && !!documents.cni_verso_url;
-    
-    if (!hasCniUploaded && !hasCniUrls) {
-      setError('La CNI du client est requise (soit en téléchargeant un fichier, soit via les CNI existantes du client)');
-      return;
-    }
-
-    // Vérifier qu'on a soit une signature uploadée, soit une URL de signature
-    if (!clientSignature && !clientSignatureUrl) {
-      setError('La signature du client est requise');
-      return;
-    }
-
-    // Vérifier les nouveaux documents PDF obligatoires
-    if (!documents.demande_ouverture_pdf) {
-      setError('La demande d\'ouverture en PDF est obligatoire');
-      return;
-    }
-
-    if (!documents.formulaire_ouverture_pdf) {
-      setError('Le formulaire d\'ouverture en PDF est obligatoire');
       return;
     }
 
@@ -193,13 +177,23 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
     setError(null);
 
     try {
+      // Récupération de l'agence id
+      const agencyId = formData.agency_id 
+                  ?? formData.client?.agency_id 
+                  ?? formData.client?.agence_id 
+                  ?? null;
+      if (!agencyId) {
+        throw new Error("L'identifiant de l'agence est manquant.");
+      }
+      
       // Préparer les données complètes
       const compteData: CompteData = {
         ...formData,
         documents,
         engagementAccepted,
         clientSignature,
-        clientSignatureUrl
+        clientSignatureUrl,
+        agency_id: agencyId,
       };
 
       // Vérifier que accountType est défini
@@ -209,6 +203,9 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
 
       // Préparer FormData
       const formDataToSend = compteService.prepareFormData(compteData);
+      if (!formDataToSend.has('agency_id')) {
+        formDataToSend.append('agency_id', String(agencyId));
+      }
 
       // Envoyer au backend
       const result = await compteService.createCompte(formDataToSend);
@@ -274,35 +271,35 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
       )}
 
       <Alert severity="info" sx={{ mb: 3 }}>
-        Téléchargez les documents nécessaires ou utilisez les documents existants du client.
+        Téléchargez les documents nécessaires pour l'ouverture du compte.
         <br />
         Formats acceptés: PDF, JPG, PNG (max 8 Mo chacun).
         <br />
-        <strong>Note:</strong> Les demandes et formulaires doivent être au format PDF.
+        <strong>Note:</strong> Tous les documents sont optionnels sauf l'acceptation des conditions générales.
       </Alert>
 
       <Grid container spacing={3}>
-        {/* Section Documents PDF Obligatoires */}
+        {/* Section Documents PDF */}
         <Grid item xs={12}>
           <Card variant="outlined">
             <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ color: '#d32f2f', display: 'flex', alignItems: 'center' }}>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                 <ArticleIcon sx={{ mr: 1 }} />
-                Documents PDF obligatoires
+                Documents PDF
               </Typography>
               <Typography variant="body2" color="text.secondary" paragraph>
-                Ces documents sont requis pour l'ouverture du compte. Ils doivent être au format PDF.
+                Ces documents peuvent être joints à la demande d'ouverture de compte. (Optionnels)
               </Typography>
 
               {/* Demande d'ouverture PDF */}
               <Box sx={{ mb: 3, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
                 <Grid container spacing={2} alignItems="center">
                   <Grid item xs={12} sm={4}>
-                    <Typography fontWeight="bold" color="primary">
-                      Demande d'ouverture (PDF) *
+                    <Typography fontWeight="bold">
+                      Demande d'ouverture (PDF)
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Document formalisant la demande d'ouverture
+                      Document formalisant la demande d'ouverture (optionnel)
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={8}>
@@ -354,11 +351,6 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                         </IconButton>
                       </Box>
                     )}
-                    {!documents.demande_ouverture_pdf && (
-                      <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
-                        Ce document est obligatoire
-                      </Typography>
-                    )}
                   </Grid>
                 </Grid>
               </Box>
@@ -367,11 +359,11 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
               <Box sx={{ mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
                 <Grid container spacing={2} alignItems="center">
                   <Grid item xs={12} sm={4}>
-                    <Typography fontWeight="bold" color="primary">
-                      Formulaire d'ouverture (PDF) *
+                    <Typography fontWeight="bold">
+                      Formulaire d'ouverture (PDF)
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Formulaire officiel d'ouverture de compte
+                      Formulaire officiel d'ouverture de compte (optionnel)
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={8}>
@@ -423,11 +415,6 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                         </IconButton>
                       </Box>
                     )}
-                    {!documents.formulaire_ouverture_pdf && (
-                      <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
-                        Ce document est obligatoire
-                      </Typography>
-                    )}
                   </Grid>
                 </Grid>
               </Box>
@@ -446,27 +433,27 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
               {/* CNI du client - avec options automatiques */}
               <Grid container spacing={2} alignItems="center" sx={{ mb: 3 }}>
                 <Grid item xs={12} sm={4}>
-                  <Typography fontWeight="bold">CNI du client *</Typography>
+                  <Typography fontWeight="bold">CNI du client</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Recto et verso ou document unique
+                    Recto et verso ou document unique (optionnel)
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={8}>
                   {/* Afficher les CNI automatiques si disponibles */}
                   {documents.cni_recto_url && documents.cni_verso_url && !documents.cni_client && (
                     <Box sx={{ mb: 2 }}>
-                      <Alert severity="success" sx={{ mb: 2 }}>
+                      <Alert severity="info" sx={{ mb: 2 }}>
                         <Typography variant="body2">
                           <strong>CNI du client disponible automatiquement</strong>
                           <br />
-                          Les CNI de {formData.client?.physique?.nom_prenoms} seront utilisées automatiquement.
+                          Les CNI de {formData.client?.physique?.nom_prenoms} sont disponibles et seront utilisées si vous ne téléchargez pas de nouvelle CNI.
                         </Typography>
                       </Alert>
                       
                       <Grid container spacing={2}>
                         <Grid item xs={6}>
                           <Box sx={{ 
-                            border: '2px solid #4CAF50', 
+                            border: '1px solid #e0e0e0', 
                             borderRadius: '4px', 
                             padding: '8px',
                             mb: 2
@@ -491,7 +478,7 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                         </Grid>
                         <Grid item xs={6}>
                           <Box sx={{ 
-                            border: '2px solid #4CAF50', 
+                            border: '1px solid #e0e0e0', 
                             borderRadius: '4px', 
                             padding: '8px',
                             mb: 2
@@ -515,10 +502,6 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                           </Box>
                         </Grid>
                       </Grid>
-                      
-                      <Typography variant="body2" color="text.secondary">
-                        Ces CNI proviennent du profil du client et seront automatiquement associées au compte.
-                      </Typography>
                     </Box>
                   )}
                   
@@ -530,9 +513,7 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                     fullWidth
                     disabled={saving}
                     sx={{
-                      background: documents.cni_recto_url && documents.cni_verso_url && !documents.cni_client
-                        ? 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)'
-                        : 'linear-gradient(135deg, #62bfc6ff 0%, #2e787d69 100%)',
+                      background: 'linear-gradient(135deg, #62bfc6ff 0%, #2e787d69 100%)',
                       boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
                       border: 'none',
                       padding: '10px 16px',
@@ -540,9 +521,7 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                       mb: documents.cni_client ? 2 : 0
                     }}
                   >
-                    {documents.cni_recto_url && documents.cni_verso_url && !documents.cni_client
-                      ? 'Utiliser une CNI différente' 
-                      : 'Télécharger la CNI (PDF ou image unique)'}
+                    Télécharger la CNI (PDF ou image)
                     <VisuallyHiddenInput
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
@@ -552,24 +531,22 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                   
                   {/* Afficher la CNI téléchargée manuellement */}
                   {documents.cni_client && (
-                    <Box sx={{ mt: 2 }}>
+                    <Box sx={{ mt: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
                       {renderFilePreview(documents.cni_client)}
-                      <Typography variant="body2" color="success.main">
-                        ✓ CNI téléchargée manuellement ({documents.cni_client.name})
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Cette CNI remplacera celle du profil client.
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}>
+                        <Typography variant="body2" color="success.main">
+                          ✓ CNI téléchargée manuellement
+                        </Typography>
+                        <IconButton
+                          size="small"
+                          onClick={handleRemoveCni}
+                          disabled={saving}
+                          sx={{ color: '#d32f2f' }}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Box>
                     </Box>
-                  )}
-                  
-                  {/* Message si aucune CNI */}
-                  {!documents.cni_client && !documents.cni_recto_url && !documents.cni_verso_url && (
-                    <Alert severity="warning" sx={{ mt: 2 }}>
-                      <Typography variant="body2">
-                        Aucune CNI disponible. Veuillez télécharger une CNI.
-                      </Typography>
-                    </Alert>
                   )}
                 </Grid>
               </Grid>
@@ -638,22 +615,25 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
           <Card variant="outlined">
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Signature du client *
+                Signature du client
+              </Typography>
+              <Typography variant="caption" color="text.secondary" paragraph>
+                Signature du client (optionnelle)
               </Typography>
               
               {/* Afficher la signature automatique si disponible */}
               {clientSignatureUrl && !clientSignature && (
                 <Box sx={{ mb: 3 }}>
-                  <Alert severity="success" sx={{ mb: 2 }}>
+                  <Alert severity="info" sx={{ mb: 2 }}>
                     <Typography variant="body2">
                       <strong>Signature du client disponible</strong>
                       <br />
-                      La signature de {formData.client?.physique?.nom_prenoms} sera utilisée automatiquement.
+                      La signature de {formData.client?.physique?.nom_prenoms} est disponible et sera utilisée si vous ne téléchargez pas de nouvelle signature.
                     </Typography>
                   </Alert>
                   
                   <Box sx={{ 
-                    border: '2px solid #4CAF50', 
+                    border: '1px solid #e0e0e0', 
                     borderRadius: '4px', 
                     padding: '8px',
                     display: 'inline-block',
@@ -673,9 +653,6 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                       }}
                     />
                   </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Cette signature provient du profil du client et sera automatiquement associée au compte.
-                  </Typography>
                 </Box>
               )}
               
@@ -686,9 +663,7 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                 startIcon={<CloudUploadIcon />}
                 disabled={saving}
                 sx={{
-                  background: clientSignatureUrl && !clientSignature 
-                    ? 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)'
-                    : 'linear-gradient(135deg, #62bfc6ff 0%, #2e787d69 100%)',
+                  background: 'linear-gradient(135deg, #62bfc6ff 0%, #2e787d69 100%)',
                   boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
                   border: 'none',
                   padding: '10px 16px',
@@ -696,9 +671,7 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                   mb: 2
                 }}
               >
-                {clientSignatureUrl && !clientSignature 
-                  ? 'Utiliser une signature différente' 
-                  : 'Télécharger la signature'}
+                Télécharger la signature
                 <VisuallyHiddenInput
                   type="file"
                   accept="image/*"
@@ -708,12 +681,13 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
               
               {/* Afficher la signature téléchargée manuellement */}
               {clientSignature && (
-                <Box sx={{ mt: 2 }}>
+                <Box sx={{ mt: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 1, display: 'inline-block' }}>
                   <Box sx={{ 
-                    border: '2px solid #2196F3', 
+                    border: '1px solid #2196F3', 
                     borderRadius: '4px', 
                     padding: '8px',
-                    display: 'inline-block'
+                    display: 'inline-block',
+                    position: 'relative'
                   }}>
                     <img 
                       src={URL.createObjectURL(clientSignature)} 
@@ -724,23 +698,26 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                         display: 'block'
                       }}
                     />
+                    <IconButton
+                      size="small"
+                      onClick={handleRemoveSignature}
+                      disabled={saving}
+                      sx={{ 
+                        position: 'absolute',
+                        top: -10,
+                        right: -10,
+                        bgcolor: 'white',
+                        color: '#d32f2f',
+                        '&:hover': { bgcolor: '#ffebee' }
+                      }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
                   </Box>
                   <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>
-                    ✓ Signature téléchargée manuellement ({clientSignature.name})
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Cette signature remplacera celle du profil client.
+                    ✓ Signature téléchargée manuellement
                   </Typography>
                 </Box>
-              )}
-              
-              {/* Message si aucune signature */}
-              {!clientSignatureUrl && !clientSignature && (
-                <Alert severity="warning" sx={{ mt: 2 }}>
-                  <Typography variant="body2">
-                    Aucune signature disponible. Veuillez télécharger une signature ou sélectionner un client qui a une signature enregistrée.
-                  </Typography>
-                </Alert>
               )}
             </CardContent>
           </Card>
@@ -751,7 +728,7 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
           <Card variant="outlined">
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Notice d'engagement
+                Notice d'engagement *
               </Typography>
               
               <Paper variant="outlined" sx={{ p: 3, mb: 3, maxHeight: 300, overflow: 'auto' }}>
@@ -805,13 +782,7 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
         {/* Récapitulatif */}
         <Grid item xs={12}>
           <Alert 
-            severity={
-              engagementAccepted && 
-              (documents.cni_client || (documents.cni_recto_url && documents.cni_verso_url)) && 
-              (clientSignature || clientSignatureUrl) &&
-              documents.demande_ouverture_pdf &&
-              documents.formulaire_ouverture_pdf ? "success" : "warning"
-            }
+            severity={engagementAccepted ? "success" : "warning"}
             sx={{ mb: 3 }}
           >
             <Typography variant="subtitle1" gutterBottom>
@@ -821,20 +792,20 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
               <ListItem>
                 <Typography>
                   <strong>Demande d'ouverture (PDF):</strong> 
-                  {documents.demande_ouverture_pdf ? '✓ Fournie' : '✗ Manquante'}
+                  {documents.demande_ouverture_pdf ? '✓ Fournie' : '✗ Non fournie (optionnel)'}
                 </Typography>
               </ListItem>
               <ListItem>
                 <Typography>
                   <strong>Formulaire d'ouverture (PDF):</strong> 
-                  {documents.formulaire_ouverture_pdf ? '✓ Fournie' : '✗ Manquante'}
+                  {documents.formulaire_ouverture_pdf ? '✓ Fourni' : '✗ Non fourni (optionnel)'}
                 </Typography>
               </ListItem>
               <ListItem>
                 <Typography>
                   <strong>CNI du client:</strong> 
                   {documents.cni_client ? '✓ Fournie (manuelle)' : 
-                   documents.cni_recto_url && documents.cni_verso_url ? '✓ Fournie (automatique)' : '✗ Manquante'}
+                   documents.cni_recto_url && documents.cni_verso_url ? '✓ Disponible (profil client)' : '✗ Non fournie (optionnel)'}
                 </Typography>
               </ListItem>
               <ListItem>
@@ -848,13 +819,13 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
                   {clientSignature ? (
                     '✓ Fournie (manuelle)'
                   ) : clientSignatureUrl ? (
-                    '✓ Fournie (automatique depuis profil)'
-                  ) : '✗ Manquante'}
+                    '✓ Disponible (profil client)'
+                  ) : '✗ Non fournie (optionnel)'}
                 </Typography>
               </ListItem>
               <ListItem>
                 <Typography>
-                  <strong>Acceptation des conditions:</strong> {engagementAccepted ? '✓ Acceptée' : '✗ En attente'}
+                  <strong>Acceptation des conditions:</strong> {engagementAccepted ? '✓ Acceptée' : '✗ Requise'}
                 </Typography>
               </ListItem>
             </List>
@@ -884,14 +855,7 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
             <Button
               variant="contained"
               onClick={handleSaveCompte}
-              disabled={
-                saving || 
-                !engagementAccepted || 
-                (!documents.cni_client && !(documents.cni_recto_url && documents.cni_verso_url)) || 
-                (!clientSignature && !clientSignatureUrl) ||
-                !documents.demande_ouverture_pdf ||
-                !documents.formulaire_ouverture_pdf
-              }
+              disabled={saving || !engagementAccepted} // UNIQUEMENT désactivé si saving OU engagement non accepté
               startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <CheckCircleIcon />}
               sx={{
                 background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
@@ -924,42 +888,28 @@ const Step4Documents: React.FC<Step4DocumentsProps> = ({
             Vérifiez que toutes les informations sont correctes avant de continuer.
           </Alert>
           
-          {/* Information sur les documents PDF */}
-          {documents.demande_ouverture_pdf && (
-            <Alert severity="success" sx={{ mt: 2 }}>
-              Demande d'ouverture (PDF): ✓ Prêt
+          {/* Information sur les documents (message informatif) */}
+          {!documents.demande_ouverture_pdf && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              Aucune demande d'ouverture PDF n'a été jointe.
             </Alert>
           )}
           
-          {documents.formulaire_ouverture_pdf && (
-            <Alert severity="success" sx={{ mt: 2 }}>
-              Formulaire d'ouverture (PDF): ✓ Prêt
+          {!documents.formulaire_ouverture_pdf && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              Aucun formulaire d'ouverture PDF n'a été joint.
             </Alert>
           )}
           
-          {/* Information sur les CNI */}
-          {documents.cni_recto_url && documents.cni_verso_url && !documents.cni_client && (
-            <Alert severity="success" sx={{ mt: 2 }}>
-              Les CNI du client seront automatiquement récupérées depuis son profil.
+          {!documents.cni_client && !documents.cni_recto_url && !documents.cni_verso_url && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              Aucune CNI n'est disponible.
             </Alert>
           )}
           
-          {documents.cni_client && (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              La CNI téléchargée manuellement sera utilisée.
-            </Alert>
-          )}
-          
-          {/* Information sur la signature */}
-          {clientSignatureUrl && !clientSignature && (
-            <Alert severity="success" sx={{ mt: 2 }}>
-              La signature du client sera automatiquement récupérée depuis son profil.
-            </Alert>
-          )}
-          
-          {clientSignature && (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              La signature téléchargée manuellement sera utilisée.
+          {!clientSignature && !clientSignatureUrl && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              Aucune signature n'est disponible.
             </Alert>
           )}
         </DialogContent>

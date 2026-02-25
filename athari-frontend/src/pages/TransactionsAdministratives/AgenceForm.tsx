@@ -138,7 +138,7 @@ useEffect(() => {
       
     } catch (err) {
       console.error('❌ Erreur initialisation:', err);
-      setError('Erreur lors du chargement des données');
+      //setError('Erreur lors du chargement des données');
     } finally {
       setLoadingAgences(false);
     }
@@ -488,7 +488,7 @@ useEffect(() => {
                     <form onSubmit={handleSubmitOuverture} style={{ width: '100%' }}>
                       <Grid container spacing={3}>
                         <Grid item xs={12} md={6}>
-                          <FormControl fullWidth size="small" required>
+                          <FormControl sx={{minWidth: 200}} size="small" required>
                             <InputLabel>Agence *</InputLabel>
                             <Select
                               name="agence_id"

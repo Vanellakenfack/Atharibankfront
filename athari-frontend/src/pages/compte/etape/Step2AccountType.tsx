@@ -1,9 +1,7 @@
-// src/pages/compte/etape/Step2AccountType.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { planComptableService } from '../../../services/api/clientApi';
 import { typeCompteService } from '../../../services/api/typeCompteApi';
-// AJOUT: Importer le service des gestionnaires
-import { gestionnaireService } from '../../../services/gestionnaireService/gestionnaireApi'; // Assurez-vous que le chemin est correct
+import { gestionnaireService } from '../../../services/gestionnaireService/gestionnaireApi'; 
 import type { SelectChangeEvent } from '@mui/material/Select';
 import {
   FormControl,
@@ -82,12 +80,12 @@ interface Step2AccountTypeProps {
   accountType: string;
   accountSubType: string;
   options: FormOptions;
+  selectedClient: any; 
   onChange: (field: string, value: unknown) => void;
   onNext: (data: any) => Promise<void>;
   isLastStep?: boolean;
 }
 
-// AJOUT: Interface pour les gestionnaires
 interface Gestionnaire {
   id: number;
   gestionnaire_code: string;
@@ -111,7 +109,6 @@ const MODULES = [
   "FONDS ISLAMIQUE"
 ];
 
-// Helper function pour formater les valeurs
 const formatValue = (value: any): string => {
   if (value === null || value === undefined) return '-';
   if (typeof value === 'boolean') return value ? 'Oui' : 'Non';
@@ -125,7 +122,6 @@ const formatValue = (value: any): string => {
   return value.toString();
 };
 
-// Helper pour formater les soldes
 const formatsolde = (value: string): string => {
   if (!value || value === '0.00' || value === '0') return '-';
   try {
@@ -136,14 +132,12 @@ const formatsolde = (value: string): string => {
   }
 };
 
-// Helper pour formater les pourcentages
 const formatPourcentage = (value: string): string => {
   if (!value || value === '0.00' || value === '0') return '-';
   if (value.includes('FCFA')) return value;
   return `${value}%`;
 };
 
-// Catégoriser les paramètres
 const categorizeParameters = (typeCompte: TypeCompte) => {
   const fraisKeys = [
     'frais_ouverture', 'frais_deblocage', 'frais_cloture_anticipe', 
@@ -187,7 +181,6 @@ const categorizeParameters = (typeCompte: TypeCompte) => {
   };
 };
 
-// Grouper les paramètres actifs/inactifs
 const groupActiveInactive = (typeCompte: TypeCompte, keys: string[]) => {
   const active: Array<{key: string, value: any, label: string}> = [];
   const inactive: Array<{key: string, value: any, label: string}> = [];
@@ -278,6 +271,7 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
   accountType,
   accountSubType,
   options,
+  selectedClient, // <--- RÉCUPÉRER ICI
   onChange,
   onNext,
   isLastStep = false
@@ -555,90 +549,92 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
   };
 
   // Gestion du changement de type de compte
-  const handleTypeCompteChange = async (event: SelectChangeEvent<number>) => {
-    const typeCompteId = Number(event.target.value);
-    const selectedType = typesComptes.find(tc => tc.code === typeCompteId.toString());
+const handleTypeCompteChange = async (event: SelectChangeEvent<number>) => {
+  const typeCompteId = Number(event.target.value);
   
-    if (selectedType) {
-      setSelectedType(selectedType.code);
-      setSelectedTypeDetails(selectedType);
+  const selectedType = typesComptes.find(tc => tc.id === typeCompteId);
+  
+  if (selectedType) {
+    console.log('Type sélectionné:', selectedType);
+    setSelectedType(selectedType.code); 
+    setSelectedTypeDetails(selectedType);
+    
+    const updates: any = {};
+    Object.entries(selectedType).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        updates[key] = value;
+      }
+    });
+    
+    updates.accountType = selectedType.id;
+    updates.accountSubType = selectedType.code;
+    
+    try {
+      setLoadingChapitres(true);
       
-      const updates: any = {};
-      Object.entries(selectedType).forEach(([key, value]) => {
-        if (value !== null && value !== undefined) {
-          updates[key] = value;
-        }
-      });
-      
-      updates.accountType = selectedType.id;
-      updates.accountSubType = selectedType.code;
-      
-      try {
-        setLoadingChapitres(true);
+      if (selectedType.chapitre_defaut_id) {
+        console.log('Chargement du chapitre par défaut:', selectedType.chapitre_defaut_id);
+        const chapitre = await planComptableService.getChapitre(selectedType.chapitre_defaut_id);
         
-        if (selectedType.chapitre_defaut_id) {
-          console.log('Chargement du chapitre par défaut:', selectedType.chapitre_defaut_id);
-          const chapitre = await planComptableService.getChapitre(selectedType.chapitre_defaut_id);
+        if (chapitre) {
+          console.log('Chapitre par défaut trouvé:', chapitre);
+          setChapitreDefaut(chapitre);
+          setSelectedChapitre(chapitre);
+          updates.chapitre_id = chapitre.id;
+          updates.categorie_id = chapitre.categorie_id || '';
+          setNatureSolde(chapitre.comptabilite?.nature_technique || 'Non spécifiée');
+        } else {
+          // Chercher dans les autres champs de chapitre
+          const chapitreKeys = Object.keys(selectedType).filter(key => 
+            key.includes('chapitre_') && key.endsWith('_id') && selectedType[key]
+          );
           
-          if (chapitre) {
-            console.log('Chapitre par défaut trouvé:', chapitre);
-            setChapitreDefaut(chapitre);
-            setSelectedChapitre(chapitre);
-            updates.chapitre_id = chapitre.id;
-            updates.categorie_id = chapitre.categorie_id || '';
-            setNatureSolde(chapitre.comptabilite?.nature_technique || 'Non spécifiée');
-          } else {
-            const chapitreKeys = Object.keys(selectedType).filter(key => 
-              key.includes('chapitre_') && key.endsWith('_id') && selectedType[key]
+          if (chapitreKeys.length > 0) {
+            const chapitreIdToFind = selectedType[chapitreKeys[0]];
+            const chapitres = await planComptableService.getChapitres();
+            const chapitre = chapitres.find((c: ChapitreComptable) => 
+              c.id === chapitreIdToFind
             );
             
-            if (chapitreKeys.length > 0) {
-              const chapitreIdToFind = selectedType[chapitreKeys[0]];
-              const chapitres = await planComptableService.getChapitres();
-              const chapitre = chapitres.find((c: ChapitreComptable) => 
-                c.id === chapitreIdToFind
-              );
-              
-              if (chapitre) {
-                setChapitreDefaut(chapitre);
-                setSelectedChapitre(chapitre);
-                updates.chapitre_id = chapitre.id;
-                updates.categorie_id = chapitre.categorie_id || '';
-                setNatureSolde(chapitre.comptabilite?.nature_technique || 'Non spécifiée');
-              } else {
-                setChapitreDefaut(null);
-                setSelectedChapitre(null);
-                setNatureSolde('');
-                updates.chapitre_id = '';
-                updates.categorie_id = '';
-              }
+            if (chapitre) {
+              setChapitreDefaut(chapitre);
+              setSelectedChapitre(chapitre);
+              updates.chapitre_id = chapitre.id;
+              updates.categorie_id = chapitre.categorie_id || '';
+              setNatureSolde(chapitre.comptabilite?.nature_technique || 'Non spécifiée');
+            } else {
+              setChapitreDefaut(null);
+              setSelectedChapitre(null);
+              setNatureSolde('');
+              updates.chapitre_id = '';
+              updates.categorie_id = '';
             }
           }
         }
-        
-        onChange('options', {
-          ...options,
-          ...updates
-        });
-        
-      } catch (err) {
-        console.error('Erreur lors du chargement du chapitre par défaut:', err);
-        setError('Erreur lors du chargement du chapitre par défaut');
-        
-        setChapitreDefaut(null);
-        setSelectedChapitre(null);
-        onChange('options', {
-          ...options,
-          chapitre_id: '',
-          categorie_id: '',
-          ...updates
-        });
-      } finally {
-        setLoadingChapitres(false);
       }
+      
+      onChange('options', {
+        ...options,
+        ...updates
+      });
+      
+    } catch (err) {
+      console.error('Erreur lors du chargement du chapitre par défaut:', err);
+      setError('Erreur lors du chargement du chapitre par défaut');
+      
+      setChapitreDefaut(null);
+      setSelectedChapitre(null);
+      onChange('options', {
+        ...options,
+        chapitre_id: '',
+        categorie_id: '',
+        ...updates
+      });
+    } finally {
+      setLoadingChapitres(false);
     }
-  };
-
+  }
+};
   // Gestion du changement des champs de formulaire
   const handleInputChange = useCallback((field: keyof FormOptions) => 
     (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -688,6 +684,13 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
         throw new Error('Veuillez sélectionner un gestionnaire');
       }
       
+    // Extraire défensivement l'ID d'agence du client (plusieurs formes possibles)
+    const clientAgencyRaw = selectedClient?.agency_id 
+        ?? selectedClient?.agence_id 
+        ?? selectedClient?.agence?.id 
+        ?? selectedClient?.agence?.agency_id 
+        ?? null;
+    const clientAgency = clientAgencyRaw !== null && clientAgencyRaw !== undefined ? Number(clientAgencyRaw) : null;
     const etape2Data = {
         account_type: selectedTypeDetails?.id || accountType,
         account_sub_type: selectedType || accountSubType,
@@ -697,13 +700,19 @@ const Step2AccountType: React.FC<Step2AccountTypeProps> = ({
         plan_comptable_id: selectedChapitre.plan_comptable_id || selectedChapitre.id,
         chapitre_comptable_id: selectedChapitre.id,
         categorie_id: selectedChapitre.categorie_id || '',
-        // AJOUT: Inclure explicitement le gestionnaire_id depuis selectedGestionnaireId ou options.gestionnaire_id
-        gestionnaire_id: selectedGestionnaireId || options.gestionnaire_id || null,
-        gestionnaire_nom: options.gestionnaire_nom || '',
-        gestionnaire_prenom: options.gestionnaire_prenom || '',
-        gestionnaire_code: options.gestionnaire_code || '',
-        type_compte_libelle: selectedTypeDetails?.libelle || ''
-      };
+        // Inclure explicitement le gestionnaire_id depuis selectedGestionnaireId ou options.gestionnaire_id
+        gestionnaire_id: selectedGestionnaireId || (options as any).gestionnaire_id || null,
+        gestionnaire_nom: (options as any).gestionnaire_nom || '',
+        gestionnaire_prenom: (options as any).gestionnaire_prenom || '',
+        gestionnaire_code: (options as any).gestionnaire_code || '',
+        type_compte_libelle: selectedTypeDetails?.libelle || '',
+        // Priorité au client sélectionné (extrait défensivement), puis options, puis localStorage
+
+        agency_id: clientAgency  || Number((options as any).agency_id)  || null,
+        };
+
+        console.log('Transmission Agency ID:', etape2Data.agency_id);
+
 
 console.log('=== DONNÉES ÉTAPE 2 ENVOYÉES ===');
       console.log('etape2Data:', etape2Data);
@@ -770,38 +779,34 @@ console.log('=== DONNÉES ÉTAPE 2 ENVOYÉES ===');
       )}
 
       <Grid container spacing={3}>
-        {/* Sélection du type de compte */}
-        <Grid item xs={12} md={6}>
-          <FormControl fullWidth variant="outlined" margin="normal">
-            <InputLabel id="type-compte-label">Type de compte *</InputLabel>
-            <Select
-              labelId="type-compte-label"
-              id="type-compte"
-              value={typesComptes.find(tc => tc.code === selectedType)?.id || ''}
-              onChange={handleTypeCompteChange}
-              label="Type de compte *"
-              disabled={loadingTypes}
-              displayEmpty
-            >
-              <MenuItem value="" disabled>
-                Sélectionnez un type de compte
-              </MenuItem>
-              {loadingTypes ? (
-                <MenuItem value="">Chargement...</MenuItem>
-              ) : (
-                typesComptes.map((type) => (
-                  <MenuItem key={type.id} value={type.code}>
-                    {type.libelle} ({type.code})
-                  </MenuItem>
-                ))
-              )}
-            </Select>
-          </FormControl>
-        </Grid>
-
+{/* Sélection du type de compte */}
+<Grid item xs={12} md={6}>
+  <FormControl sx={{minWidth: 200}} variant="outlined" margin="normal">
+    <InputLabel id="type-compte-label">Sélectionnez un type de compte *</InputLabel>
+    <Select
+      labelId="type-compte-label"
+      id="type-compte"
+      value={selectedType ? typesComptes.find(tc => tc.code === selectedType)?.id || '' : ''}
+      onChange={handleTypeCompteChange}
+      disabled={loadingTypes}
+      displayEmpty
+    >
+      {loadingTypes ? (
+        <MenuItem value="">Chargement...</MenuItem>
+      ) : (
+        typesComptes.map((type) => (
+          // CORRECTION: Utiliser type.id comme valeur
+          <MenuItem key={type.id} value={type.id}>
+            {type.libelle} ({type.code})
+          </MenuItem>
+        ))
+      )}
+    </Select>
+  </FormControl>
+</Grid>
         {/* Chapitre comptable en lecture seule */}
         <Grid item xs={12} md={6}>
-          <FormControl fullWidth variant="outlined" margin="normal">
+          <FormControl sx={{minWidth: 515}}  variant="outlined" margin="normal">
             <TextField
               label="Chapitre comptable *"
               value={chapitreDefaut ? `${chapitreDefaut.code} - ${chapitreDefaut.libelle}` : 'Aucun chapitre par défaut'}
@@ -842,9 +847,6 @@ console.log('=== DONNÉES ÉTAPE 2 ENVOYÉES ===');
               disabled={loadingGestionnaires}
               displayEmpty
             >
-              <MenuItem value="">
-                <em>Sélectionnez un gestionnaire...</em>
-              </MenuItem>
               {loadingGestionnaires ? (
                 <MenuItem value="">Chargement des gestionnaires...</MenuItem>
               ) : (

@@ -110,8 +110,8 @@ const GuichetForm: React.FC = () => {
             setOperation('OU');
           }
           
-          // 3. Charger les guichets disponibles
-          await loadGuichets();
+          // 3. Charger les guichets disponibles avec l'ID de session
+          await loadGuichets(agenceSession.id);
           
         } else {
           showSnackbar('Ouvrez d\'abord l\'agence', 'warning');
@@ -126,6 +126,7 @@ const GuichetForm: React.FC = () => {
 
     init();
   }, []);
+
   // Fonction pour vérifier l'état du guichet
   const checkGuichetSession = async () => {
     try {
@@ -175,37 +176,90 @@ const GuichetForm: React.FC = () => {
     setOperation('OU');
   };
 
-  const loadGuichets = async () => {
+  const loadGuichets = async (sessionId?: string) => {
     try {
       setLoadingGuichets(true);
-      console.log('📋 Chargement de tous les guichets...');
       
-      const data = await guichetService.getGuichets();
-      console.log('📦 Réponse API getGuichets:', data);
+      // Utiliser l'ID passé en paramètre ou celui de l'état
+      const currentSessionId = sessionId || agenceSessionId;
       
+      console.log('🔄 1. Début loadGuichets, sessionId:', currentSessionId);
+      
+      // Vérifier si on a une session agence
+      if (!currentSessionId) {
+        console.log('❌ Aucune session agence active');
+        setGuichets([]);
+        showSnackbar('Ouvrez d\'abord l\'agence', 'warning');
+        return;
+      }
+      
+      console.log(`Appel API: /sessions/guichets/disponibles/${currentSessionId}`);
+      
+      // Utiliser la méthode getGuichetsDisponibles
+      const data = await guichetService.getGuichetsDisponibles(parseInt(currentSessionId));
+      
+      console.log('📦 4. Réponse API brute:', data);
+      
+      // Gérer la structure de la réponse
       if (Array.isArray(data)) {
-        console.log('✅ Guichets chargés (tableau):', data);
+        console.log('✅ 5. Données (tableau direct):', data.length, 'guichets');
         setGuichets(data);
       } else if (data && typeof data === 'object') {
-        console.log('✅ Guichet unique chargé (converti en tableau):', data);
-        setGuichets([data]);
-      } else if (data && data.statut === 'success' && Array.isArray(data.data)) {
-        console.log('✅ Guichets chargés depuis structure data:', data.data);
-        setGuichets(data.data);
+        console.log('✅ 5. Données (objet):', Object.keys(data));
+        
+        // Vérifier différentes structures possibles
+        if (data.statut === 'success' && Array.isArray(data.data)) {
+          console.log('✅ Structure: data.statut success avec data.data');
+          setGuichets(data.data);
+        } else if (data.data && Array.isArray(data.data)) {
+          console.log('✅ Structure: data.data (sans statut)');
+          setGuichets(data.data);
+        } else if (Array.isArray(data.guichets)) {
+          console.log('✅ Structure: data.guichets');
+          setGuichets(data.guichets);
+        } else {
+          console.warn('⚠️ Structure de données inattendue:', data);
+          setGuichets([]);
+        }
       } else {
-        console.warn('⚠️ Format de données inattendu:', data);
+        console.log('ℹ️ Aucun guichet disponible ou réponse vide');
         setGuichets([]);
       }
       
     } catch (error: any) {
-      console.error('❌ Erreur chargement guichets:', error);
+      console.error('❌ ERREUR dans loadGuichets:', error);
+      
+      // Log détaillé de l'erreur
+      if (error.response) {
+        console.error('📊 Détails erreur:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          headers: error.response.headers,
+          url: error.response.config?.url
+        });
+      }
+      
       let errorMessage = 'Erreur lors du chargement des guichets';
       
       if (error && typeof error === 'object') {
         const err = error as any;
-        errorMessage = err.response?.data?.message || 
-                      err.message || 
-                      errorMessage;
+        
+        // Messages d'erreur spécifiques
+        if (err.response?.status === 404) {
+          errorMessage = 'Aucun guichet disponible pour cette agence';
+        } else if (err.response?.status === 400) {
+          errorMessage = 'Session agence invalide';
+        } else if (err.response?.status === 401) {
+          errorMessage = 'Session expirée, veuillez vous reconnecter';
+        } else if (err.response?.status === 500) {
+          errorMessage = 'Erreur serveur, veuillez réessayer';
+        } else {
+          errorMessage = err.response?.data?.message || 
+                        err.response?.data?.error || 
+                        err.message || 
+                        errorMessage;
+        }
       }
       
       showSnackbar(errorMessage, 'error');
@@ -624,7 +678,7 @@ const GuichetForm: React.FC = () => {
                   <form onSubmit={handleSubmitOuverture} style={{ width: '100%' }}>
                     <Grid container spacing={3}>
                       <Grid item xs={12} md={6}>
-                        <FormControl fullWidth size="small" required>
+                        <FormControl sx={{minWidth:200}} size="small" required>
                           <InputLabel>Sélectionner Guichet</InputLabel>
                           <Select
                             name="guichet_id"
@@ -711,26 +765,6 @@ const GuichetForm: React.FC = () => {
                     </Grid>
                   </form>
                 )}
-
-                {/* Informations de session 
-                <Grid item xs={12}>
-                  <Alert severity="info" icon={false}>
-                    <Typography variant="body2" fontWeight="bold">
-                      Informations stockées dans localStorage:
-                    </Typography>
-                    <Typography variant="body2" component="div" sx={{ mt: 1, fontFamily: 'monospace', fontSize: '12px' }}>
-                      session_agence_id: {localStorage.getItem('session_agence_id') || 'null'}<br/>
-                      guichet_session_id: {localStorage.getItem('guichet_session_id') || 'null'}<br/>
-                      guichet_id: {localStorage.getItem('guichet_id') || 'null'}<br/>
-                      code_guichet: {localStorage.getItem('code_guichet') || 'null'}
-                    </Typography>
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      <strong>État actuel:</strong><br/>
-                      - Guichet sélectionné: {formDataOuverture.guichet_id || 'Aucun'}<br/>
-                      - Code guichet: {formDataOuverture.code_guichet || 'Aucun'}
-                    </Typography>
-                  </Alert>
-                </Grid>*/}
 
                 {/* Boutons */}
                 <Grid item xs={12}>

@@ -37,12 +37,18 @@ const TraitementFinJournee = () => {
             setVerifying(true);
             const sessionResponse = await apiClient.get('/sessions/agence/active');
             
+            console.log("DEBUG - Réponse Session API:", sessionResponse.data);
+
             if (sessionResponse.data.statut === 'success' && sessionResponse.data.session) {
                 const session = sessionResponse.data.session;
                 setActiveSession(session);
 
-                const statusResponse = await apiClient.get(`/sessions/etat-agence/${session.id}`);
-                setStatusData(statusResponse.data);
+                // On vérifie si l'ID existe avant d'appeler l'état
+                const sessionId = session.id || session.agence_session_id;
+                if (sessionId) {
+                    const statusResponse = await apiClient.get(`/sessions/etat-agence/${sessionId}`);
+                    setStatusData(statusResponse.data);
+                }
             } else {
                 setSnackbar({ 
                     open: true, 
@@ -63,16 +69,28 @@ const TraitementFinJournee = () => {
     }, []);
 
     const handleLancerTFJ = async () => {
-        if (!activeSession?.id || !activeSession?.jour_comptable_id) {
-            setSnackbar({ open: true, message: "Données de session incomplètes", severity: 'error' });
+        // --- LOG DE DIAGNOSTIC ---
+        console.log("Tentative de lancement TFJ avec activeSession:", activeSession);
+
+        // On essaie de récupérer les IDs même si les noms de clés varient légèrement
+        const sessionId = activeSession?.id || activeSession?.agence_session_id;
+        const jourId = activeSession?.jour_comptable_id || activeSession?.journee_id;
+
+        if (!sessionId || !jourId) {
+            const detail = !sessionId ? "ID de session manquant" : "ID de journée comptable manquant";
+            setSnackbar({ 
+                open: true, 
+                message: `Données de session incomplètes : ${detail}`, 
+                severity: 'error' 
+            });
             return;
         }
 
         setLoading(true);
         try {
             const response = await apiClient.post('/sessions/traiter-bilan-agence', {
-                agence_session_id: activeSession.id,
-                jour_comptable_id: activeSession.jour_comptable_id
+                agence_session_id: sessionId,
+                jours_comptable_id: jourId
             });
             
             setBilanData(response.data.bilan || response.data.data); 
@@ -87,24 +105,25 @@ const TraitementFinJournee = () => {
     };
 
     const handlePrintPDF = async () => {
-        // CORRECTION : Vérification avant appel pour éviter le /null
-        if (!activeSession?.jour_comptable_id) {
+        const jourId = activeSession?.jour_comptable_id || activeSession?.journee_id;
+
+        if (!jourId) {
             setSnackbar({ open: true, message: "Identifiant de journée manquant pour l'impression", severity: 'error' });
             return;
         }
 
         try {
             setLoading(true);
-            const response = await apiClient.get(`/sessions/imprimer-brouillard/${activeSession.jour_comptable_id}`, {
+            const response = await apiClient.get(`/sessions/imprimer-brouillard/${jourId}`, {
                 responseType: 'blob'
             });
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `Brouillard_Agence_${activeSession.date_comptable || 'export'}.pdf`);
+            link.setAttribute('download', `Brouillard_Agence_${activeSession?.date_comptable || 'export'}.pdf`);
             document.body.appendChild(link);
             link.click();
-            link.remove(); // Nettoyage du DOM
+            link.remove(); 
             setSnackbar({ open: true, message: "Téléchargement du rapport lancé", severity: 'success' });
         } catch (error) {
             setSnackbar({ open: true, message: "Erreur lors de la génération du PDF", severity: 'error' });
@@ -159,7 +178,7 @@ const TraitementFinJournee = () => {
                                             </ListItemIcon>
                                             <ListItemText 
                                                 primary="Clôture des guichets" 
-                                                secondary={canStart ? "Tous les guichets sont fermés." : `${statusData?.guichets_ouverts} guichet(s) encore en activité.`} 
+                                                secondary={canStart ? "Tous les guichets sont fermés." : `${statusData?.guichets_ouverts || 0} guichet(s) encore en activité.`} 
                                             />
                                         </ListItem>
                                         <Divider variant="inset" component="li" />
@@ -247,14 +266,13 @@ const TraitementFinJournee = () => {
                                                             </Button>
                                                         </Grid>
                                                         <Grid item xs={6}>
-                                                            {/* CORRECTION : Bouton désactivé si l'ID est null */}
                                                             <Button 
                                                                 fullWidth 
                                                                 variant="outlined" 
                                                                 color="secondary" 
                                                                 startIcon={<PdfIcon />} 
                                                                 onClick={handlePrintPDF}
-                                                                disabled={loading || !activeSession?.jour_comptable_id}
+                                                                disabled={loading}
                                                             >
                                                                 PDF
                                                             </Button>

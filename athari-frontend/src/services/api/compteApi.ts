@@ -69,22 +69,50 @@ export const compteService = {
   },
 
   // Valider étape 1
-  async validerEtape1(data: any): Promise<any> {
-    try {
-      console.log('Données étape 1:', data);
-      const response = await ApiClient.post('/comptes/etape1/valider', data);
-      return response.data;
-    } catch (error: any) {
-      console.error('Erreur validation étape 1:', error);
-      return handleAuthError(error);
-    }
-  },
+async validerEtape1(data: any): Promise<any> {
+  try {
+    // On s'assure que client_id est bien présent à la racine pour le Middleware
+    const payload = {
+      ...data,
+      client_id: data.client_id // Garantit que c'est visible par le middleware
+    };
+
+    console.log('Payload envoyé au middleware:', payload);
+    const response = await ApiClient.post('/comptes/etape1/valider', payload);
+    return response.data;
+  } catch (error: any) {
+    console.error('Erreur validation étape 1:', error);
+    return handleAuthError(error);
+  }
+},
 
   // Valider étape 2
   async validerEtape2(data: any): Promise<any> {
     try {
       console.log('=== VALIDATION ÉTAPE 2 ===');
       console.log('Données étape 2 envoyées:', JSON.stringify(data, null, 2));
+      // Si un client est présent, forcer l'usage de son agence (priorité)
+      if (data.client?.agence_id) {
+        const coercedClientAgency = Number(data.client.agence_id);
+        if (!isNaN(coercedClientAgency)) {
+          if (data.agency_id && Number(data.agency_id) !== coercedClientAgency) {
+            console.warn('Override: agency_id fourni (%s) remplacé par client.agence_id (%s)', String(data.agency_id), String(coercedClientAgency));
+          }
+          data.agency_id = coercedClientAgency;
+          console.log('Agency_id défini depuis client.agence_id ->', coercedClientAgency);
+        }
+      } else {
+        // Sinon, fallback sur le localStorage si absent
+        if (!data.agency_id) {
+          const inferredAgency = localStorage.getItem('agence_id') || localStorage.getItem('current_agency_id');
+          if (inferredAgency) {
+            data.agency_id = Number(inferredAgency);
+            console.log('Fallback: agency_id injecté depuis localStorage ->', data.agency_id);
+          } else {
+            console.warn('Aucun agency_id trouvé dans les données ou localStorage, le backend pourrait rejeter la requête.');
+          }
+        }
+      }
       
       // Vérification du gestionnaire_id
       if (!data.gestionnaire_id) {
@@ -92,7 +120,11 @@ export const compteService = {
         throw new Error('Le gestionnaire_id est requis pour l\'étape 2');
       }
       
-      const response = await ApiClient.post('/comptes/etape2/valider', data);
+      // Envoyer agency_id également en paramètre de requête pour le middleware (exigence des power users)
+      const params: any = {};
+      if (data.agency_id !== undefined && data.agency_id !== null) params.agency_id = data.agency_id;
+
+      const response = await ApiClient.post('/comptes/etape2/valider', data, { params });
       console.log('Réponse étape 2:', response.data);
       return response.data;
     } catch (error: any) {
@@ -117,18 +149,18 @@ export const compteService = {
         
         // Liste des champs attendus par le backend
         const fields = [
-          { key: 'sexe', required: true },
-          { key: 'nom', required: true, altKey: 'noms' },
-          { key: 'prenom', required: true, altKey: 'prenoms' },
-          { key: 'date_naissance', required: true },
-          { key: 'lieu_naissance', required: true },
-          { key: 'telephone', required: true },
-          { key: 'adresse', required: true },
-          { key: 'nationalite', required: true },
-          { key: 'profession', required: true },
+          { key: 'sexe', required: false },
+          { key: 'nom', required: false, altKey: 'noms' },
+          { key: 'prenom', required: false, altKey: 'prenoms' },
+          { key: 'date_naissance', required: false },
+          { key: 'lieu_naissance', required: false },
+          { key: 'telephone', required: false },
+          { key: 'adresse', required: false },
+          { key: 'nationalite', required: false },
+          { key: 'profession', required: false },
           { key: 'nom_jeune_fille_mere', required: false },
-          { key: 'numero_cni', required: true, altKey: 'cni' },
-          { key: 'situation_familiale', required: true },
+          { key: 'numero_cni', required: false, altKey: 'cni' },
+          { key: 'situation_familiale', required: false },
           { key: 'nom_conjoint', required: mandataire.situation_familiale === 'marie' },
           { key: 'date_naissance_conjoint', required: mandataire.situation_familiale === 'marie' },
           { key: 'lieu_naissance_conjoint', required: mandataire.situation_familiale === 'marie' },
@@ -333,6 +365,19 @@ export const compteService = {
         formData.append('etape2[chapitre_comptable_id]', String(etape2.chapitre_comptable_id));
         console.log('📝 etape2[chapitre_comptable_id]:', etape2.chapitre_comptable_id);
       }
+      // 8. Agency ID (important pour les power users)
+      // Priorité au client sélectionné : évite d'envoyer une agence différente (ex: session)
+      if (compteData.client?.agence_id) {
+        formData.append('etape2[agency_id]', String(compteData.client.agence_id));
+        console.log('📝 etape2[agency_id] PRIORITAIRE depuis client:', compteData.client.agence_id);
+      } else if (etape2.agency_id !== undefined && etape2.agency_id !== null) {
+        formData.append('etape2[agency_id]', String(etape2.agency_id));
+        console.log('📝 etape2[agency_id]:', etape2.agency_id);
+      } else if (localStorage.getItem('agence_id') || localStorage.getItem('current_agency_id')) {
+        const storedAgency = localStorage.getItem('agence_id') || localStorage.getItem('current_agency_id');
+        formData.append('etape2[agency_id]', String(storedAgency));
+        console.log('📝 etape2[agency_id] depuis localStorage:', storedAgency);
+      }
     } 
     // Fallback: Vérifier dans les options
     else if (compteData.options) {
@@ -363,6 +408,11 @@ export const compteService = {
       if (options.gestionnaire_code) {
         formData.append('etape2[gestionnaire_code]', options.gestionnaire_code);
         console.log('📝 etape2[gestionnaire_code]:', options.gestionnaire_code);
+      }
+      // Ajouter agency_id depuis options si présent
+      if (options.agency_id) {
+        formData.append('etape2[agency_id]', String(options.agency_id));
+        console.log('✅ AJOUTÉ: etape2[agency_id] depuis options:', options.agency_id);
       }
       
       // Solde et durée

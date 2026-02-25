@@ -45,7 +45,7 @@ export default function ModifierClient() {
     const niuImageMoraleRef = useRef(null);
     const statutsRef = useRef(null);
     const pvAgcRef = useRef(null);
-    const attestationRef = useRef(null);
+    const attestationNonRedevanceRef = useRef(null);
     const procesVerbalRef = useRef(null);
     const registreCoopRef = useRef(null);
     const recepisseRef = useRef(null);
@@ -79,10 +79,14 @@ export default function ModifierClient() {
     const [cniRectoPreview, setCniRectoPreview] = useState(null);
     const [cniVersoPreview, setCniVersoPreview] = useState(null);
     const [nuiImagePreview, setNuiImagePreview] = useState(null);
+    
+    // Noms des fichiers PDF
     const [demandeOuverturePdfName, setDemandeOuverturePdfName] = useState('');
     const [formulaireOuverturePdfName, setFormulaireOuverturePdfName] = useState('');
     const [listeMembresPdfName, setListeMembresPdfName] = useState('');
     const [attestationConformitePdfName, setAttestationConformitePdfName] = useState('');
+    const [acteDesignationPdfName, setActeDesignationPdfName] = useState('');
+    const [listeConseilPdfName, setListeConseilPdfName] = useState('');
     
     // Prévisualisations client moral
     const [gerantPreviews, setGerantPreviews] = useState([null, null]);
@@ -98,7 +102,7 @@ export default function ModifierClient() {
     const [niuImageMoralePreview, setNiuImageMoralePreview] = useState(null);
     const [statutsPreview, setStatutsPreview] = useState(null);
     const [pvAgcPreview, setPvAgcPreview] = useState(null);
-    const [attestationPreview, setAttestationPreview] = useState(null);
+    const [attestationNonRedevancePreview, setAttestationNonRedevancePreview] = useState(null);
     const [procesVerbalPreview, setProcesVerbalPreview] = useState(null);
     const [registreCoopPreview, setRegistreCoopPreview] = useState(null);
     const [recepissePreview, setRecepissePreview] = useState(null);
@@ -137,6 +141,8 @@ export default function ModifierClient() {
         niu_image: null,
         liste_membres_pdf: null,
         attestation_conformite_pdf: null,
+        demande_ouverture_pdf: null,
+        formulaire_ouverture_pdf: null,
         
         // Client physique
         physique: {
@@ -248,6 +254,29 @@ export default function ModifierClient() {
         facture_electricite_signataire1_image: null,
         facture_electricite_signataire2_image: null,
         facture_electricite_signataire3_image: null,
+        
+        // Fichiers spécifiques signataires
+        photo_signataire1: null,
+        photo_signataire2: null,
+        photo_signataire3: null,
+        signature_signataire1: null,
+        signature_signataire2: null,
+        signature_signataire3: null,
+        cni_photo_recto_signataire1: null,
+        cni_photo_recto_signataire2: null,
+        cni_photo_recto_signataire3: null,
+        cni_photo_verso_signataire1: null,
+        cni_photo_verso_signataire2: null,
+        cni_photo_verso_signataire3: null,
+        nui_image_signataire1: null,
+        nui_image_signataire2: null,
+        nui_image_signataire3: null,
+        lieu_dit_domicile_photo_signataire1: null,
+        lieu_dit_domicile_photo_signataire2: null,
+        lieu_dit_domicile_photo_signataire3: null,
+        photo_localisation_domicile_signataire1: null,
+        photo_localisation_domicile_signataire2: null,
+        photo_localisation_domicile_signataire3: null,
     });
 
     useEffect(() => {
@@ -388,8 +417,16 @@ export default function ModifierClient() {
                 
                 if (data.type_client === 'morale' && data.morale) {
                     // Photos gérants
-                    if (data.morale.photo_gerant_url) setGerantPreviews([getFullUrl(data.morale.photo_gerant_url), null]);
-                    if (data.morale.photo_gerant2_url) setGerantPreviews(prev => [prev[0], getFullUrl(data.morale.photo_gerant2_url)]);
+                    if (data.morale.photo_gerant_url) setGerantPreviews(prev => {
+                        const newPreviews = [...prev];
+                        newPreviews[0] = getFullUrl(data.morale.photo_gerant_url);
+                        return newPreviews;
+                    });
+                    if (data.morale.photo_gerant2_url) setGerantPreviews(prev => {
+                        const newPreviews = [...prev];
+                        newPreviews[1] = getFullUrl(data.morale.photo_gerant2_url);
+                        return newPreviews;
+                    });
                     
                     // Photos signataires
                     const signatairePreviewsTemp = [null, null, null];
@@ -426,7 +463,7 @@ export default function ModifierClient() {
                     if (data.morale.niu_image_url) setNiuImageMoralePreview(getFullUrl(data.morale.niu_image_url));
                     if (data.morale.statuts_image_url) setStatutsPreview(getFullUrl(data.morale.statuts_image_url));
                     if (data.morale.pv_agc_image_url) setPvAgcPreview(getFullUrl(data.morale.pv_agc_image_url));
-                    if (data.morale.attestation_non_redevance_image_url) setAttestationPreview(getFullUrl(data.morale.attestation_non_redevance_image_url));
+                    if (data.morale.attestation_non_redevance_image_url) setAttestationNonRedevancePreview(getFullUrl(data.morale.attestation_non_redevance_image_url));
                     if (data.morale.proces_verbal_image_url) setProcesVerbalPreview(getFullUrl(data.morale.proces_verbal_image_url));
                     if (data.morale.registre_coop_gic_image_url) setRegistreCoopPreview(getFullUrl(data.morale.registre_coop_gic_image_url));
                     if (data.morale.recepisse_declaration_association_image_url) setRecepissePreview(getFullUrl(data.morale.recepisse_declaration_association_image_url));
@@ -459,14 +496,15 @@ export default function ModifierClient() {
                     // PDFs
                     if (data.morale.liste_membres_pdf_url) setListeMembresPdfName('Liste membres.pdf');
                     if (data.morale.attestation_conformite_pdf_url) setAttestationConformitePdfName('Attestation conformité.pdf');
+                    if (data.morale.demande_ouverture_pdf_url) setDemandeOuverturePdfName('Demande ouverture.pdf');
+                    if (data.morale.formulaire_ouverture_pdf_url) setFormulaireOuverturePdfName('Formulaire ouverture.pdf');
+                    if (data.morale.acte_designation_signataires_pdf_url) setActeDesignationPdfName('Acte désignation.pdf');
+                    if (data.morale.liste_conseil_administration_pdf_url) setListeConseilPdfName('Liste conseil.pdf');
                 }
                 
                 // Photos de localisation (communes)
                 if (data.photo_localisation_domicile_url) setDomicilePreview(getFullUrl(data.photo_localisation_domicile_url));
                 if (data.photo_localisation_activite_url) setActivitePreview(getFullUrl(data.photo_localisation_activite_url));
-                
-                // PDFs communs
-                if (data.liste_membres_pdf_url) setListeMembresPdfName('Liste membres.pdf');
                 
             } catch (error) { 
                 console.error("Erreur lors de la récupération:", error);
@@ -569,6 +607,14 @@ export default function ModifierClient() {
                 setListeMembresPdfName(file.name);
             } else if (field === 'attestation_conformite_pdf') {
                 setAttestationConformitePdfName(file.name);
+            } else if (field === 'demande_ouverture_pdf') {
+                setDemandeOuverturePdfName(file.name);
+            } else if (field === 'formulaire_ouverture_pdf') {
+                setFormulaireOuverturePdfName(file.name);
+            } else if (field === 'acte_designation_signataires_pdf') {
+                setActeDesignationPdfName(file.name);
+            } else if (field === 'liste_conseil_administration_pdf') {
+                setListeConseilPdfName(file.name);
             }
             
             const previewUrl = URL.createObjectURL(file);
@@ -610,7 +656,7 @@ export default function ModifierClient() {
                     setPvAgcPreview(previewUrl);
                     break;
                 case 'attestation_non_redevance_image':
-                    setAttestationPreview(previewUrl);
+                    setAttestationNonRedevancePreview(previewUrl);
                     break;
                 case 'proces_verbal_image':
                     setProcesVerbalPreview(previewUrl);
@@ -652,7 +698,7 @@ export default function ModifierClient() {
     const handleSignatairePhotoChange = (index, e) => {
         const file = e.target.files[0];
         if (file) {
-            const field = index === 0 ? 'photo_signataire' : index === 1 ? 'photo_signataire2' : 'photo_signataire3';
+            const field = index === 0 ? 'photo_signataire1' : index === 1 ? 'photo_signataire2' : 'photo_signataire3';
             setFormDataState(prev => ({
                 ...prev,
                 [field]: file
@@ -667,7 +713,7 @@ export default function ModifierClient() {
     const handleSignatureSignataireChange = (index, e) => {
         const file = e.target.files[0];
         if (file) {
-            const field = index === 0 ? 'signature_signataire' : index === 1 ? 'signature_signataire2' : 'signature_signataire3';
+            const field = index === 0 ? 'signature_signataire1' : index === 1 ? 'signature_signataire2' : 'signature_signataire3';
             setFormDataState(prev => ({
                 ...prev,
                 [field]: file
@@ -682,7 +728,7 @@ export default function ModifierClient() {
     const handleCniRectoSignataireChange = (index, e) => {
         const file = e.target.files[0];
         if (file) {
-            const field = index === 0 ? 'cni_photo_recto_signataire' : 
+            const field = index === 0 ? 'cni_photo_recto_signataire1' : 
                          index === 1 ? 'cni_photo_recto_signataire2' : 
                          'cni_photo_recto_signataire3';
             setFormDataState(prev => ({
@@ -699,7 +745,7 @@ export default function ModifierClient() {
     const handleCniVersoSignataireChange = (index, e) => {
         const file = e.target.files[0];
         if (file) {
-            const field = index === 0 ? 'cni_photo_verso_signataire' : 
+            const field = index === 0 ? 'cni_photo_verso_signataire1' : 
                          index === 1 ? 'cni_photo_verso_signataire2' : 
                          'cni_photo_verso_signataire3';
             setFormDataState(prev => ({
@@ -716,7 +762,7 @@ export default function ModifierClient() {
     const handleNuiImageSignataireChange = (index, e) => {
         const file = e.target.files[0];
         if (file) {
-            const field = index === 0 ? 'nui_image_signataire' : 
+            const field = index === 0 ? 'nui_image_signataire1' : 
                          index === 1 ? 'nui_image_signataire2' : 
                          'nui_image_signataire3';
             setFormDataState(prev => ({
@@ -733,7 +779,7 @@ export default function ModifierClient() {
     const handleLieuDitDomicilePhotoChange = (index, e) => {
         const file = e.target.files[0];
         if (file) {
-            const field = index === 0 ? 'lieu_dit_domicile_photo_signataire' : 
+            const field = index === 0 ? 'lieu_dit_domicile_photo_signataire1' : 
                          index === 1 ? 'lieu_dit_domicile_photo_signataire2' : 
                          'lieu_dit_domicile_photo_signataire3';
             setFormDataState(prev => ({
@@ -750,7 +796,7 @@ export default function ModifierClient() {
     const handlePhotoLocalisationDomicileChange = (index, e) => {
         const file = e.target.files[0];
         if (file) {
-            const field = index === 0 ? 'photo_localisation_domicile_signataire' : 
+            const field = index === 0 ? 'photo_localisation_domicile_signataire1' : 
                          index === 1 ? 'photo_localisation_domicile_signataire2' : 
                          'photo_localisation_domicile_signataire3';
             setFormDataState(prev => ({
@@ -821,7 +867,15 @@ export default function ModifierClient() {
             [field]: null
         }));
         if (setPreview) {
-            setPreview(null);
+            if (Array.isArray(setPreview)) {
+                // Pour les prévisualisations multiples (signataires)
+                const [previewArray, setPreviewArray, index] = setPreview;
+                const newPreviews = [...previewArray];
+                newPreviews[index] = null;
+                setPreviewArray(newPreviews);
+            } else {
+                setPreview(null);
+            }
         }
         if (setFileName) {
             setFileName('');
@@ -854,12 +908,10 @@ export default function ModifierClient() {
             
             // Ajouter les fichiers communs
             const commonFileFields = [
-                'photo_localisation_domicile', 'photo_localisation_activite'
+                'photo_localisation_domicile', 'photo_localisation_activite',
+                'liste_membres_pdf', 'attestation_conformite_pdf',
+                'demande_ouverture_pdf', 'formulaire_ouverture_pdf'
             ];
-            
-            if (!isPhysique) {
-                commonFileFields.push('liste_membres_pdf');
-            }
             
             commonFileFields.forEach(field => {
                 if (formDataState[field] instanceof File) {
@@ -934,20 +986,19 @@ export default function ModifierClient() {
                     'plan_localisation_siege_image', 'facture_eau_siege_image', 'facture_electricite_siege_image',
                     'plan_localisation_signataire1_image', 'plan_localisation_signataire2_image', 'plan_localisation_signataire3_image',
                     'facture_eau_signataire1_image', 'facture_eau_signataire2_image', 'facture_eau_signataire3_image',
-                    'facture_electricite_signataire1_image', 'facture_electricite_signataire2_image', 'facture_electricite_signataire3_image',
-                    'attestation_conformite_pdf'
+                    'facture_electricite_signataire1_image', 'facture_electricite_signataire2_image', 'facture_electricite_signataire3_image'
                 ];
                 
                 // Fichiers des signataires
                 for (let i = 0; i < 3; i++) {
                     const fields = [
-                        `photo_signataire${i === 0 ? '' : i + 1}`,
-                        `signature_signataire${i === 0 ? '' : i + 1}`,
-                        `cni_photo_recto_signataire${i === 0 ? '' : i + 1}`,
-                        `cni_photo_verso_signataire${i === 0 ? '' : i + 1}`,
-                        `nui_image_signataire${i === 0 ? '' : i + 1}`,
-                        `lieu_dit_domicile_photo_signataire${i === 0 ? '' : i + 1}`,
-                        `photo_localisation_domicile_signataire${i === 0 ? '' : i + 1}`
+                        `photo_signataire${i + 1}`,
+                        `signature_signataire${i + 1}`,
+                        `cni_photo_recto_signataire${i + 1}`,
+                        `cni_photo_verso_signataire${i + 1}`,
+                        `nui_image_signataire${i + 1}`,
+                        `lieu_dit_domicile_photo_signataire${i + 1}`,
+                        `photo_localisation_domicile_signataire${i + 1}`
                     ];
                     
                     fields.forEach(field => {
@@ -1104,44 +1155,15 @@ export default function ModifierClient() {
                                         <Card sx={{ borderRadius: 5, boxShadow: '0 10px 30px rgba(0,0,0,0.04)' }}>
                                             <CardContent>
                                                 <Typography variant="subtitle1" fontWeight="800" sx={{ mb: 2 }}>Signature</Typography>
-                                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                                                    {signaturePreview && (
-                                                        <>
-                                                            <img 
-                                                                src={signaturePreview} 
-                                                                alt="Signature"
-                                                                style={{ 
-                                                                    width: '100%', 
-                                                                    maxHeight: '100px',
-                                                                    borderRadius: '8px',
-                                                                    objectFit: 'contain'
-                                                                }}
-                                                            />
-                                                            <IconButton 
-                                                                size="small" 
-                                                                onClick={() => removeFile('signature', setSignaturePreview)}
-                                                                sx={{ position: 'absolute', right: 10, top: 10 }}
-                                                            >
-                                                                <CloseIcon fontSize="small" />
-                                                            </IconButton>
-                                                        </>
-                                                    )}
-                                                    <Button
-                                                        variant="outlined"
-                                                        startIcon={<UploadIcon />}
-                                                        onClick={() => signatureRef.current.click()}
-                                                        fullWidth
-                                                    >
-                                                        {signaturePreview ? 'Changer la signature' : 'Ajouter une signature'}
-                                                    </Button>
-                                                    <input 
-                                                        type="file" 
-                                                        hidden 
-                                                        ref={signatureRef} 
-                                                        onChange={(e) => handleFileChange('signature', e)} 
-                                                        accept="image/*" 
-                                                    />
-                                                </Box>
+                                                <FileUploadField
+                                                    label=""
+                                                    preview={signaturePreview}
+                                                    onRemove={() => removeFile('signature', setSignaturePreview)}
+                                                    onClick={() => signatureRef.current.click()}
+                                                    inputRef={signatureRef}
+                                                    onChange={(e) => handleFileChange('signature', e)}
+                                                    hideLabel={true}
+                                                />
                                             </CardContent>
                                         </Card>
                                         
@@ -1150,76 +1172,22 @@ export default function ModifierClient() {
                                             <CardContent>
                                                 <Typography variant="subtitle1" fontWeight="800" sx={{ mb: 2 }}>Documents CNI</Typography>
                                                 <Stack spacing={2}>
-                                                    <Box>
-                                                        <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>Recto CNI</Typography>
-                                                        <Stack direction="row" spacing={2} alignItems="center">
-                                                            {cniRectoPreview && (
-                                                                <>
-                                                                    <Avatar 
-                                                                        variant="rounded"
-                                                                        src={cniRectoPreview}
-                                                                        sx={{ width: 60, height: 60 }}
-                                                                    />
-                                                                    <IconButton 
-                                                                        size="small" 
-                                                                        onClick={() => removeFile('cni_recto', setCniRectoPreview)}
-                                                                    >
-                                                                        <CloseIcon fontSize="small" />
-                                                                    </IconButton>
-                                                                </>
-                                                            )}
-                                                            <Button
-                                                                variant="outlined"
-                                                                size="small"
-                                                                startIcon={<PhotoCameraIcon />}
-                                                                onClick={() => cniRectoRef.current.click()}
-                                                            >
-                                                                {cniRectoPreview ? 'Changer' : 'Ajouter'}
-                                                            </Button>
-                                                            <input 
-                                                                type="file" 
-                                                                hidden 
-                                                                ref={cniRectoRef} 
-                                                                onChange={(e) => handleFileChange('cni_recto', e)} 
-                                                                accept="image/*" 
-                                                            />
-                                                        </Stack>
-                                                    </Box>
-                                                    <Box>
-                                                        <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>Verso CNI</Typography>
-                                                        <Stack direction="row" spacing={2} alignItems="center">
-                                                            {cniVersoPreview && (
-                                                                <>
-                                                                    <Avatar 
-                                                                        variant="rounded"
-                                                                        src={cniVersoPreview}
-                                                                        sx={{ width: 60, height: 60 }}
-                                                                    />
-                                                                    <IconButton 
-                                                                        size="small" 
-                                                                        onClick={() => removeFile('cni_verso', setCniVersoPreview)}
-                                                                    >
-                                                                        <CloseIcon fontSize="small" />
-                                                                    </IconButton>
-                                                                </>
-                                                            )}
-                                                            <Button
-                                                                variant="outlined"
-                                                                size="small"
-                                                                startIcon={<PhotoCameraIcon />}
-                                                                onClick={() => cniVersoRef.current.click()}
-                                                            >
-                                                                {cniVersoPreview ? 'Changer' : 'Ajouter'}
-                                                            </Button>
-                                                            <input 
-                                                                type="file" 
-                                                                hidden 
-                                                                ref={cniVersoRef} 
-                                                                onChange={(e) => handleFileChange('cni_verso', e)} 
-                                                                accept="image/*" 
-                                                            />
-                                                        </Stack>
-                                                    </Box>
+                                                    <FileUploadField
+                                                        label="Recto CNI"
+                                                        preview={cniRectoPreview}
+                                                        onRemove={() => removeFile('cni_recto', setCniRectoPreview)}
+                                                        onClick={() => cniRectoRef.current.click()}
+                                                        inputRef={cniRectoRef}
+                                                        onChange={(e) => handleFileChange('cni_recto', e)}
+                                                    />
+                                                    <FileUploadField
+                                                        label="Verso CNI"
+                                                        preview={cniVersoPreview}
+                                                        onRemove={() => removeFile('cni_verso', setCniVersoPreview)}
+                                                        onClick={() => cniVersoRef.current.click()}
+                                                        inputRef={cniVersoRef}
+                                                        onChange={(e) => handleFileChange('cni_verso', e)}
+                                                    />
                                                 </Stack>
                                             </CardContent>
                                         </Card>
@@ -1232,41 +1200,14 @@ export default function ModifierClient() {
                                         <Card sx={{ borderRadius: 5, boxShadow: '0 10px 30px rgba(0,0,0,0.04)' }}>
                                             <CardContent>
                                                 <Typography variant="subtitle1" fontWeight="800" sx={{ mb: 2 }}>Gérant Secondaire</Typography>
-                                                <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-                                                    {gerantPreviews[1] && (
-                                                        <>
-                                                            <Avatar 
-                                                                src={gerantPreviews[1]}
-                                                                sx={{ width: 60, height: 60 }}
-                                                            />
-                                                            <IconButton 
-                                                                size="small" 
-                                                                onClick={() => removeFile('photo_gerant2', () => {
-                                                                    const newPreviews = [...gerantPreviews];
-                                                                    newPreviews[1] = null;
-                                                                    setGerantPreviews(newPreviews);
-                                                                })}
-                                                            >
-                                                                <CloseIcon fontSize="small" />
-                                                            </IconButton>
-                                                        </>
-                                                    )}
-                                                    <Button
-                                                        variant="outlined"
-                                                        size="small"
-                                                        startIcon={<PhotoCameraIcon />}
-                                                        onClick={() => gerantPhotoRefs[1].current.click()}
-                                                    >
-                                                        {gerantPreviews[1] ? 'Changer' : 'Ajouter'}
-                                                    </Button>
-                                                    <input 
-                                                        type="file" 
-                                                        hidden 
-                                                        ref={gerantPhotoRefs[1]} 
-                                                        onChange={(e) => handleGerantPhotoChange(1, e)} 
-                                                        accept="image/*" 
-                                                    />
-                                                </Stack>
+                                                <FileUploadField
+                                                    label="Photo Gérant Secondaire"
+                                                    preview={gerantPreviews[1]}
+                                                    onRemove={() => removeFile('photo_gerant2', [gerantPreviews, setGerantPreviews, 1])}
+                                                    onClick={() => gerantPhotoRefs[1].current.click()}
+                                                    inputRef={gerantPhotoRefs[1]}
+                                                    onChange={(e) => handleGerantPhotoChange(1, e)}
+                                                />
                                             </CardContent>
                                         </Card>
                                     </>
@@ -1279,77 +1220,24 @@ export default function ModifierClient() {
                                             <CardContent>
                                                 <Typography variant="subtitle1" fontWeight="800" sx={{ mb: 2 }}>Localisation</Typography>
                                                 
-                                                <Box sx={{ mb: 3 }}>
-                                                    <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>Photo domicile</Typography>
-                                                    <Stack direction="row" spacing={2} alignItems="center">
-                                                        {domicilePreview && (
-                                                            <>
-                                                                <Avatar 
-                                                                    variant="rounded"
-                                                                    src={domicilePreview}
-                                                                    sx={{ width: 60, height: 60 }}
-                                                                />
-                                                                <IconButton 
-                                                                    size="small" 
-                                                                    onClick={() => removeFile('photo_localisation_domicile', setDomicilePreview)}
-                                                                >
-                                                                    <CloseIcon fontSize="small" />
-                                                                </IconButton>
-                                                            </>
-                                                        )}
-                                                        <Button
-                                                            variant="outlined"
-                                                            size="small"
-                                                            startIcon={<PhotoCameraIcon />}
-                                                            onClick={() => domicilePhotoRef.current.click()}
-                                                        >
-                                                            {domicilePreview ? 'Changer' : 'Ajouter'}
-                                                        </Button>
-                                                        <input 
-                                                            type="file" 
-                                                            hidden 
-                                                            ref={domicilePhotoRef} 
-                                                            onChange={(e) => handleFileChange('photo_localisation_domicile', e)} 
-                                                            accept="image/*" 
-                                                        />
-                                                    </Stack>
-                                                </Box>
+                                                <FileUploadField
+                                                    label="Photo domicile"
+                                                    preview={domicilePreview}
+                                                    onRemove={() => removeFile('photo_localisation_domicile', setDomicilePreview)}
+                                                    onClick={() => domicilePhotoRef.current.click()}
+                                                    inputRef={domicilePhotoRef}
+                                                    onChange={(e) => handleFileChange('photo_localisation_domicile', e)}
+                                                    sx={{ mb: 2 }}
+                                                />
                                                 
-                                                <Box>
-                                                    <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>Photo activité</Typography>
-                                                    <Stack direction="row" spacing={2} alignItems="center">
-                                                        {activitePreview && (
-                                                            <>
-                                                                <Avatar 
-                                                                    variant="rounded"
-                                                                    src={activitePreview}
-                                                                    sx={{ width: 60, height: 60 }}
-                                                                />
-                                                                <IconButton 
-                                                                    size="small" 
-                                                                    onClick={() => removeFile('photo_localisation_activite', setActivitePreview)}
-                                                                >
-                                                                    <CloseIcon fontSize="small" />
-                                                                </IconButton>
-                                                            </>
-                                                        )}
-                                                        <Button
-                                                            variant="outlined"
-                                                            size="small"
-                                                            startIcon={<PhotoCameraIcon />}
-                                                            onClick={() => activitePhotoRef.current.click()}
-                                                        >
-                                                            {activitePreview ? 'Changer' : 'Ajouter'}
-                                                        </Button>
-                                                        <input 
-                                                            type="file" 
-                                                            hidden 
-                                                            ref={activitePhotoRef} 
-                                                            onChange={(e) => handleFileChange('photo_localisation_activite', e)} 
-                                                            accept="image/*" 
-                                                        />
-                                                    </Stack>
-                                                </Box>
+                                                <FileUploadField
+                                                    label="Photo activité"
+                                                    preview={activitePreview}
+                                                    onRemove={() => removeFile('photo_localisation_activite', setActivitePreview)}
+                                                    onClick={() => activitePhotoRef.current.click()}
+                                                    inputRef={activitePhotoRef}
+                                                    onChange={(e) => handleFileChange('photo_localisation_activite', e)}
+                                                />
                                             </CardContent>
                                         </Card>
                                         
@@ -1358,37 +1246,41 @@ export default function ModifierClient() {
                                             <CardContent>
                                                 <Typography variant="subtitle1" fontWeight="800" sx={{ mb: 2 }}>Documents communs</Typography>
                                                 <Stack spacing={2}>
-                                                    {isPhysique ? (
-                                                        <>
-                                                            <FileUploadPdfField
-                                                                label="Attestation de conformité (PDF)"
-                                                                fileName={attestationConformitePdfName}
-                                                                onClick={() => attestationConformitePdfRef.current.click()}
-                                                                inputRef={attestationConformitePdfRef}
-                                                                onChange={(e) => handleFileChange('attestation_conformite_pdf', e)}
-                                                                onRemove={() => removeFile('attestation_conformite_pdf', null, setAttestationConformitePdfName)}
-                                                            />
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <FileUploadPdfField
-                                                                label="Liste des membres (PDF)"
-                                                                fileName={listeMembresPdfName}
-                                                                onClick={() => listeMembresPdfRef.current.click()}
-                                                                inputRef={listeMembresPdfRef}
-                                                                onChange={(e) => handleFileChange('liste_membres_pdf', e)}
-                                                                onRemove={() => removeFile('liste_membres_pdf', null, setListeMembresPdfName)}
-                                                            />
-                                                            <FileUploadPdfField
-                                                                label="Attestation de conformité (PDF)"
-                                                                fileName={attestationConformitePdfName}
-                                                                onClick={() => attestationConformitePdfRef.current.click()}
-                                                                inputRef={attestationConformitePdfRef}
-                                                                onChange={(e) => handleFileChange('attestation_conformite_pdf', e)}
-                                                                onRemove={() => removeFile('attestation_conformite_pdf', null, setAttestationConformitePdfName)}
-                                                            />
-                                                        </>
-                                                    )}
+                                                    <FileUploadPdfField
+                                                        label="Liste des membres (PDF)"
+                                                        fileName={listeMembresPdfName}
+                                                        onClick={() => listeMembresPdfRef.current.click()}
+                                                        inputRef={listeMembresPdfRef}
+                                                        onChange={(e) => handleFileChange('liste_membres_pdf', e)}
+                                                        onRemove={() => removeFile('liste_membres_pdf', null, setListeMembresPdfName)}
+                                                    />
+                                                    
+                                                    <FileUploadPdfField
+                                                        label="Attestation de conformité (PDF)"
+                                                        fileName={attestationConformitePdfName}
+                                                        onClick={() => attestationConformitePdfRef.current.click()}
+                                                        inputRef={attestationConformitePdfRef}
+                                                        onChange={(e) => handleFileChange('attestation_conformite_pdf', e)}
+                                                        onRemove={() => removeFile('attestation_conformite_pdf', null, setAttestationConformitePdfName)}
+                                                    />
+                                                    
+                                                    <FileUploadPdfField
+                                                        label="Demande d'ouverture (PDF)"
+                                                        fileName={demandeOuverturePdfName}
+                                                        onClick={() => demandeOuverturePdfRef.current.click()}
+                                                        inputRef={demandeOuverturePdfRef}
+                                                        onChange={(e) => handleFileChange('demande_ouverture_pdf', e)}
+                                                        onRemove={() => removeFile('demande_ouverture_pdf', null, setDemandeOuverturePdfName)}
+                                                    />
+                                                    
+                                                    <FileUploadPdfField
+                                                        label="Formulaire d'ouverture (PDF)"
+                                                        fileName={formulaireOuverturePdfName}
+                                                        onClick={() => formulaireOuverturePdfRef.current.click()}
+                                                        inputRef={formulaireOuverturePdfRef}
+                                                        onChange={(e) => handleFileChange('formulaire_ouverture_pdf', e)}
+                                                        onRemove={() => removeFile('formulaire_ouverture_pdf', null, setFormulaireOuverturePdfName)}
+                                                    />
                                                 </Stack>
                                             </CardContent>
                                         </Card>
@@ -1455,12 +1347,6 @@ export default function ModifierClient() {
                                                                         inputRef={statutsRef}
                                                                         onChange={(e) => handleFileChange('statuts_image', e)}
                                                                     />
-                                                                    <FileUploadPdfField
-                                                                        label="Acte de Désignation (PDF)"
-                                                                        onClick={() => acteDesignationPdfRef.current.click()}
-                                                                        inputRef={acteDesignationPdfRef}
-                                                                        onChange={(e) => handleFileChange('acte_designation_signataires_pdf', e)}
-                                                                    />
                                                                 </>
                                                             ) : (
                                                                 <>
@@ -1474,10 +1360,10 @@ export default function ModifierClient() {
                                                                     />
                                                                     <FileUploadField
                                                                         label="Attestation de non redevance"
-                                                                        preview={attestationPreview}
-                                                                        onRemove={() => removeFile('attestation_non_redevance_image', setAttestationPreview)}
-                                                                        onClick={() => attestationRef.current.click()}
-                                                                        inputRef={attestationRef}
+                                                                        preview={attestationNonRedevancePreview}
+                                                                        onRemove={() => removeFile('attestation_non_redevance_image', setAttestationNonRedevancePreview)}
+                                                                        onClick={() => attestationNonRedevanceRef.current.click()}
+                                                                        inputRef={attestationNonRedevanceRef}
                                                                         onChange={(e) => handleFileChange('attestation_non_redevance_image', e)}
                                                                     />
                                                                     <FileUploadField
@@ -1506,11 +1392,23 @@ export default function ModifierClient() {
                                                                     />
                                                                 </>
                                                             )}
+                                                            
+                                                            <FileUploadPdfField
+                                                                label="Acte de Désignation (PDF)"
+                                                                fileName={acteDesignationPdfName}
+                                                                onClick={() => acteDesignationPdfRef.current.click()}
+                                                                inputRef={acteDesignationPdfRef}
+                                                                onChange={(e) => handleFileChange('acte_designation_signataires_pdf', e)}
+                                                                onRemove={() => removeFile('acte_designation_signataires_pdf', null, setActeDesignationPdfName)}
+                                                            />
+                                                            
                                                             <FileUploadPdfField
                                                                 label="Liste Conseil d'Administration (PDF)"
+                                                                fileName={listeConseilPdfName}
                                                                 onClick={() => listeConseilPdfRef.current.click()}
                                                                 inputRef={listeConseilPdfRef}
                                                                 onChange={(e) => handleFileChange('liste_conseil_administration_pdf', e)}
+                                                                onRemove={() => removeFile('liste_conseil_administration_pdf', null, setListeConseilPdfName)}
                                                             />
                                                         </Stack>
                                                     </CardContent>
@@ -1730,6 +1628,7 @@ export default function ModifierClient() {
                                                                 value={formDataState.morale?.forme_juridique || ''} 
                                                                 onChange={(e) => handleNestedChange('morale', e)}
                                                             >
+                                                                <MenuItem value="">Sélectionner</MenuItem>
                                                                 <MenuItem value="SARL">SARL</MenuItem>
                                                                 <MenuItem value="SA">SA</MenuItem>
                                                                 <MenuItem value="SNC">SNC</MenuItem>
@@ -1982,51 +1881,48 @@ export default function ModifierClient() {
                                         {!isPhysique && (
                                             <Box sx={{ mb: 4 }}>
                                                 <Typography variant="subtitle1" fontWeight="700" sx={{ mb: 2 }}>
-                                                    Documents Signataires
+                                                    Documents Signataires (Plans et Factures)
                                                 </Typography>
                                                 <Grid container spacing={2}>
-                                                    <Grid item xs={12} md={6}>
-                                                        <FileUploadField
-                                                            label="Plan Signataire 1"
-                                                            preview={planSignatairePreviews[0]}
-                                                            onRemove={() => removeFile('plan_localisation_signataire1_image', () => {
-                                                                const newPreviews = [...planSignatairePreviews];
-                                                                newPreviews[0] = null;
-                                                                setPlanSignatairePreviews(newPreviews);
-                                                            })}
-                                                            onClick={() => planSignataireRefs[0].current.click()}
-                                                            inputRef={planSignataireRefs[0]}
-                                                            onChange={(e) => handlePlanSignataireChange(0, e)}
-                                                        />
-                                                    </Grid>
-                                                    <Grid item xs={12} md={6}>
-                                                        <FileUploadField
-                                                            label="Plan Signataire 2"
-                                                            preview={planSignatairePreviews[1]}
-                                                            onRemove={() => removeFile('plan_localisation_signataire2_image', () => {
-                                                                const newPreviews = [...planSignatairePreviews];
-                                                                newPreviews[1] = null;
-                                                                setPlanSignatairePreviews(newPreviews);
-                                                            })}
-                                                            onClick={() => planSignataireRefs[1].current.click()}
-                                                            inputRef={planSignataireRefs[1]}
-                                                            onChange={(e) => handlePlanSignataireChange(1, e)}
-                                                        />
-                                                    </Grid>
-                                                    <Grid item xs={12} md={6}>
-                                                        <FileUploadField
-                                                            label="Plan Signataire 3"
-                                                            preview={planSignatairePreviews[2]}
-                                                            onRemove={() => removeFile('plan_localisation_signataire3_image', () => {
-                                                                const newPreviews = [...planSignatairePreviews];
-                                                                newPreviews[2] = null;
-                                                                setPlanSignatairePreviews(newPreviews);
-                                                            })}
-                                                            onClick={() => planSignataireRefs[2].current.click()}
-                                                            inputRef={planSignataireRefs[2]}
-                                                            onChange={(e) => handlePlanSignataireChange(2, e)}
-                                                        />
-                                                    </Grid>
+                                                    {[0, 1, 2].map(index => (
+                                                        <React.Fragment key={index}>
+                                                            <Grid item xs={12}>
+                                                                <Typography variant="subtitle2" fontWeight="600" sx={{ mt: 2, color: '#6366f1' }}>
+                                                                    Signataire {index + 1}
+                                                                </Typography>
+                                                            </Grid>
+                                                            <Grid item xs={12} md={4}>
+                                                                <FileUploadField
+                                                                    label={`Plan localisation`}
+                                                                    preview={planSignatairePreviews[index]}
+                                                                    onRemove={() => removeFile(`plan_localisation_signataire${index + 1}_image`, [planSignatairePreviews, setPlanSignatairePreviews, index])}
+                                                                    onClick={() => planSignataireRefs[index].current.click()}
+                                                                    inputRef={planSignataireRefs[index]}
+                                                                    onChange={(e) => handlePlanSignataireChange(index, e)}
+                                                                />
+                                                            </Grid>
+                                                            <Grid item xs={12} md={4}>
+                                                                <FileUploadField
+                                                                    label="Facture eau"
+                                                                    preview={factureEauSignatairePreviews[index]}
+                                                                    onRemove={() => removeFile(`facture_eau_signataire${index + 1}_image`, [factureEauSignatairePreviews, setFactureEauSignatairePreviews, index])}
+                                                                    onClick={() => factureEauSignataireRefs[index].current.click()}
+                                                                    inputRef={factureEauSignataireRefs[index]}
+                                                                    onChange={(e) => handleFactureEauSignataireChange(index, e)}
+                                                                />
+                                                            </Grid>
+                                                            <Grid item xs={12} md={4}>
+                                                                <FileUploadField
+                                                                    label="Facture électricité"
+                                                                    preview={factureElecSignatairePreviews[index]}
+                                                                    onRemove={() => removeFile(`facture_electricite_signataire${index + 1}_image`, [factureElecSignatairePreviews, setFactureElecSignatairePreviews, index])}
+                                                                    onClick={() => factureElecSignataireRefs[index].current.click()}
+                                                                    inputRef={factureElecSignataireRefs[index]}
+                                                                    onChange={(e) => handleFactureElecSignataireChange(index, e)}
+                                                                />
+                                                            </Grid>
+                                                        </React.Fragment>
+                                                    ))}
                                                 </Grid>
                                             </Box>
                                         )}
@@ -2254,305 +2150,70 @@ export default function ModifierClient() {
                                             <Grid container spacing={2}>
                                                 <Grid item xs={12} md={6}>
                                                     <Stack spacing={2}>
-                                                        <Box>
-                                                            <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>Photo</Typography>
-                                                            <Stack direction="row" spacing={2} alignItems="center">
-                                                                {signatairePreviews[activeSignataireTab] && (
-                                                                    <>
-                                                                        <Avatar 
-                                                                            src={signatairePreviews[activeSignataireTab]}
-                                                                            sx={{ width: 60, height: 60 }}
-                                                                        />
-                                                                        <IconButton 
-                                                                            size="small" 
-                                                                            onClick={() => {
-                                                                                const newPreviews = [...signatairePreviews];
-                                                                                newPreviews[activeSignataireTab] = null;
-                                                                                setSignatairePreviews(newPreviews);
-                                                                            }}
-                                                                        >
-                                                                            <CloseIcon fontSize="small" />
-                                                                        </IconButton>
-                                                                    </>
-                                                                )}
-                                                                <Button
-                                                                    variant="outlined"
-                                                                    size="small"
-                                                                    startIcon={<PhotoCameraIcon />}
-                                                                    onClick={() => signatairePhotoRefs[activeSignataireTab].current.click()}
-                                                                >
-                                                                    {signatairePreviews[activeSignataireTab] ? 'Changer' : 'Ajouter'}
-                                                                </Button>
-                                                                <input 
-                                                                    type="file" 
-                                                                    hidden 
-                                                                    ref={signatairePhotoRefs[activeSignataireTab]} 
-                                                                    onChange={(e) => handleSignatairePhotoChange(activeSignataireTab, e)} 
-                                                                    accept="image/*" 
-                                                                />
-                                                            </Stack>
-                                                        </Box>
-                                                        <Box>
-                                                            <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>Signature</Typography>
-                                                            <Stack direction="row" spacing={2} alignItems="center">
-                                                                {signatureSignatairePreviews[activeSignataireTab] && (
-                                                                    <>
-                                                                        <Avatar 
-                                                                            variant="rounded"
-                                                                            src={signatureSignatairePreviews[activeSignataireTab]}
-                                                                            sx={{ width: 60, height: 60 }}
-                                                                        />
-                                                                        <IconButton 
-                                                                            size="small" 
-                                                                            onClick={() => {
-                                                                                const newPreviews = [...signatureSignatairePreviews];
-                                                                                newPreviews[activeSignataireTab] = null;
-                                                                                setSignatureSignatairePreviews(newPreviews);
-                                                                            }}
-                                                                        >
-                                                                            <CloseIcon fontSize="small" />
-                                                                        </IconButton>
-                                                                    </>
-                                                                )}
-                                                                <Button
-                                                                    variant="outlined"
-                                                                    size="small"
-                                                                    startIcon={<PhotoCameraIcon />}
-                                                                    onClick={() => signatureSignataireRefs[activeSignataireTab].current.click()}
-                                                                >
-                                                                    {signatureSignatairePreviews[activeSignataireTab] ? 'Changer' : 'Ajouter'}
-                                                                </Button>
-                                                                <input 
-                                                                    type="file" 
-                                                                    hidden 
-                                                                    ref={signatureSignataireRefs[activeSignataireTab]} 
-                                                                    onChange={(e) => handleSignatureSignataireChange(activeSignataireTab, e)} 
-                                                                    accept="image/*" 
-                                                                />
-                                                            </Stack>
-                                                        </Box>
-                                                        <Box>
-                                                            <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>Recto CNI</Typography>
-                                                            <Stack direction="row" spacing={2} alignItems="center">
-                                                                {cniRectoSignatairePreviews[activeSignataireTab] && (
-                                                                    <>
-                                                                        <Avatar 
-                                                                            variant="rounded"
-                                                                            src={cniRectoSignatairePreviews[activeSignataireTab]}
-                                                                            sx={{ width: 60, height: 60 }}
-                                                                        />
-                                                                        <IconButton 
-                                                                            size="small" 
-                                                                            onClick={() => {
-                                                                                const newPreviews = [...cniRectoSignatairePreviews];
-                                                                                newPreviews[activeSignataireTab] = null;
-                                                                                setCniRectoSignatairePreviews(newPreviews);
-                                                                            }}
-                                                                        >
-                                                                            <CloseIcon fontSize="small" />
-                                                                        </IconButton>
-                                                                    </>
-                                                                )}
-                                                                <Button
-                                                                    variant="outlined"
-                                                                    size="small"
-                                                                    startIcon={<PhotoCameraIcon />}
-                                                                    onClick={() => cniRectoSignataireRefs[activeSignataireTab].current.click()}
-                                                                >
-                                                                    {cniRectoSignatairePreviews[activeSignataireTab] ? 'Changer' : 'Ajouter'}
-                                                                </Button>
-                                                                <input 
-                                                                    type="file" 
-                                                                    hidden 
-                                                                    ref={cniRectoSignataireRefs[activeSignataireTab]} 
-                                                                    onChange={(e) => handleCniRectoSignataireChange(activeSignataireTab, e)} 
-                                                                    accept="image/*" 
-                                                                />
-                                                            </Stack>
-                                                        </Box>
-                                                        <Box>
-                                                            <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>Verso CNI</Typography>
-                                                            <Stack direction="row" spacing={2} alignItems="center">
-                                                                {cniVersoSignatairePreviews[activeSignataireTab] && (
-                                                                    <>
-                                                                        <Avatar 
-                                                                            variant="rounded"
-                                                                            src={cniVersoSignatairePreviews[activeSignataireTab]}
-                                                                            sx={{ width: 60, height: 60 }}
-                                                                        />
-                                                                        <IconButton 
-                                                                            size="small" 
-                                                                            onClick={() => {
-                                                                                const newPreviews = [...cniVersoSignatairePreviews];
-                                                                                newPreviews[activeSignataireTab] = null;
-                                                                                setCniVersoSignatairePreviews(newPreviews);
-                                                                            }}
-                                                                        >
-                                                                            <CloseIcon fontSize="small" />
-                                                                        </IconButton>
-                                                                    </>
-                                                                )}
-                                                                <Button
-                                                                    variant="outlined"
-                                                                    size="small"
-                                                                    startIcon={<PhotoCameraIcon />}
-                                                                    onClick={() => cniVersoSignataireRefs[activeSignataireTab].current.click()}
-                                                                >
-                                                                    {cniVersoSignatairePreviews[activeSignataireTab] ? 'Changer' : 'Ajouter'}
-                                                                </Button>
-                                                                <input 
-                                                                    type="file" 
-                                                                    hidden 
-                                                                    ref={cniVersoSignataireRefs[activeSignataireTab]} 
-                                                                    onChange={(e) => handleCniVersoSignataireChange(activeSignataireTab, e)} 
-                                                                    accept="image/*" 
-                                                                />
-                                                            </Stack>
-                                                        </Box>
-                                                        <Box>
-                                                            <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>Photocopie NUI</Typography>
-                                                            <Stack direction="row" spacing={2} alignItems="center">
-                                                                {nuiImageSignatairePreviews[activeSignataireTab] && (
-                                                                    <>
-                                                                        <Avatar 
-                                                                            variant="rounded"
-                                                                            src={nuiImageSignatairePreviews[activeSignataireTab]}
-                                                                            sx={{ width: 60, height: 60 }}
-                                                                        />
-                                                                        <IconButton 
-                                                                            size="small" 
-                                                                            onClick={() => {
-                                                                                const newPreviews = [...nuiImageSignatairePreviews];
-                                                                                newPreviews[activeSignataireTab] = null;
-                                                                                setNuiImageSignatairePreviews(newPreviews);
-                                                                            }}
-                                                                        >
-                                                                            <CloseIcon fontSize="small" />
-                                                                        </IconButton>
-                                                                    </>
-                                                                )}
-                                                                <Button
-                                                                    variant="outlined"
-                                                                    size="small"
-                                                                    startIcon={<PhotoCameraIcon />}
-                                                                    onClick={() => nuiImageSignataireRefs[activeSignataireTab].current.click()}
-                                                                >
-                                                                    {nuiImageSignatairePreviews[activeSignataireTab] ? 'Changer' : 'Ajouter'}
-                                                                </Button>
-                                                                <input 
-                                                                    type="file" 
-                                                                    hidden 
-                                                                    ref={nuiImageSignataireRefs[activeSignataireTab]} 
-                                                                    onChange={(e) => handleNuiImageSignataireChange(activeSignataireTab, e)} 
-                                                                    accept="image/*" 
-                                                                />
-                                                            </Stack>
-                                                        </Box>
-                                                        <Box>
-                                                            <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>Photo lieu-dit domicile</Typography>
-                                                            <Stack direction="row" spacing={2} alignItems="center">
-                                                                {lieuDitDomicilePhotoPreviews[activeSignataireTab] && (
-                                                                    <>
-                                                                        <Avatar 
-                                                                            variant="rounded"
-                                                                            src={lieuDitDomicilePhotoPreviews[activeSignataireTab]}
-                                                                            sx={{ width: 60, height: 60 }}
-                                                                        />
-                                                                        <IconButton 
-                                                                            size="small" 
-                                                                            onClick={() => {
-                                                                                const newPreviews = [...lieuDitDomicilePhotoPreviews];
-                                                                                newPreviews[activeSignataireTab] = null;
-                                                                                setLieuDitDomicilePhotoPreviews(newPreviews);
-                                                                            }}
-                                                                        >
-                                                                            <CloseIcon fontSize="small" />
-                                                                        </IconButton>
-                                                                    </>
-                                                                )}
-                                                                <Button
-                                                                    variant="outlined"
-                                                                    size="small"
-                                                                    startIcon={<PhotoCameraIcon />}
-                                                                    onClick={() => lieuDitDomicilePhotoRefs[activeSignataireTab].current.click()}
-                                                                >
-                                                                    {lieuDitDomicilePhotoPreviews[activeSignataireTab] ? 'Changer' : 'Ajouter'}
-                                                                </Button>
-                                                                <input 
-                                                                    type="file" 
-                                                                    hidden 
-                                                                    ref={lieuDitDomicilePhotoRefs[activeSignataireTab]} 
-                                                                    onChange={(e) => handleLieuDitDomicilePhotoChange(activeSignataireTab, e)} 
-                                                                    accept="image/*" 
-                                                                />
-                                                            </Stack>
-                                                        </Box>
-                                                        <Box>
-                                                            <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>Photo localisation domicile</Typography>
-                                                            <Stack direction="row" spacing={2} alignItems="center">
-                                                                {photoLocalisationDomicilePreviews[activeSignataireTab] && (
-                                                                    <>
-                                                                        <Avatar 
-                                                                            variant="rounded"
-                                                                            src={photoLocalisationDomicilePreviews[activeSignataireTab]}
-                                                                            sx={{ width: 60, height: 60 }}
-                                                                        />
-                                                                        <IconButton 
-                                                                            size="small" 
-                                                                            onClick={() => {
-                                                                                const newPreviews = [...photoLocalisationDomicilePreviews];
-                                                                                newPreviews[activeSignataireTab] = null;
-                                                                                setPhotoLocalisationDomicilePreviews(newPreviews);
-                                                                            }}
-                                                                        >
-                                                                            <CloseIcon fontSize="small" />
-                                                                        </IconButton>
-                                                                    </>
-                                                                )}
-                                                                <Button
-                                                                    variant="outlined"
-                                                                    size="small"
-                                                                    startIcon={<PhotoCameraIcon />}
-                                                                    onClick={() => photoLocalisationDomicileRefs[activeSignataireTab].current.click()}
-                                                                >
-                                                                    {photoLocalisationDomicilePreviews[activeSignataireTab] ? 'Changer' : 'Ajouter'}
-                                                                </Button>
-                                                                <input 
-                                                                    type="file" 
-                                                                    hidden 
-                                                                    ref={photoLocalisationDomicileRefs[activeSignataireTab]} 
-                                                                    onChange={(e) => handlePhotoLocalisationDomicileChange(activeSignataireTab, e)} 
-                                                                    accept="image/*" 
-                                                                />
-                                                            </Stack>
-                                                        </Box>
+                                                        <FileUploadField
+                                                            label="Photo"
+                                                            preview={signatairePreviews[activeSignataireTab]}
+                                                            onRemove={() => removeFile(`photo_signataire${activeSignataireTab + 1}`, [signatairePreviews, setSignatairePreviews, activeSignataireTab])}
+                                                            onClick={() => signatairePhotoRefs[activeSignataireTab].current.click()}
+                                                            inputRef={signatairePhotoRefs[activeSignataireTab]}
+                                                            onChange={(e) => handleSignatairePhotoChange(activeSignataireTab, e)}
+                                                        />
+                                                        
+                                                        <FileUploadField
+                                                            label="Signature"
+                                                            preview={signatureSignatairePreviews[activeSignataireTab]}
+                                                            onRemove={() => removeFile(`signature_signataire${activeSignataireTab + 1}`, [signatureSignatairePreviews, setSignatureSignatairePreviews, activeSignataireTab])}
+                                                            onClick={() => signatureSignataireRefs[activeSignataireTab].current.click()}
+                                                            inputRef={signatureSignataireRefs[activeSignataireTab]}
+                                                            onChange={(e) => handleSignatureSignataireChange(activeSignataireTab, e)}
+                                                        />
+                                                        
+                                                        <FileUploadField
+                                                            label="Recto CNI"
+                                                            preview={cniRectoSignatairePreviews[activeSignataireTab]}
+                                                            onRemove={() => removeFile(`cni_photo_recto_signataire${activeSignataireTab + 1}`, [cniRectoSignatairePreviews, setCniRectoSignatairePreviews, activeSignataireTab])}
+                                                            onClick={() => cniRectoSignataireRefs[activeSignataireTab].current.click()}
+                                                            inputRef={cniRectoSignataireRefs[activeSignataireTab]}
+                                                            onChange={(e) => handleCniRectoSignataireChange(activeSignataireTab, e)}
+                                                        />
+                                                        
+                                                        <FileUploadField
+                                                            label="Verso CNI"
+                                                            preview={cniVersoSignatairePreviews[activeSignataireTab]}
+                                                            onRemove={() => removeFile(`cni_photo_verso_signataire${activeSignataireTab + 1}`, [cniVersoSignatairePreviews, setCniVersoSignatairePreviews, activeSignataireTab])}
+                                                            onClick={() => cniVersoSignataireRefs[activeSignataireTab].current.click()}
+                                                            inputRef={cniVersoSignataireRefs[activeSignataireTab]}
+                                                            onChange={(e) => handleCniVersoSignataireChange(activeSignataireTab, e)}
+                                                        />
                                                     </Stack>
                                                 </Grid>
                                                 <Grid item xs={12} md={6}>
                                                     <Stack spacing={2}>
                                                         <FileUploadField
-                                                            label="Facture eau"
-                                                            preview={factureEauSignatairePreviews[activeSignataireTab]}
-                                                            onRemove={() => {
-                                                                const newPreviews = [...factureEauSignatairePreviews];
-                                                                newPreviews[activeSignataireTab] = null;
-                                                                setFactureEauSignatairePreviews(newPreviews);
-                                                            }}
-                                                            onClick={() => factureEauSignataireRefs[activeSignataireTab].current.click()}
-                                                            inputRef={factureEauSignataireRefs[activeSignataireTab]}
-                                                            onChange={(e) => handleFactureEauSignataireChange(activeSignataireTab, e)}
+                                                            label="Photocopie NUI"
+                                                            preview={nuiImageSignatairePreviews[activeSignataireTab]}
+                                                            onRemove={() => removeFile(`nui_image_signataire${activeSignataireTab + 1}`, [nuiImageSignatairePreviews, setNuiImageSignatairePreviews, activeSignataireTab])}
+                                                            onClick={() => nuiImageSignataireRefs[activeSignataireTab].current.click()}
+                                                            inputRef={nuiImageSignataireRefs[activeSignataireTab]}
+                                                            onChange={(e) => handleNuiImageSignataireChange(activeSignataireTab, e)}
                                                         />
+                                                        
                                                         <FileUploadField
-                                                            label="Facture électricité"
-                                                            preview={factureElecSignatairePreviews[activeSignataireTab]}
-                                                            onRemove={() => {
-                                                                const newPreviews = [...factureElecSignatairePreviews];
-                                                                newPreviews[activeSignataireTab] = null;
-                                                                setFactureElecSignatairePreviews(newPreviews);
-                                                            }}
-                                                            onClick={() => factureElecSignataireRefs[activeSignataireTab].current.click()}
-                                                            inputRef={factureElecSignataireRefs[activeSignataireTab]}
-                                                            onChange={(e) => handleFactureElecSignataireChange(activeSignataireTab, e)}
+                                                            label="Photo lieu-dit domicile"
+                                                            preview={lieuDitDomicilePhotoPreviews[activeSignataireTab]}
+                                                            onRemove={() => removeFile(`lieu_dit_domicile_photo_signataire${activeSignataireTab + 1}`, [lieuDitDomicilePhotoPreviews, setLieuDitDomicilePhotoPreviews, activeSignataireTab])}
+                                                            onClick={() => lieuDitDomicilePhotoRefs[activeSignataireTab].current.click()}
+                                                            inputRef={lieuDitDomicilePhotoRefs[activeSignataireTab]}
+                                                            onChange={(e) => handleLieuDitDomicilePhotoChange(activeSignataireTab, e)}
+                                                        />
+                                                        
+                                                        <FileUploadField
+                                                            label="Photo localisation domicile"
+                                                            preview={photoLocalisationDomicilePreviews[activeSignataireTab]}
+                                                            onRemove={() => removeFile(`photo_localisation_domicile_signataire${activeSignataireTab + 1}`, [photoLocalisationDomicilePreviews, setPhotoLocalisationDomicilePreviews, activeSignataireTab])}
+                                                            onClick={() => photoLocalisationDomicileRefs[activeSignataireTab].current.click()}
+                                                            inputRef={photoLocalisationDomicileRefs[activeSignataireTab]}
+                                                            onChange={(e) => handlePhotoLocalisationDomicileChange(activeSignataireTab, e)}
                                                         />
                                                     </Stack>
                                                 </Grid>
@@ -2581,12 +2242,12 @@ export default function ModifierClient() {
 }
 
 // Composant pour l'upload de fichiers images
-function FileUploadField({ label, preview, onRemove, onClick, inputRef, onChange, isPdf = false }) {
+function FileUploadField({ label, preview, onRemove, onClick, inputRef, onChange, hideLabel = false, sx = {} }) {
     return (
-        <Box>
-            <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>{label}</Typography>
-            <Stack direction="row" spacing={2} alignItems="center">
-                {preview && !isPdf && (
+        <Box sx={sx}>
+            {!hideLabel && <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>{label}</Typography>}
+            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+                {preview && (
                     <>
                         <Avatar 
                             variant="rounded"
@@ -2601,7 +2262,7 @@ function FileUploadField({ label, preview, onRemove, onClick, inputRef, onChange
                 <Button
                     variant="outlined"
                     size="small"
-                    startIcon={isPdf ? <UploadIcon /> : <PhotoCameraIcon />}
+                    startIcon={<PhotoCameraIcon />}
                     onClick={onClick}
                 >
                     {preview ? 'Changer' : 'Ajouter'}
@@ -2611,7 +2272,7 @@ function FileUploadField({ label, preview, onRemove, onClick, inputRef, onChange
                     hidden 
                     ref={inputRef} 
                     onChange={onChange} 
-                    accept={isPdf ? ".pdf" : "image/*"} 
+                    accept="image/*" 
                 />
             </Stack>
         </Box>
@@ -2623,10 +2284,10 @@ function FileUploadPdfField({ label, fileName, onClick, inputRef, onChange, onRe
     return (
         <Box>
             <Typography variant="body2" fontWeight="700" sx={{ mb: 1 }}>{label}</Typography>
-            <Stack direction="row" spacing={2} alignItems="center">
+            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
                 {fileName && (
                     <>
-                        <Typography variant="body2" sx={{ color: '#6366f1' }}>
+                        <Typography variant="body2" sx={{ color: '#6366f1', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {fileName}
                         </Typography>
                         <IconButton size="small" onClick={onRemove}>

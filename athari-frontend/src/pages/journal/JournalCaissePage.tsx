@@ -118,7 +118,7 @@ const typeVersementColors: Record<string, string> = {
   'AUTRE': '#757575',
 };
 
-// CORRECTION : Fonction pour grouper les mouvements par type de versement
+// Fonction pour grouper les mouvements par type de versement
 const groupMovementsByTypeVersement = (mouvements: CaisseMovement[]): CaisseSection[] => {
   const groupedData: Record<string, CaisseMovement[]> = {};
   
@@ -131,7 +131,6 @@ const groupMovementsByTypeVersement = (mouvements: CaisseMovement[]): CaisseSect
   });
   
   const sections: CaisseSection[] = Object.entries(groupedData).map(([typeVersement, entries]) => {
-    // CORRECTION : Assurez-vous que les totaux sont des NOMBRES
     const totalDebit = entries.reduce((sum, entry) => sum + (Number(entry.montant_debit) || 0), 0);
     const totalCredit = entries.reduce((sum, entry) => sum + (Number(entry.montant_credit) || 0), 0);
     
@@ -140,8 +139,8 @@ const groupMovementsByTypeVersement = (mouvements: CaisseMovement[]): CaisseSect
       totalLabel: typeVersement,
       entries: entries,
       count: entries.length,
-      totalDebit, // Nombre, pas chaîne
-      totalCredit // Nombre, pas chaîne
+      totalDebit,
+      totalCredit
     };
   });
   
@@ -151,7 +150,7 @@ const groupMovementsByTypeVersement = (mouvements: CaisseMovement[]): CaisseSect
   return sections;
 };
 
-// CORRECTION : Fonction pour transformer les données API
+// Fonction pour transformer les données API
 const transformCaisseApiData = (
   apiData: CaisseJournalApiResponse, 
   filtres: CaisseFilterParams, 
@@ -191,7 +190,7 @@ const transformCaisseApiData = (
   // Créer les sections par type de versement
   const sections = groupMovementsByTypeVersement(apiData.mouvements);
   
-  // CORRECTION : Calculer les totaux - utiliser les totaux API si disponibles
+  // Calculer les totaux - utiliser les totaux API si disponibles
   const totalGeneral = apiData.mouvements.length || 0;
   const totalDebit = apiData.total_debit || sections.reduce((total, section) => total + section.totalDebit, 0);
   const totalCredit = apiData.total_credit || sections.reduce((total, section) => total + section.totalCredit, 0);
@@ -228,20 +227,18 @@ const transformCaisseApiData = (
     soldeCloture: apiData.solde_cloture || 0,
     sections: sections,
     totalGeneral: totalGeneral,
-    totalDebit: totalDebit, // Nombre, pas chaîne
-    totalCredit: totalCredit, // Nombre, pas chaîne
+    totalDebit: totalDebit,
+    totalCredit: totalCredit,
     synthese: apiData.synthese || {}
   };
 };
 
-// FONCTION CORRIGÉE POUR FORMATER LES MONTANTS
+// Fonction pour formater les montants
 const formatMontant = (montant: number | undefined | null): string => {
-  // Vérifier si le montant est valide
   if (montant === undefined || montant === null || isNaN(montant)) {
     return '0,00';
   }
   
-  // Formater le montant en français avec séparateurs de milliers
   return new Intl.NumberFormat('fr-FR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -303,7 +300,6 @@ const JournalCaissePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [donneesBrutes, setDonneesBrutes] = useState<CaisseJournalApiResponse | null>(null);
-  const [backendAccessible, setBackendAccessible] = useState<boolean>(true);
   const [debugInfo, setDebugInfo] = useState<string>('');
 
   // Charger les agences au démarrage
@@ -321,43 +317,12 @@ const JournalCaissePage: React.FC = () => {
         console.log('✅ Agences chargées avec succès:', agencesData.length);
         setDebugInfo(`✅ ${agencesData.length} agences chargées`);
         setAgences(agencesData);
-        
-        // Tester si le backend est accessible
-        console.log('Test de connexion au backend journal caisse...');
-        const accessible = await journalCaisseService.testBackend();
-        setBackendAccessible(accessible);
-        console.log('Backend accessible:', accessible);
-        
-        if (!accessible) {
-          setError('Le backend Laravel n\'est pas accessible. Vérifiez que le serveur est démarré.');
-          setSnackbarOpen(true);
-          setDebugInfo('❌ Backend non accessible');
-        } else {
-          setDebugInfo('✅ Backend accessible');
-        }
       } catch (error: any) {
         console.error('❌ Erreur lors du chargement des agences:', error);
-        
         setErrorAgences(error.message || 'Erreur lors du chargement des agences');
-        setBackendAccessible(false);
         setError(`Impossible de charger les agences: ${error.message}.`);
         setSnackbarOpen(true);
         setDebugInfo(`❌ Erreur: ${error.message}`);
-        
-        // Données fictives pour développement
-        const agencesFictives = [
-          { id: 1, code: '001', name: 'SIÈGE CENTRAL', shortName: 'SIEGE', createdAt: '', updatedAt: '' },
-          { id: 2, code: '002', name: 'AGENCE COMMERCIALE', shortName: 'AGCOMM', createdAt: '', updatedAt: '' },
-          { id: 3, code: '003', name: 'AGENCE PRINCIPALE', shortName: 'PRINCIPALE', createdAt: '', updatedAt: '' },
-        ];
-        setAgences(agencesFictives);
-        
-        const caissesFictives = [
-          { id: 1, code_caisse: 'CAISSE-01', libelle: 'Caisse de Test', solde_actuel: -1201500.00, est_active: true, plafond_autonomie_caissiere: 500000.00 },
-        ];
-        setCaisses(caissesFictives);
-        
-        setDebugInfo(`✅ Utilisation de données fictives (${agencesFictives.length} agences, ${caissesFictives.length} caisses)`);
       } finally {
         setChargementAgences(false);
         console.log('Chargement des agences terminé');
@@ -367,7 +332,7 @@ const JournalCaissePage: React.FC = () => {
     chargerAgences();
   }, []);
 
-  // Fonction pour charger les caisses (toutes les caisses, pas besoin de filtrer par agence)
+  // Fonction pour charger les caisses (toutes les caisses)
   const chargerCaisses = async () => {
     setChargementCaisses(true);
     setErrorCaisses(null);
@@ -403,51 +368,6 @@ const JournalCaissePage: React.FC = () => {
     } catch (error: any) {
       console.error('❌ Erreur chargement caisses:', error);
       setErrorCaisses(`Erreur lors du chargement des caisses: ${error.message || 'Erreur inconnue'}`);
-      
-      // Données fictives pour développement
-      const caissesFictives = [
-        { 
-          id: 1, 
-          guichet_id: 1,
-          code_caisse: 'CAISSE-01', 
-          libelle: 'Caisse de Test', 
-          solde_actuel: -1201500.00, 
-          plafond_max: null,
-          est_active: true,
-          created_at: '2026-01-13T09:56:32.000000Z',
-          updated_at: '2026-01-14T16:21:33.000000Z',
-          compte_comptable_id: 403,
-          plafond_autonomie_caissiere: 500000.00
-        },
-        { 
-          id: 2, 
-          guichet_id: 1,
-          code_caisse: 'CAISSE-02', 
-          libelle: 'Caisse Espèces', 
-          solde_actuel: 2500000.00, 
-          plafond_max: 10000000.00,
-          est_active: true,
-          created_at: '2026-01-13T09:56:32.000000Z',
-          updated_at: '2026-01-14T16:21:33.000000Z',
-          compte_comptable_id: 404,
-          plafond_autonomie_caissiere: 750000.00
-        },
-        { 
-          id: 3, 
-          guichet_id: 2,
-          code_caisse: 'CAISSE-03', 
-          libelle: 'Caisse Mobile Money', 
-          solde_actuel: 1500000.00, 
-          plafond_max: 5000000.00,
-          est_active: true,
-          created_at: '2026-01-13T09:56:32.000000Z',
-          updated_at: '2026-01-14T16:21:33.000000Z',
-          compte_comptable_id: 405,
-          plafond_autonomie_caissiere: 300000.00
-        }
-      ];
-      setCaisses(caissesFictives);
-      setDebugInfo(`⚠️ Utilisation de données fictives pour les caisses`);
     } finally {
       setChargementCaisses(false);
     }
@@ -455,21 +375,12 @@ const JournalCaissePage: React.FC = () => {
 
   // Effet pour charger les caisses au démarrage
   useEffect(() => {
-    if (backendAccessible) {
-      chargerCaisses();
-    }
-  }, [backendAccessible]);
+    chargerCaisses();
+  }, []);
 
   // Lancer la requête pour le journal de caisse
   const lancerRequete = async () => {
     console.log('Lancement de la requête journal caisse avec filtres:', filtres);
-    
-    if (!backendAccessible) {
-      console.error('Backend non accessible');
-      setError('Impossible de se connecter au backend. Vérifiez que le serveur Laravel est démarré.');
-      setSnackbarOpen(true);
-      return;
-    }
     
     if (filtres.caisse_id === 'all') {
       setError('Veuillez sélectionner une caisse spécifique.');
@@ -477,8 +388,6 @@ const JournalCaissePage: React.FC = () => {
       return;
     }
     
-    // Pour l'instant, on utilise une valeur par défaut pour code_agence
-    // À adapter selon votre logique métier
     if (filtres.code_agence === 'all') {
       setError('Veuillez sélectionner une agence.');
       setSnackbarOpen(true);
@@ -547,13 +456,6 @@ const JournalCaissePage: React.FC = () => {
     if (!donneesJournal || donneesJournal.totalGeneral === 0) {
       console.error('Aucune donnée à exporter');
       setError('Aucune donnée à exporter');
-      setSnackbarOpen(true);
-      return;
-    }
-    
-    if (!backendAccessible) {
-      console.error('Backend non accessible');
-      setError('Le backend n\'est pas accessible. Impossible de générer le PDF.');
       setSnackbarOpen(true);
       return;
     }
@@ -661,38 +563,6 @@ const JournalCaissePage: React.FC = () => {
     return selectedCaisse ? `${selectedCaisse.libelle} (${selectedCaisse.code_caisse})` : `CAISSE ${filtres.caisse_id}`;
   };
 
-  // Fonction pour tester à nouveau la connexion au backend
-  const retesterConnexion = async () => {
-    console.log('Retest de la connexion journal caisse...');
-    setChargement(true);
-    setDebugInfo('Test de connexion en cours...');
-    
-    try {
-      const accessible = await journalCaisseService.testBackend();
-      setBackendAccessible(accessible);
-      console.log('Backend accessible:', accessible);
-      
-      if (accessible) {
-        setError(null);
-        setDebugInfo('✅ Connexion rétablie');
-        // Recharger les caisses si la connexion est rétablie
-        await chargerCaisses();
-      } else {
-        setError('Le backend Laravel n\'est toujours pas accessible.');
-        setSnackbarOpen(true);
-        setDebugInfo('❌ Backend toujours inaccessible');
-      }
-    } catch (error) {
-      console.error('❌ Erreur test backend:', error);
-      setBackendAccessible(false);
-      setError('Erreur lors de la connexion au backend.');
-      setSnackbarOpen(true);
-      setDebugInfo('❌ Échec du test de connexion');
-    } finally {
-      setChargement(false);
-    }
-  };
-
   // Couleur du solde selon le signe
   const getSoldeColor = (montant: number): string => {
     return montant < 0 ? '#f44336' : '#4caf50';
@@ -729,7 +599,7 @@ const JournalCaissePage: React.FC = () => {
                 mb: 4, 
                 p: 4,
                 textAlign: 'center',
-                background: backendAccessible ? blueGradient.primary : blueGradient.error,
+                background: blueGradient.primary,
                 borderRadius: 3,
                 boxShadow: '0 8px 32px rgba(25, 118, 210, 0.3)',
                 color: 'white'
@@ -741,28 +611,8 @@ const JournalCaissePage: React.FC = () => {
                   Journal des Opérations de Caisse
                 </Typography>
                 <Typography variant="h6" sx={{ opacity: 0.9 }}>
-                  {backendAccessible 
-                    ? 'Consultez et exportez les journaux des opérations de caisse' 
-                    : '⚠️ Backend non accessible'}
+                  Consultez et exportez les journaux des opérations de caisse
                 </Typography>
-                
-                {!backendAccessible && (
-                  <Button
-                    variant="contained"
-                    onClick={retesterConnexion}
-                    sx={{
-                      mt: 2,
-                      background: 'white',
-                      color: blueGradient.error,
-                      fontWeight: 'bold',
-                      '&:hover': {
-                        background: '#e3f2fd'
-                      }
-                    }}
-                  >
-                    Tester la connexion
-                  </Button>
-                )}
               </Box>
 
               {/* Section Paramètres */}
@@ -802,7 +652,7 @@ const JournalCaissePage: React.FC = () => {
                       onChange={handleDateDebutChange}
                       format="dd/MM/yyyy"
                       maxDate={filtres.dateFin}
-                      disabled={!backendAccessible || chargementAgences}
+                      disabled={chargementAgences}
                       slotProps={{
                         textField: { 
                           fullWidth: true,
@@ -832,7 +682,7 @@ const JournalCaissePage: React.FC = () => {
                       format="dd/MM/yyyy"
                       minDate={filtres.dateDebut}
                       maxDate={new Date()}
-                      disabled={!backendAccessible || chargementAgences}
+                      disabled={chargementAgences}
                       slotProps={{
                         textField: { 
                           fullWidth: true,
@@ -870,7 +720,7 @@ const JournalCaissePage: React.FC = () => {
                         value={filtres.code_agence}
                         label={chargementAgences ? 'Chargement...' : 'Agence'}
                         onChange={handleAgenceChange}
-                        disabled={!backendAccessible || chargementAgences}
+                        disabled={chargementAgences}
                         sx={{
                           borderRadius: 2,
                           '& .MuiOutlinedInput-notchedOutline': {
@@ -967,7 +817,7 @@ const JournalCaissePage: React.FC = () => {
                         value={filtres.caisse_id}
                         label={chargementCaisses ? 'Chargement...' : 'Caisse'}
                         onChange={handleCaisseChange}
-                        disabled={!backendAccessible || chargementCaisses}
+                        disabled={chargementCaisses}
                         sx={{
                           borderRadius: 2,
                           '& .MuiOutlinedInput-notchedOutline': {
@@ -1096,11 +946,11 @@ const JournalCaissePage: React.FC = () => {
                     <Button
                       variant="contained"
                       onClick={lancerRequete}
-                      disabled={chargement || !backendAccessible || chargementAgences || 
+                      disabled={chargement || chargementAgences || 
                               filtres.caisse_id === 'all' || filtres.code_agence === 'all'}
                       startIcon={chargement ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
                       sx={{
-                        background: backendAccessible && !chargementAgences && 
+                        background: !chargementAgences && 
                           filtres.caisse_id !== 'all' && filtres.code_agence !== 'all'
                           ? blueGradient.button : '#bdbdbd',
                         color: 'white',
@@ -1109,10 +959,10 @@ const JournalCaissePage: React.FC = () => {
                         px: 4,
                         py: 1.5,
                         borderRadius: 2,
-                        boxShadow: backendAccessible && !chargementAgences && 
+                        boxShadow: !chargementAgences && 
                           filtres.caisse_id !== 'all' && filtres.code_agence !== 'all'
                           ? '0 4px 12px rgba(25, 118, 210, 0.3)' : 'none',
-                        '&:hover': backendAccessible && !chargementAgences && 
+                        '&:hover': !chargementAgences && 
                           filtres.caisse_id !== 'all' && filtres.code_agence !== 'all' ? {
                           background: blueGradient.buttonHover,
                           boxShadow: '0 6px 20px rgba(25, 118, 210, 0.4)',
@@ -1423,23 +1273,23 @@ const JournalCaissePage: React.FC = () => {
                     <Button
                       variant="contained"
                       onClick={genererPDF}
-                      disabled={chargementPDF || !backendAccessible}
+                      disabled={chargementPDF}
                       startIcon={chargementPDF ? <CircularProgress size={20} color="inherit" /> : <PictureAsPdfIcon />}
                       size="large"
                       sx={{
-                        background: backendAccessible ? blueGradient.primary : '#bdbdbd',
+                        background: blueGradient.primary,
                         color: 'white',
                         fontWeight: 'bold',
                         fontSize: '1rem',
                         px: 5,
                         py: 1.5,
                         borderRadius: 2,
-                        boxShadow: backendAccessible ? '0 4px 12px rgba(25, 118, 210, 0.3)' : 'none',
-                        '&:hover': backendAccessible ? {
+                        boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
+                        '&:hover': {
                           background: blueGradient.buttonHover,
                           boxShadow: '0 6px 20px rgba(25, 118, 210, 0.4)',
                           transform: 'translateY(-2px)'
-                        } : {},
+                        },
                         '&:disabled': {
                           background: '#bdbdbd',
                           boxShadow: 'none',
@@ -1457,23 +1307,22 @@ const JournalCaissePage: React.FC = () => {
                     <Button
                       variant="contained"
                       onClick={lancerRequete}
-                      disabled={!backendAccessible}
                       startIcon={<RefreshIcon />}
                       size="large"
                       sx={{
-                        background: backendAccessible ? blueGradient.button : '#bdbdbd',
+                        background: blueGradient.button,
                         color: 'white',
                         fontWeight: 'bold',
                         fontSize: '1rem',
                         px: 5,
                         py: 1.5,
                         borderRadius: 2,
-                        boxShadow: backendAccessible ? '0 4px 12px rgba(25, 118, 210, 0.3)' : 'none',
-                        '&:hover': backendAccessible ? {
+                        boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
+                        '&:hover': {
                           background: blueGradient.buttonHover,
                           boxShadow: '0 6px 20px rgba(25, 118, 210, 0.4)',
                           transform: 'translateY(-2px)'
-                        } : {},
+                        },
                         transition: 'all 0.3s ease',
                         minWidth: 220
                       }}
@@ -1520,7 +1369,7 @@ const JournalCaissePage: React.FC = () => {
               )}
 
               {/* Message initial */}
-              {initialLoad && !chargement && !donneesJournal && backendAccessible && (
+              {initialLoad && !chargement && !donneesJournal && (
                 <Paper elevation={6} sx={{ 
                   p: 6, 
                   textAlign: 'center',
@@ -1558,10 +1407,10 @@ const JournalCaissePage: React.FC = () => {
                     variant="contained"
                     onClick={lancerRequete}
                     startIcon={<PlayArrowIcon />}
-                    disabled={!backendAccessible || chargementAgences || 
+                    disabled={chargementAgences || 
                             filtres.caisse_id === 'all' || filtres.code_agence === 'all'}
                     sx={{
-                      background: backendAccessible && !chargementAgences && 
+                      background: !chargementAgences && 
                         filtres.caisse_id !== 'all' && filtres.code_agence !== 'all'
                         ? blueGradient.button : '#bdbdbd',
                       color: 'white',
@@ -1570,10 +1419,10 @@ const JournalCaissePage: React.FC = () => {
                       px: 5,
                       py: 1.5,
                       borderRadius: 2,
-                      boxShadow: backendAccessible && !chargementAgences && 
+                      boxShadow: !chargementAgences && 
                         filtres.caisse_id !== 'all' && filtres.code_agence !== 'all'
                         ? '0 4px 12px rgba(25, 118, 210, 0.3)' : 'none',
-                      '&:hover': backendAccessible && !chargementAgences && 
+                      '&:hover': !chargementAgences && 
                         filtres.caisse_id !== 'all' && filtres.code_agence !== 'all' ? {
                         background: blueGradient.buttonHover,
                         boxShadow: '0 6px 20px rgba(25, 118, 210, 0.4)',
@@ -1587,85 +1436,8 @@ const JournalCaissePage: React.FC = () => {
                 </Paper>
               )}
 
-              {/* Message backend non accessible */}
-              {!backendAccessible && !chargement && (
-                <Paper elevation={6} sx={{ 
-                  p: 6, 
-                  textAlign: 'center',
-                  border: 'none',
-                  borderRadius: 3,
-                  background: '#e3f2fd',
-                  boxShadow: '0 8px 32px rgba(244, 67, 54, 0.1)',
-                }}>
-                  <Box sx={{
-                    width: 100,
-                    height: 100,
-                    background: blueGradient.error,
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 24px',
-                    boxShadow: '0 8px 24px rgba(244, 67, 54, 0.3)'
-                  }}>
-                    <InfoIcon sx={{ fontSize: 50, color: 'white' }} />
-                  </Box>
-                  <Typography variant="h5" gutterBottom sx={{ 
-                    color: '#c62828',
-                    fontWeight: 'bold',
-                    mb: 2
-                  }}>
-                    Backend non accessible
-                  </Typography>
-                  <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 600, mx: 'auto' }}>
-                    Le serveur Laravel ne répond pas. Veuillez vérifier que :
-                  </Typography>
-                  <Box sx={{ textAlign: 'left', maxWidth: 600, mx: 'auto', mb: 4 }}>
-                    <ul style={{ paddingLeft: '20px' }}>
-                      <li>Le serveur Laravel est démarré (php artisan serve)</li>
-                      <li>Les routes API sont définies dans routes/api.php</li>
-                      <li>La route /caisse/journal existe</li>
-                      <li>La route /caisse/journal/export-pdf existe</li>
-                      <li>Le CORS est configuré pour autoriser votre domaine React</li>
-                    </ul>
-                  </Box>
-                  <Stack direction="row" spacing={2} justifyContent="center">
-                    <Button
-                      variant="contained"
-                      onClick={retesterConnexion}
-                      startIcon={<RefreshIcon />}
-                      sx={{
-                        background: blueGradient.error,
-                        color: 'white',
-                        fontWeight: 'bold',
-                        '&:hover': {
-                          background: '#b71c1c'
-                        }
-                      }}
-                    >
-                      Réessayer la connexion
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      onClick={() => window.open('http://127.0.0.1:8000/api/caisse/journal', '_blank')}
-                      sx={{
-                        borderColor: blueGradient.error,
-                        color: blueGradient.error,
-                        fontWeight: 'bold',
-                        '&:hover': {
-                          borderColor: '#b71c1c',
-                          background: 'rgba(244, 67, 54, 0.04)'
-                        }
-                      }}
-                    >
-                      Tester l'API journal caisse
-                    </Button>
-                  </Stack>
-                </Paper>
-              )}
-
               {/* Message aucune donnée */}
-              {donneesJournal && !chargement && donneesJournal.totalGeneral === 0 && backendAccessible && (
+              {donneesJournal && !chargement && donneesJournal.totalGeneral === 0 && (
                 <Paper elevation={6} sx={{ 
                   p: 6, 
                   textAlign: 'center',

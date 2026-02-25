@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -33,6 +33,9 @@ import {
   TableHead,
   IconButton,
   InputAdornment,
+  Avatar,
+  Divider,
+  Tooltip,
 } from '@mui/material';
 import {
   CheckCircle,
@@ -44,7 +47,19 @@ import {
   Remove as RemoveIcon,
   Calculate as CalculateIcon,
   Warning,
+  Print,
+  Download,
+  AccountBalance,
+  AccountBalanceWallet,
+  Portrait,
+  Receipt,
 } from '@mui/icons-material';
+
+// Import pour génération PDF
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+
+import logo from '../../../assets/img/logo.png';
 
 // --- IMPORT DES COMPOSANTS DE LAYOUT ---
 import Sidebar from '../../../components/layout/Sidebar';
@@ -170,6 +185,30 @@ interface TabPanelProps {
   value: number;
 }
 
+// Interface pour les données du reçu
+interface ReceiptData {
+  reference: string;
+  date: string;
+  compte: string;
+  titulaire: string;
+  remettant: string;
+  pieceId: string;
+  montant: string;
+  caissierId: string;
+  typeOperation: 'VERSEMENT' | 'RETRAIT';
+  agence?: string;
+  guichet?: string;
+  motif?: string;
+  provenance_fonds?: string;
+  billetage?: BilletageItem[];
+}
+
+// Interface pour la modal de succès
+interface SuccessModalData {
+  open: boolean;
+  transactionData?: ReceiptData;
+}
+
 // --- COMPOSANTS STYLISÉS ---
 const StyledTabs = styled(Tabs)({
   '& .MuiTab-root': {
@@ -232,6 +271,12 @@ const SecondaryButton = styled(Button)({
   },
 });
 
+const StyledAvatar = styled(Avatar)({
+  width: 120,
+  height: 120,
+  border: '3px solid #e0e0e0',
+});
+
 // --- FONCTIONS UTILITAIRES ---
 const formatCurrency = (value: string) => {
   const num = parseFloat(value || '0');
@@ -239,6 +284,121 @@ const formatCurrency = (value: string) => {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(num);
+};
+
+const formatDate = (dateString: string) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('fr-FR');
+};
+
+const formatDateTime = (dateString: string) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('fr-FR') + ' ' + date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+};
+
+// Fonction pour générer une référence unique
+const generateReference = (type: 'VER' | 'RET' = 'VER'): string => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  
+  // Générer un identifiant aléatoire de 4 caractères
+  const randomId = Math.random().toString(36).substring(2, 6).toUpperCase();
+  
+  return `${type}-${year}${month}${day}${hours}${minutes}${seconds}-${randomId}`;
+};
+
+// Fonction pour convertir un nombre en lettres (français)
+const numberToFrenchWords = (num: number): string => {
+  const units = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf'];
+  const teens = ['dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'dix-sept', 'dix-huit', 'dix-neuf'];
+  const tens = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante', 'soixante', 'quatre-vingt', 'quatre-vingt'];
+  
+  if (num === 0) return 'zéro';
+  
+  let result = '';
+  
+  // Convertir les millions
+  if (num >= 1000000) {
+    const millions = Math.floor(num / 1000000);
+    result += numberToFrenchWords(millions) + ' million';
+    if (millions > 1) result += 's';
+    num %= 1000000;
+    if (num > 0) result += ' ';
+  }
+  
+  // Convertir les milliers
+  if (num >= 1000) {
+    const thousands = Math.floor(num / 1000);
+    if (thousands === 1) {
+      result += 'mille';
+    } else {
+      result += numberToFrenchWords(thousands) + ' mille';
+    }
+    num %= 1000;
+    if (num > 0) result += ' ';
+  }
+  
+  // Convertir les centaines
+  if (num >= 100) {
+    const hundreds = Math.floor(num / 100);
+    if (hundreds === 1) {
+      result += 'cent';
+    } else {
+      result += units[hundreds] + ' cent';
+    }
+    num %= 100;
+    if (num > 0) result += ' ';
+  }
+  
+  // Convertir les dizaines et unités
+  if (num >= 10) {
+    if (num >= 10 && num < 20) {
+      result += teens[num - 10];
+      num = 0;
+    } else {
+      const ten = Math.floor(num / 10);
+      const unit = num % 10;
+      
+      if (ten === 7 || ten === 9) {
+        // Soixante-dix ou quatre-vingt-dix
+        const base = ten === 7 ? 60 : 80;
+        const remainder = num - base;
+        if (remainder === 0) {
+          result += tens[ten];
+        } else if (remainder === 1) {
+          result += tens[ten] + '-et-un';
+        } else if (remainder < 10) {
+          result += tens[ten] + '-' + units[remainder];
+        } else {
+          result += tens[ten] + '-' + teens[remainder - 10];
+        }
+        num = 0;
+      } else {
+        result += tens[ten];
+        if (unit === 1 && ten !== 8) {
+          result += '-et-un';
+          num = 0;
+        } else if (unit > 0) {
+          result += '-' + units[unit];
+          num = 0;
+        }
+      }
+    }
+  }
+  
+  // Convertir les unités
+  if (num > 0) {
+    result += units[num];
+  }
+  
+  return result;
 };
 
 const TabPanel = (props: TabPanelProps) => {
@@ -286,9 +446,23 @@ const Versement = () => {
     { valeur: 100, quantite: 0 },
   ]);
   
-  const [billetageError, setBilletageError] = useState<string>('');
-  const [montantADiviser, setMontantADiviser] = useState<string>('0');
+  const [calculating, setCalculating] = useState(false);
   
+  // État pour la modal de succès
+  const [successModal, setSuccessModal] = useState<SuccessModalData>({
+    open: false,
+    transactionData: undefined,
+  });
+
+  // État pour le chargement du téléchargement
+  const [downloading, setDownloading] = useState<boolean>(false);
+
+  // NOUVEL ÉTAT: Stocker la dernière transaction réussie
+  const [lastSuccessfulTransaction, setLastSuccessfulTransaction] = useState<ReceiptData | null>(null);
+
+  // Référence pour le reçu caché
+  const receiptRef = useRef<HTMLDivElement>(null);
+
   const [formData, setFormData] = useState<VersementFormData>({
     // Onglet Versement Espèces
     agenceCode: '',
@@ -335,6 +509,301 @@ const Versement = () => {
     netEncaisser: '0',
     netCrediter: '0',
   });
+
+  // Fonction pour préparer les données du reçu
+  const prepareReceiptData = (): ReceiptData => {
+    // Récupérer l'agence et le guichet sélectionnés
+    const selectedAgence = agences.find(a => a.id.toString() === formData.selectedAgence);
+    const selectedGuichet = guichets.find(g => g.id.toString() === formData.guichet);
+    
+    // Récupérer le nom du caissier (à remplacer par les informations réelles de l'utilisateur connecté)
+    const caissierId = "Caissier"; // À remplacer par l'utilisateur connecté
+    
+    return {
+      reference: generateReference('VER'),
+      date: formatDateTime(new Date().toISOString()),
+      compte: formData.compte,
+      titulaire: formData.client,
+      remettant: formData.nomRemettant,
+      pieceId: `${formData.typeId} - ${formData.numeroId}`,
+      montant: formData.montant,
+      caissierId: caissierId,
+      typeOperation: 'VERSEMENT' as const,
+      agence: selectedAgence?.name,
+      guichet: selectedGuichet?.nom_guichet,
+      motif: formData.motif,
+      provenance_fonds: formData.provenance_fonds,
+      billetage: billetage.filter(item => item.quantite > 0),
+    };
+  };
+
+  // Fonction pour générer et télécharger le reçu PDF pour VERSEMENT
+  const generateAndDownloadReceipt = async (receiptData: ReceiptData) => {
+    try {
+      setDownloading(true);
+      
+      // Créer un élément temporaire pour le reçu en FORMAT PAYSAGE
+      const receiptElement = document.createElement('div');
+      receiptElement.style.position = 'absolute';
+      receiptElement.style.left = '-9999px';
+      receiptElement.style.top = '0';
+      receiptElement.style.width = '150mm'; // Largeur pour format paysage
+      receiptElement.style.minHeight = 'auto';
+      receiptElement.style.maxWidth = '150mm'; // Augmenté pour paysage
+      receiptElement.style.backgroundColor = 'white';
+      receiptElement.style.padding = '5mm'; // Légèrement augmenté
+      receiptElement.style.fontFamily = "'Courier New', monospace";
+      receiptElement.style.color = '#000';
+      receiptElement.style.fontSize = '9px';
+      receiptElement.style.lineHeight = '1.1';
+      receiptElement.style.wordWrap = 'break-word';
+      receiptElement.style.overflowWrap = 'break-word';
+      
+      // Convertir le montant en lettres
+      const montantNumerique = parseFloat(receiptData.montant.replace(/\s/g, '')) || 0;
+      const montantEnLettres = numberToFrenchWords(montantNumerique).toUpperCase();
+      
+      receiptElement.innerHTML = `
+        <!-- En-tête avec logo -->
+        <div style="text-align: center; margin-bottom: 5px; border-bottom: 1px solid #000; padding-bottom: 3px;">
+          <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 2px;">
+            <div style="width: 20mm; height: 20mm; margin-right: 5mm;">
+              <img src="${logo}" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;" />
+            </div>
+            <div style="text-align: left;">
+              <div style="font-size: 12px; font-weight: bold; margin-bottom: 1px; text-transform: uppercase;">
+                ATHARI FINANCIAL COOP-CA
+              </div>
+              <div style="font-size: 8px; margin-bottom: 2px;">
+                Coopérative d'Épargne et de Crédit
+              </div>
+              <div style="font-size: 7px; border-top: 1px dashed #ccc; padding-top: 2px; margin-top: 2px;">
+                Tél: XX XX XX XX - Email: contact@athari.bf
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Titre principal -->
+        <div style="text-align: center; margin-bottom: 5px;">
+          <div style="font-size: 10px; font-weight: bold; margin-bottom: 2px; text-decoration: underline;">
+            REÇU DE VERSEMENT D'ESPÈCES
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 8px; margin-bottom: 1px;">
+            <span>Réf: ${receiptData.reference}</span>
+            <span>${receiptData.date}</span>
+          </div>
+        </div>
+        
+        <!-- Informations du compte en deux colonnes -->
+        <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+          <!-- Colonne gauche -->
+          <div style="flex: 1; font-size: 8px;">
+            <div style="display: flex; margin-bottom: 1px;">
+              <span style="min-width: 30mm;">Compte:</span>
+              <span style="font-weight: bold;">${receiptData.compte}</span>
+            </div>
+            <div style="display: flex; margin-bottom: 1px;">
+              <span style="min-width: 30mm;">Titulaire:</span>
+              <span>${receiptData.titulaire}</span>
+            </div>
+            ${receiptData.agence ? `
+            <div style="display: flex; margin-bottom: 1px;">
+              <span style="min-width: 30mm;">Agence:</span>
+              <span>${receiptData.agence}</span>
+            </div>
+            ` : ''}
+            ${receiptData.provenance_fonds ? `
+            <div style="display: flex; margin-bottom: 1px;">
+              <span style="min-width: 30mm;">Provenance:</span>
+              <span>${receiptData.provenance_fonds}</span>
+            </div>
+            ` : ''}
+          </div>
+          
+          <!-- Colonne droite -->
+          <div style="flex: 1; font-size: 8px;">
+            <div style="display: flex; margin-bottom: 1px;">
+              <span style="min-width: 30mm;">Remettant:</span>
+              <span>${receiptData.remettant}</span>
+            </div>
+            <div style="display: flex; margin-bottom: 1px;">
+              <span style="min-width: 30mm;">Pièce:</span>
+              <span>${receiptData.pieceId}</span>
+            </div>
+            ${receiptData.guichet ? `
+            <div style="display: flex; margin-bottom: 1px;">
+              <span style="min-width: 30mm;">Guichet:</span>
+              <span>${receiptData.guichet}</span>
+            </div>
+            ` : ''}
+            ${receiptData.motif ? `
+            <div style="display: flex; margin-bottom: 1px;">
+              <span style="min-width: 30mm;">Motif:</span>
+              <span>${receiptData.motif}</span>
+            </div>
+            ` : ''}
+          </div>
+        </div>
+        
+        <!-- Montant en évidence -->
+        <div style="border: 1px solid #000; padding: 3px; margin-bottom: 5px; text-align: center;">
+          <div style="font-size: 9px; font-weight: bold; margin-bottom: 2px;">
+            MONTANT DU VERSEMENT
+          </div>
+          <div style="font-size: 14px; font-weight: bold; margin-bottom: 2px;">
+            ${formatCurrency(receiptData.montant)} FCFA
+          </div>
+          <div style="font-size: 7px; font-style: italic;">
+            (${montantEnLettres.substring(0, 60)}${montantEnLettres.length > 60 ? '...' : ''})
+          </div>
+        </div>
+        
+        <!-- Billetage -->
+        ${receiptData.billetage && receiptData.billetage.some(item => item.quantite > 0) ? `
+        <div style="margin-bottom: 5px;">
+          <div style="font-size: 8px; font-weight: bold; text-align: center; margin-bottom: 2px; border-bottom: 1px dashed #666; padding-bottom: 1px;">
+            COMPOSITION DU BILLETAGE
+          </div>
+          <div style="font-size: 7px; display: flex; flex-wrap: wrap; gap: 10px;">
+            ${receiptData.billetage
+              .filter(item => item.quantite > 0)
+              .map(item => `
+                <div style="flex: 1; min-width: 45mm; display: flex; justify-content: space-between; margin-bottom: 1px;">
+                  <span>${item.valeur.toLocaleString()} FCFA × ${item.quantite}</span>
+                  <span>${(item.valeur * item.quantite).toLocaleString()} FCFA</span>
+                </div>
+              `).join('')}
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 2px; border-top: 1px dashed #666; padding-top: 2px; font-weight: bold; font-size: 8px;">
+            <span>TOTAL BILLETAGE:</span>
+            <span>${receiptData.billetage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0).toLocaleString()} FCFA</span>
+          </div>
+        </div>
+        ` : ''}
+        
+        <!-- Informations supplémentaires -->
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 7px;">
+          <div>
+            <div>Caissier: ${receiptData.caissierId}</div>
+          </div>
+          <div>
+            <div>Généré le: ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div>
+          </div>
+        </div>
+        
+        <!-- Séparateur -->
+        <div style="border-top: 1px dashed #000; margin: 5px 0; padding-top: 3px; text-align: center; font-size: 6px;">
+          --------------------------------
+        </div>
+        
+        <!-- Zone de signatures -->
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+          <div style="text-align: center; width: 48%;">
+            <div style="border-bottom: 1px solid #000; height: 20px; margin-bottom: 2px;"></div>
+            <div style="font-size: 7px;">Signature du remettant</div>
+          </div>
+          <div style="text-align: center; width: 48%;">
+            <div style="border-bottom: 1px solid #000; height: 20px; margin-bottom: 2px;"></div>
+            <div style="font-size: 7px;">Signature & cachet</div>
+          </div>
+        </div>
+        
+        <!-- Message final -->
+        <div style="text-align: center; font-size: 6px; color: #666; border-top: 1px dashed #ccc; padding-top: 2px;">
+          <div>Conservez ce reçu comme preuve de transaction</div>
+          <div>Merci de votre confiance !</div>
+        </div>
+      `;
+      
+      // Ajouter l'élément au DOM
+      document.body.appendChild(receiptElement);
+      
+      // Générer le PDF en orientation paysage
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: [150, 100],
+      });
+      
+      // Générer le canvas
+      const canvas = await html2canvas(receiptElement, {
+        scale: 3,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#FFFFFF',
+        width: 150 * 3.78,
+        height: receiptElement.scrollHeight,
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      
+      // Calculer les dimensions
+      const pageWidth = 150;
+      const pageHeight = 100;
+      const imgWidth = pageWidth - 10;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      // Positionner l'image
+      const xPos = 5;
+      const yPos = 5;
+      
+      pdf.addImage(imgData, 'PNG', xPos, yPos, imgWidth, imgHeight);
+      
+      // Télécharger le PDF
+      const fileName = `Versement-${receiptData.reference}.pdf`;
+      pdf.save(fileName);
+      
+      // Nettoyer
+      document.body.removeChild(receiptElement);
+      
+      showSnackbar('Reçu PDF généré avec succès', 'success');
+      
+    } catch (error) {
+      console.error('Erreur lors de la génération du reçu:', error);
+      showSnackbar('Erreur lors de la génération du reçu', 'error');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  // Fonction pour télécharger le reçu
+  const downloadReceipt = async (receiptData: ReceiptData) => {
+    await generateAndDownloadReceipt(receiptData);
+  };
+
+  // Fonction pour ouvrir la modal de succès
+  const openSuccessModal = (transactionData: any) => {
+    const receiptData = prepareReceiptData();
+    
+    // Sauvegarder la transaction pour réutilisation
+    setLastSuccessfulTransaction(receiptData);
+    
+    setSuccessModal({
+      open: true,
+      transactionData: receiptData,
+    });
+  };
+
+  // NOUVELLE FONCTION : Ouvrir la modal d'impression à tout moment
+  const openPrintModal = () => {
+    if (lastSuccessfulTransaction) {
+      setSuccessModal({
+        open: true,
+        transactionData: lastSuccessfulTransaction,
+      });
+    } else {
+      showSnackbar('Aucune transaction récente à imprimer', 'warning');
+    }
+  };
+
+  // Fonction pour fermer la modal de succès
+  const closeSuccessModal = () => {
+    setSuccessModal({
+      open: false,
+      transactionData: undefined,
+    });
+  };
 
   // Charger les agences au montage
   useEffect(() => {
@@ -612,46 +1081,38 @@ const Versement = () => {
     newBilletage[index] = { ...newBilletage[index], [field]: Math.max(0, value) };
     setBilletage(newBilletage);
     
-    // Réinitialiser l'erreur de billetage
-    setBilletageError('');
+    const total = newBilletage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0);
     
-    // Calculer le total du billetage
-    const totalBilletage = newBilletage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0);
-    
-    // Mettre à jour le montant à diviser
-    setMontantADiviser(totalBilletage.toString());
-    
-    // Si le total du billetage correspond au montant saisi, désactiver le champ "Montant à diviser"
-    if (formData.montant && Math.abs(totalBilletage - parseFloat(formData.montant)) < 1) {
-      setMontantADiviser('0');
-    }
+    setFormData(prev => ({
+      ...prev,
+      montant: total.toString()
+    }));
   };
 
-  // Fonction pour vérifier si le billetage correspond au montant
-  const verifyBilletage = () => {
-    const totalBilletage = billetage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0);
-    const montantSaisi = parseFloat(formData.montant) || 0;
+  // Calculer le billetage à partir du montant
+  const calculateBilletageFromAmount = (montantStr: string) => {
+    const montant = parseFloat(montantStr) || 0;
+    if (montant <= 0) return;
     
-    if (montantSaisi <= 0) {
-      setBilletageError('Veuillez d\'abord saisir un montant valide');
-      return false;
-    }
+    setCalculating(true);
     
-    if (totalBilletage === 0) {
-      setBilletageError('Veuillez saisir le billetage (quantité de billets)');
-      return false;
-    }
-    
-    if (Math.abs(totalBilletage - montantSaisi) < 1) {
-      setBilletageError('');
-      setMontantADiviser('0'); // Désactiver le champ car le billetage est correct
-      showSnackbar('Billetage correct !', 'success');
-      return true;
-    } else {
-      setBilletageError(`Le billetage (${totalBilletage.toLocaleString()} FCFA) ne correspond pas au montant saisi (${montantSaisi.toLocaleString()} FCFA)`);
-      showSnackbar(`Billetage incorrect. Différence: ${Math.abs(totalBilletage - montantSaisi).toLocaleString()} FCFA`, 'error');
-      return false;
-    }
+    setTimeout(() => {
+      let remaining = montant;
+      const coupures = [10000, 5000, 2000, 1000, 500, 200, 100];
+      const newBilletage = coupures.map(valeur => {
+        const quantite = Math.floor(remaining / valeur);
+        remaining = remaining % valeur;
+        return { valeur, quantite };
+      });
+      
+      setBilletage(newBilletage);
+      
+      if (remaining > 0) {
+        showSnackbar(`Attention: ${remaining} FCFA non alloués (montant non divisible)`, 'warning');
+      }
+      
+      setCalculating(false);
+    }, 300);
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -693,7 +1154,6 @@ const Versement = () => {
         return;
       }
       
-      // Vérifier le billetage
       const billetageValide = billetage.filter(item => item.quantite > 0);
       if (billetageValide.length === 0) {
         showSnackbar('Veuillez saisir le billetage', 'error');
@@ -703,12 +1163,6 @@ const Versement = () => {
       const totalBilletage = billetageValide.reduce((sum, item) => sum + (item.valeur * item.quantite), 0);
       if (Math.abs(totalBilletage - montant) > 1) {
         showSnackbar(`Le billetage (${totalBilletage} FCFA) ne correspond pas au montant (${montant} FCFA)`, 'error');
-        return;
-      }
-      
-      // Vérifier que le billetage a été validé
-      if (montantADiviser !== '0') {
-        showSnackbar('Veuillez vérifier le billetage avant de soumettre', 'error');
         return;
       }
       
@@ -783,7 +1237,7 @@ const Versement = () => {
         // Contexte de l'opération
         origine_fonds: formData.motif?.trim() || 'Versement espèces',
         // CORRECTION ICI: Utiliser la valeur de l'enum
-        type_versement: formData.typeVersement, // Doit être 'ESPECE', 'ORANGE_MONEY', ou 'MOBILE_MONEY'
+        type_versement: formData.typeVersement,
         date_valeur: formData.dateValeur,
         ref_lettrage: formData.refLettrage?.trim() || '',
         
@@ -801,7 +1255,17 @@ const Versement = () => {
       console.log('Type versement envoyé:', versementData.type_versement);
       console.log('Provenance des fonds:', versementData.provenance_fonds);
       
-     
+      try {
+        const plafondCheck = await caisseServices.verifierPlafond(selectedCaisse.id, montant);
+        if (!plafondCheck.success) {
+          showSnackbar(`Attention: ${plafondCheck.message}`, 'warning');
+          if (!window.confirm(`${plafondCheck.message}\n\nVoulez-vous continuer ?`)) {
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn('Erreur lors de la vérification du plafond:', error);
+      }
       
       const result = await caisseServices.effectuerVersement(versementData, billetageValide);
       
@@ -816,6 +1280,13 @@ const Versement = () => {
       } else if (result.success) {
         showSnackbar('Versement effectué avec succès !', 'success');
         console.log('Référence transaction:', result.data?.reference);
+        
+        // Préparer et sauvegarder les données du reçu
+        const receiptData = prepareReceiptData();
+        setLastSuccessfulTransaction(receiptData);
+        
+        // Ouvrir la modal de succès avec le reçu
+        openSuccessModal(result.data);
         
         resetForm();
         
@@ -851,7 +1322,7 @@ const Versement = () => {
       selectedAgence: '',
       guichet: '',
       caisse: '',
-      typeVersement: 'ESPECE', // CORRIGÉ
+      typeVersement: 'ESPECE',
       agenceCompte: '',
       compte: '',
       compte_id: null,
@@ -884,8 +1355,6 @@ const Versement = () => {
     });
     
     setBilletage(billetage.map(item => ({ ...item, quantite: 0 })));
-    setMontantADiviser('0');
-    setBilletageError('');
     setCompteDetails(null);
     setGuichets([]);
     setCaisses([]);
@@ -920,13 +1389,33 @@ const Versement = () => {
         <TopBar sidebarOpen={sidebarOpen} />
 
         <Box sx={{ px: { xs: 2, md: 3 }, py: 3 }}>
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="h5" sx={{ fontWeight: 600, color: '#1E293B', mb: 0.5 }}>
-              Versement Espèces
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#64748B' }}>
-              Interface de versement d'espèces - Turbobank
-            </Typography>
+          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 600, color: '#1E293B', mb: 0.5 }}>
+                Versement Espèces
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748B' }}>
+                Interface de versement d'espèces - Turbobank
+              </Typography>
+            </Box>
+            
+            {/* NOUVEAU BOUTON: Imprimer le dernier reçu */}
+            {lastSuccessfulTransaction && (
+              <Tooltip title="Réimprimer le reçu de la dernière transaction">
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  startIcon={<Print />}
+                  onClick={openPrintModal}
+                  sx={{
+                    bgcolor: '#9C27B0',
+                    '&:hover': { bgcolor: '#7B1FA2' },
+                  }}
+                >
+                  Imprimer le dernier reçu
+                </Button>
+              </Tooltip>
+            )}
           </Box>
 
           <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #e0e0e0', overflow: 'hidden' }}>
@@ -967,7 +1456,7 @@ const Versement = () => {
                         <Grid container spacing={1.5}>
                           <Grid item xs={6}>
                             <TextField
-                              sx={{minWidth:250}}
+                              fullWidth
                               size="small"
                               label="Code Agence"
                               name="agenceCode"
@@ -979,7 +1468,7 @@ const Versement = () => {
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <FormControl  sx={{minWidth:250}} size="small">
+                            <FormControl sx={{minWidth: 200}} size="small">
                               <InputLabel>Agence *</InputLabel>
                               <Select
                                 name="selectedAgence"
@@ -1000,7 +1489,7 @@ const Versement = () => {
                           </Grid>
 
                           <Grid item xs={6}>
-                            <FormControl  sx={{minWidth:250}} size="small">
+                            <FormControl sx={{minWidth: 200}} size="small">
                               <InputLabel>Guichet *</InputLabel>
                               <Select
                                 name="guichet"
@@ -1023,7 +1512,7 @@ const Versement = () => {
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <FormControl  sx={{minWidth:250}} size="small">
+                            <FormControl sx={{minWidth: 200}} size="small">
                               <InputLabel>Caisse *</InputLabel>
                               <Select
                                 name="caisse"
@@ -1046,7 +1535,7 @@ const Versement = () => {
                           </Grid>
                           
                           <Grid item xs={6}>
-                            <FormControl  sx={{minWidth:250}} size="small">
+                            <FormControl sx={{minWidth: 200}} size="small">
                               <InputLabel>Type versement *</InputLabel>
                               <Select
                                 name="typeVersement"
@@ -1054,7 +1543,6 @@ const Versement = () => {
                                 label="Type versement *"
                                 onChange={handleSelectChange}
                               >
-                                {/* CORRECTION ICI: Utiliser les valeurs de l'enum Laravel */}
                                 <MenuItem value="ESPECE">Espèces</MenuItem>
                                 <MenuItem value="ORANGE_MONEY">Orange Money</MenuItem>
                                 <MenuItem value="MOBILE_MONEY">Mobile Money</MenuItem>
@@ -1062,8 +1550,8 @@ const Versement = () => {
                             </FormControl>
                           </Grid>
                           
-                          <Grid item xs={6}>
-                              {/**  <TextField
+                         {/**<Grid item xs={6}>
+                            <TextField
                               fullWidth
                               size="small"
                               label="Agence Compte"
@@ -1071,8 +1559,8 @@ const Versement = () => {
                               value={formData.agenceCompte}
                               onChange={handleChange}
                               placeholder="Code agence du compte"
-                            />*/}
-                          </Grid>
+                            />
+                          </Grid> */} 
                         </Grid>
                       </CardContent>
                     </StyledCard>
@@ -1160,7 +1648,7 @@ const Versement = () => {
                                   variant="outlined"
                                   size="small"
                                   required
-                                  sx={{minWidth:250}}
+                                  sx={{minWidth: 250}}
                                   InputProps={{
                                     ...params.InputProps,
                                     endAdornment: (
@@ -1225,12 +1713,11 @@ const Versement = () => {
                             />
                           </Grid>
                           
-                          {/* NOUVEAU CHAMP : Provenance des fonds */}
                           <Grid item xs={12}>
                             <TextField
                               fullWidth
                               size="small"
-                              label="Provenance des fonds"
+                              label="Provenance des fonds *"
                               name="provenance_fonds"
                               value={formData.provenance_fonds}
                               onChange={handleChange}
@@ -1239,7 +1726,6 @@ const Versement = () => {
                             />
                           </Grid>
                           
-                          {/* Dates - MODIFICATION: Date opération et Date valeur désactivées */}
                           <Grid item xs={12}>
                             <Grid container spacing={1.5}>
                               <Grid item xs={4}>
@@ -1252,7 +1738,7 @@ const Versement = () => {
                                   value={formData.dateOperation}
                                   onChange={handleChange}
                                   InputLabelProps={{ shrink: true }}
-                                  disabled // MODIFICATION: Champ désactivé
+                                  disabled
                                   helperText="Date automatique"
                                 />
                               </Grid>
@@ -1266,7 +1752,7 @@ const Versement = () => {
                                   value={formData.dateValeur}
                                   onChange={handleChange}
                                   InputLabelProps={{ shrink: true }}
-                                  disabled // MODIFICATION: Champ désactivé
+                                  disabled
                                   helperText="Date automatique"
                                 />
                               </Grid>
@@ -1318,6 +1804,17 @@ const Versement = () => {
                                 />
                               )}
                             </Box>
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  size="small"
+                                  name="fraisEnCompte"
+                                  checked={formData.fraisEnCompte}
+                                  onChange={handleChange}
+                                />
+                              }
+                              label="Frais en compte"
+                            />
                           </Grid>
                           
                           <Grid item xs={12} md={8}>
@@ -1329,7 +1826,12 @@ const Versement = () => {
                                   label="Montant *"
                                   name="montant"
                                   value={formData.montant}
-                                  onChange={handleChange}
+                                  onChange={(e) => {
+                                    handleChange(e);
+                                    if (e.target.value) {
+                                      calculateBilletageFromAmount(e.target.value);
+                                    }
+                                  }}
                                   placeholder="0"
                                   type="number"
                                   required
@@ -1384,38 +1886,30 @@ const Versement = () => {
                           Billetage - Saisie des coupures *
                         </Typography>
                         
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                           <TextField
                             size="small"
                             label="Montant à diviser"
-                            value={montantADiviser}
-                            disabled={montantADiviser === '0'}
-                            InputProps={{
-                              readOnly: montantADiviser === '0',
+                            value={formData.montant}
+                            onChange={(e) => {
+                              setFormData(prev => ({ ...prev, montant: e.target.value }));
+                              calculateBilletageFromAmount(e.target.value);
                             }}
                             type="number"
                             sx={{ width: 200 }}
-                            helperText={montantADiviser === '0' ? "Billetage correct !" : "Total du billetage saisi"}
                           />
-                          
                           <Button
                             variant="outlined"
-                            startIcon={<CalculateIcon />}
-                            onClick={verifyBilletage}
-                            disabled={!formData.montant || parseFloat(formData.montant) <= 0}
+                            startIcon={calculating ? <CircularProgress size={20} /> : <CalculateIcon />}
+                            onClick={() => calculateBilletageFromAmount(formData.montant)}
+                            disabled={calculating || !formData.montant || parseFloat(formData.montant) <= 0}
                           >
-                            Vérifier le billetage
+                            Calculer billetage
                           </Button>
                           <Typography variant="caption" color="text.secondary">
-                            Montant saisi: {formatCurrency(formData.montant)} FCFA
+                            Total: {billetage.reduce((sum, item) => sum + (item.valeur * item.quantite), 0).toLocaleString()} FCFA
                           </Typography>
                         </Box>
-                        
-                        {billetageError && (
-                          <Alert severity="error" sx={{ mb: 2 }}>
-                            {billetageError}
-                          </Alert>
-                        )}
                         
                         <TableContainer component={Paper} variant="outlined">
                           <Table size="small">
@@ -1486,7 +1980,7 @@ const Versement = () => {
                         </TableContainer>
                         
                         <Alert severity="info" sx={{ mt: 2 }}>
-                          Saisissez les quantités de billets pour chaque coupure, puis cliquez sur "Vérifier le billetage"
+                          Le total du billetage doit correspondre au montant du versement
                         </Alert>
                       </CardContent>
                     </StyledCard>
@@ -1569,7 +2063,7 @@ const Versement = () => {
                             />
                           </Grid>
                           <Grid item xs={6}>
-                            <FormControl fullWidth size="small">
+                            <FormControl sx={{minWidth: 200}} size="small">
                               <InputLabel>Type pièce *</InputLabel>
                               <Select
                                 name="typeId"
@@ -1714,17 +2208,44 @@ const Versement = () => {
               </TabPanel>
 
               <TabPanel value={tabValue} index={3}>
-                <StyledCard>
-                  <CardContent sx={{ textAlign: 'center', py: 4 }}>
-                    <Photo sx={{ fontSize: 64, color: '#bdbdbd', mb: 2 }} />
-                    <Typography variant="body1" color="text.secondary" gutterBottom>
-                      Photo et signature du client
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Cette section affiche la photo et la signature si elles ont été rattachées au compte
-                    </Typography>
-                  </CardContent>
-                </StyledCard>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <StyledCard sx={{ height: '100%' }}>
+                      <CardContent sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <Typography variant="subtitle2" sx={{ mb: 2, color: '#1976D2', fontWeight: 600, alignSelf: 'flex-start' }}>
+                          Photo du remettant
+                        </Typography>
+                        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 4 }}>
+                          <Portrait sx={{ fontSize: 64, color: '#bdbdbd', mb: 2 }} />
+                          <Typography variant="body1" color="text.secondary" gutterBottom>
+                            Aucune photo disponible
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" align="center">
+                            La photo du remettant n'est pas disponible dans le système
+                          </Typography>
+                        </Box>
+                      </CardContent>
+                    </StyledCard>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <StyledCard sx={{ height: '100%' }}>
+                      <CardContent sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                        <Typography variant="subtitle2" sx={{ mb: 2, color: '#1976D2', fontWeight: 600 }}>
+                          Signature du remettant
+                        </Typography>
+                        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 4 }}>
+                          <Description sx={{ fontSize: 64, color: '#bdbdbd', mb: 2 }} />
+                          <Typography variant="body1" color="text.secondary" gutterBottom>
+                            Aucune signature disponible
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" align="center">
+                            La signature du remettant n'est pas disponible dans le système
+                          </Typography>
+                        </Box>
+                      </CardContent>
+                    </StyledCard>
+                  </Grid>
+                </Grid>
               </TabPanel>
 
               <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
@@ -1741,12 +2262,11 @@ const Versement = () => {
                     parseFloat(formData.montant) <= 0 ||
                     !formData.nomRemettant ||
                     !formData.numeroId ||
-                    !formData.provenance_fonds || // MODIFICATION: Ajout de la validation
+                    !formData.provenance_fonds ||
                     billetage.every(item => item.quantite === 0) ||
                     !formData.selectedAgence ||
                     !formData.guichet ||
-                    !formData.caisse ||
-                    montantADiviser !== '0' // Le billetage doit être vérifié et correct
+                    !formData.caisse
                   }
                 >
                   Valider le versement
@@ -1809,6 +2329,138 @@ const Versement = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Modal de succès - Impression du reçu */}
+      <Dialog 
+        open={successModal.open} 
+        onClose={closeSuccessModal}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'success.main' }}>
+          <CheckCircle />
+          Versement effectué avec succès !
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="success" sx={{ mb: 2 }}>
+            Votre transaction a été validée et enregistrée avec succès.
+          </Alert>
+          
+          <Box sx={{ mb: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, color: '#1976D2', fontWeight: 600 }}>
+              Détails de la transaction :
+            </Typography>
+            <Grid container spacing={1}>
+              <Grid item xs={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Référence :
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {successModal.transactionData?.reference || 'N/A'}
+                </Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Date :
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {successModal.transactionData?.date || formatDateTime(new Date().toISOString())}
+                </Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Compte :
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {successModal.transactionData?.compte || 'N/A'}
+                </Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Titulaire :
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {successModal.transactionData?.titulaire || 'N/A'}
+                </Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Montant :
+                </Typography>
+                <Typography variant="body2" fontWeight={500} color="success.main">
+                  {successModal.transactionData?.montant ? formatCurrency(successModal.transactionData.montant) : '0'} FCFA
+                </Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Remettant :
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {successModal.transactionData?.remettant || 'N/A'}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Box>
+          
+          <Typography variant="body1" sx={{ mb: 2, fontWeight: 500, textAlign: 'center' }}>
+            Télécharger le reçu de votre versement <span style={{ color: 'red' }}>AVANT DE FERMER CETTE POP-UP</span>
+          </Typography>
+          
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
+            Cliquez sur le bouton ci-dessous pour télécharger le reçu PDF professionnel de votre transaction.
+          </Typography>
+          
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={downloading ? <CircularProgress size={20} color="inherit" /> : <Download />}
+              onClick={() => successModal.transactionData && downloadReceipt(successModal.transactionData)}
+              disabled={downloading || !successModal.transactionData}
+              sx={{ px: 4, py: 1.5, minWidth: 250 }}
+            >
+              {downloading ? 'Téléchargement en cours...' : 'Télécharger le reçu PDF'}
+            </Button>
+          </Box>
+          
+          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+            <Button
+              variant="outlined"
+              startIcon={<Print />}
+              onClick={() => successModal.transactionData && downloadReceipt(successModal.transactionData)}
+              disabled={downloading || !successModal.transactionData}
+              sx={{ minWidth: 250 }}
+            >
+              Imprimer le reçu
+            </Button>
+          </Box>
+          
+          {/* NOUVELLE SECTION : Message d'information */}
+          <Alert severity="info" sx={{ mt: 3 }}>
+            <Typography variant="body2">
+              <strong>Astuce :</strong> Vous pourrez réimprimer ce reçu à tout moment en utilisant le bouton 
+              "Imprimer le dernier reçu" dans l'en-tête de la page.
+            </Typography>
+          </Alert>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={closeSuccessModal} color="inherit">
+            Fermer
+          </Button>
+          <Button 
+            onClick={() => {
+              closeSuccessModal();
+            }} 
+            variant="contained" 
+            color="primary"
+          >
+            Terminer
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Élément caché pour le reçu (utilisé pour la génération PDF) */}
+      <div ref={receiptRef} style={{ position: 'absolute', left: '-9999px', top: '0' }}></div>
 
       <Dialog open={validationDialog} onClose={() => setValidationDialog(false)}>
         <DialogTitle>

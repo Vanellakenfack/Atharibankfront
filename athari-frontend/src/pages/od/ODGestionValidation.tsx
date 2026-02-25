@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+
 import {
   Box, Button, Paper, Typography, TextField, Grid, Dialog, DialogTitle,
   DialogContent, DialogActions, Table, TableBody, TableCell, TableContainer,
@@ -13,7 +14,7 @@ import {
   VerifiedUser, GppGood, Check, Clear,
   Person, Business, TrendingUp, HourglassEmpty, DoneAll,
   Block, Security, Warning, LockPerson, ArrowBack,
-  ContentCopy, Send, Lock
+  ContentCopy, Send, Lock, AttachMoney
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { indigo, red, green, orange, blue } from "@mui/material/colors";
@@ -34,6 +35,7 @@ interface OperationDiverse {
   est_comptabilise: boolean;
   date_operation: string;
   date_validation: string | null;
+  justificatif_path:string;
   agence: { id: number; name: string; code: string };
   saisi_par: { id: number; name: string };
   valide_par: { id: number; name: string } | null;
@@ -78,6 +80,7 @@ interface ValidationStatus {
   validateur?: string;
   date?: string;
   commentaire?: string;
+  est_requis: boolean; // Nouveau champ : indique si cette validation est requise
 }
 
 interface UserProfile {
@@ -91,7 +94,9 @@ interface UserProfile {
 export default function ODGestionValidation() {
 
   const navigate = useNavigate();
-  
+  const BASE_URL = ApiClient.defaults.baseURL.replace('/api', '');
+const FILE_BASE = `${BASE_URL}/storage`;
+
   // États principaux
   const [ods, setOds] = useState<OperationDiverse[]>([]);
   const [filteredOds, setFilteredOds] = useState<OperationDiverse[]>([]);
@@ -181,15 +186,36 @@ export default function ODGestionValidation() {
   };
 
   // Fonction pour envoyer le code (simulation)
-  const envoyerCode = () => {
-    // Ici, vous pourriez ajouter une logique pour envoyer le code
-    // par email, SMS, ou le sauvegarder quelque part
-    setSnackbar({
-      open: true,
-      message: `Code ${codeCaisseModal.code} envoyé à la caissière pour l'OD ${codeCaisseModal.odNumero}`,
-      severity: "success"
-    });
-    setCodeCaisseModal({ ...codeCaisseModal, open: false });
+  const envoyerCode = async () => {
+    try {
+      const response = await ApiClient.post(
+        `/operation-diverses/${selectedOd?.id}/enregistrer-code-dg`, 
+        {
+          code: codeCaisseModal.code
+        }
+      );
+
+      if (response.data.success) {
+        setSnackbar({
+          open: true,
+          message: `Code ${codeCaisseModal.code} enregistré pour l'OD ${codeCaisseModal.odNumero}`,
+          severity: "success"
+        });
+        setCodeCaisseModal({ ...codeCaisseModal, open: false });
+        
+        // Rafraîchir les données
+        if (openDetails && selectedOd) {
+          handleShowDetails(selectedOd);
+        }
+      }
+    } catch (error: any) {
+      console.error('Erreur enregistrement code:', error);
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message || "Erreur lors de l'enregistrement du code",
+        severity: "error"
+      });
+    }
   };
 
   // Fonction modifiée pour la validation DG
@@ -255,66 +281,6 @@ export default function ODGestionValidation() {
     }
   };
 
-  // CORRECTION : useCallback pour stabiliser la fonction applyFilters
-  const applyFilters = useCallback(() => {
-    console.log("🔄 Application des filtres", { odsLength: ods.length, search, filters });
-    
-    if (!Array.isArray(ods)) {
-      console.log("📭 ods n'est pas un tableau");
-      setFilteredOds([]);
-      return;
-    }
-
-    let filtered = [...ods];
-
-    // Filtre de recherche
-    if (search.trim()) {
-      const searchLower = search.toLowerCase().trim();
-      filtered = filtered.filter(od =>
-        (od.numero_od?.toLowerCase() || '').includes(searchLower) ||
-        (od.libelle?.toLowerCase() || '').includes(searchLower) ||
-        (od.numero_piece?.toLowerCase() || '').includes(searchLower) ||
-        (od.agence?.name?.toLowerCase() || '').includes(searchLower) ||
-        (od.agence?.code?.toLowerCase() || '').includes(searchLower)
-      );
-    }
-
-    // Filtres par statut
-    if (filters.statut) {
-      filtered = filtered.filter(od => od.statut === filters.statut);
-    }
-
-    // Filtre par type de collecte
-    if (filters.type_collecte) {
-      filtered = filtered.filter(od => od.type_collecte === filters.type_collecte);
-    }
-
-    // Filtre par type d'opération
-    if (filters.type_operation) {
-      filtered = filtered.filter(od => od.type_operation === filters.type_operation);
-    }
-
-    // Filtre par dates
-    if (filters.date_debut) {
-      filtered = filtered.filter(od => {
-        if (!od.date_operation) return false;
-        return new Date(od.date_operation) >= new Date(filters.date_debut);
-      });
-    }
-    
-    if (filters.date_fin) {
-      filtered = filtered.filter(od => {
-        if (!od.date_operation) return false;
-        const dateFin = new Date(filters.date_fin);
-        dateFin.setHours(23, 59, 59, 999);
-        return new Date(od.date_operation) <= dateFin;
-      });
-    }
-
-    console.log("✅ Filtrage terminé:", filtered.length, "sur", ods.length, "éléments");
-    setFilteredOds(filtered);
-  }, [ods, search, filters]); // CORRECTION : Dépendances stabilisées
-
   // Fonction pour vérifier si le rôle est autorisé
   const checkAuthorization = (role: string): boolean => {
     const authorizedRoles = [
@@ -325,7 +291,7 @@ export default function ODGestionValidation() {
     return authorizedRoles.includes(role);
   };
 
-  // Fonction SIMPLIFIÉE pour récupérer le profil utilisateur
+  // Fonction pour récupérer le profil utilisateur
   const fetchUserProfile = async () => {
     try {
       console.log("=== CHARGEMENT PROFIL UTILISATEUR ===");
@@ -379,7 +345,7 @@ export default function ODGestionValidation() {
     }
   };
 
-  // CORRECTION : Fonction pour charger les OD depuis l'API
+  // Fonction pour charger les OD depuis l'API
   const fetchODs = async () => {
     setLoading(true);
     try {
@@ -423,6 +389,21 @@ export default function ODGestionValidation() {
         est_comptabilise: od.est_comptabilise || od.comptabilisé || false,
         date_operation: od.date_operation || od.date_opération || new Date().toISOString(),
         date_validation: od.date_validation || od.date_validation || null,
+  // Remplacez la ligne 263 par:
+          justificatif_path: (() => {
+            const path = od.justificatif_path;
+            if (!path) return null;
+            
+            console.log("🔍 DEBUG justificatif_path:", {
+              original: path,
+              afterReplace: path.replace(/^app\/public\//, '').replace(/\\/g, '/'),
+              urlComplete: `${BASE_URL}/${path.replace(/^app\/public\//, '').replace(/\\/g, '/')}`
+            });
+            
+            return path
+              .replace(/^app\/public\//, '')
+              .replace(/\\/g, '/');
+          })(),
         agence: od.agence || { id: od.agence_id || 0, name: 'N/A', code: 'N/A' },
         saisi_par: od.saisi_par || od.saisiPar || { id: 0, name: 'Inconnu' },
         valide_par: od.valide_par || od.validePar || null,
@@ -549,36 +530,43 @@ export default function ODGestionValidation() {
     return labels[type] || type;
   };
 
+  // NOUVELLE FONCTION : Analyse le statut de validation avec les nouvelles règles
   const analyzeValidationStatus = (od: OperationDiverse): ValidationStatus[] => {
+    const isCharge = od.type_collecte === "CHARGE";
+    
+    // Récupérer l'état des validations depuis le backend
+    const chefAgenceValide = od.etat_validations?.chef_agence || false;
+    const chefComptableValide = od.etat_validations?.chef_comptable || false;
+    const directeurGeneralValide = od.etat_validations?.directeur_general || false;
+    
+    // Base des statuts de validation
     const statuses: ValidationStatus[] = [
       {
         niveau: 1,
         role: 'Chef d\'Agence (CA)',
         label: 'Chef d\'Agence',
-        statut: 'pending'
+        statut: chefAgenceValide ? 'approved' : 'pending',
+        est_requis: true // Chef d'agence toujours requis
       },
       {
         niveau: 2,
         role: 'Chef Comptable',
         label: 'Chef Comptable',
-        statut: 'pending'
+        statut: chefComptableValide ? 'approved' : 'pending',
+        est_requis: true // Chef comptable toujours requis
       },
       {
         niveau: 3,
         role: 'DG',
         label: 'Directeur Général',
-        statut: od.type_collecte === 'CHARGE' ? 'pending' : 'not_required'
+        statut: isCharge 
+          ? (directeurGeneralValide ? 'approved' : 'pending')
+          : 'not_required', // DG requis uniquement pour les charges
+        est_requis: isCharge // DG requis seulement pour les charges
       }
     ];
 
-    if (od.etat_validations) {
-      statuses[0].statut = od.etat_validations.chef_agence ? 'approved' : 'pending';
-      statuses[1].statut = od.etat_validations.chef_comptable ? 'approved' : 'pending';
-      if (od.type_collecte === 'CHARGE') {
-        statuses[2].statut = od.etat_validations.directeur_general ? 'approved' : 'pending';
-      }
-    }
-
+    // Mettre à jour avec les détails du workflow
     if (od.workflow && od.workflow.length > 0) {
       od.workflow.forEach((step: any) => {
         const index = statuses.findIndex(s => s.niveau === step.niveau);
@@ -615,16 +603,115 @@ export default function ODGestionValidation() {
     }
   };
 
-  // FONCTION SIMPLIFIÉE - TOUJOURS RETOURNE TRUE (Backend vérifie les permissions)
-  const peutValider = true;
-  const peutRejeter = true;
-
-  // Fonction simplifiée pour comptabiliser (juste pour l'affichage)
-  const peutComptabiliser = (od: OperationDiverse) => {
-    return od.statut === 'VALIDE' && !od.est_comptabilise;
+  // NOUVELLE FONCTION : Vérifie si l'utilisateur peut valider selon son rôle et l'état actuel
+  const peutValiderSelonRole = (od: OperationDiverse): boolean => {
+    const validationStatuses = analyzeValidationStatus(od);
+    const isCharge = od.type_collecte === "CHARGE";
+    
+    // Récupérer les statuts actuels
+    const chefAgenceStatus = validationStatuses.find(s => s.niveau === 1);
+    const chefComptableStatus = validationStatuses.find(s => s.niveau === 2);
+    const dgStatus = validationStatuses.find(s => s.niveau === 3);
+    
+    // Vérifications par rôle
+    switch (userRole) {
+      case "Chef d'Agence (CA)":
+        // Chef d'agence peut toujours valider si pas encore validé
+        return chefAgenceStatus?.statut === 'pending';
+        
+      case "Chef Comptable":
+        // Chef comptable ne peut valider QUE si le chef d'agence a validé
+        return chefAgenceStatus?.statut === 'approved' && 
+               chefComptableStatus?.statut === 'pending';
+               
+      case "DG":
+        // DG ne peut valider QUE si:
+        // 1. C'est une charge (sinon pas requis)
+        // 2. Chef d'agence a validé
+        // 3. Chef comptable a validé
+        // 4. DG n'a pas encore validé
+        if (!isCharge) return false; // DG pas requis pour non-charges
+        return chefAgenceStatus?.statut === 'approved' && 
+               chefComptableStatus?.statut === 'approved' && 
+               dgStatus?.statut === 'pending';
+               
+      default:
+        return false;
+    }
   };
 
+  // NOUVELLE FONCTION : Vérifie si l'utilisateur peut comptabiliser
+  const peutComptabiliser = (od: OperationDiverse): boolean => {
+    const validationStatuses = analyzeValidationStatus(od);
+    const isCharge = od.type_collecte === "CHARGE";
+    
+    // Récupérer les statuts actuels
+    const chefAgenceStatus = validationStatuses.find(s => s.niveau === 1);
+    const chefComptableStatus = validationStatuses.find(s => s.niveau === 2);
+    const dgStatus = validationStatuses.find(s => s.niveau === 3);
+    
+    // Conditions pour comptabiliser :
+    // 1. Chef d'agence doit avoir validé
+    // 2. Chef comptable doit avoir validé
+    // 3. Pour les charges : DG doit avoir validé
+    // 4. Pas déjà comptabilisé
+    // 5. Doit être Chef Comptable (seul rôle autorisé à comptabiliser)
+    
+    if (userRole !== "Chef Comptable") return false;
+    if (od.est_comptabilise) return false;
+    if (chefAgenceStatus?.statut !== 'approved') return false;
+    if (chefComptableStatus?.statut !== 'approved') return false;
+    
+    // Pour les charges, vérifier que le DG a validé
+    if (isCharge) {
+      return dgStatus?.statut === 'approved';
+    }
+    
+    // Pour les non-charges, chef comptable peut comptabiliser directement après sa validation
+    return true;
+  };
+
+  // FONCTION MODIFIÉE : Gestion du clic sur le bouton Valider
   const handleValidateClick = (od: OperationDiverse) => {
+    const peutValider = peutValiderSelonRole(od);
+    
+    if (!peutValider) {
+      let message = "";
+      
+      switch (userRole) {
+        case "Chef d'Agence (CA)":
+          message = "Vous ne pouvez pas valider cette OD (déjà validée ou non éligible)";
+          break;
+        case "Chef Comptable":
+          if (od.etat_validations?.chef_agence === false) {
+            message = "Le Chef d'Agence doit valider avant vous";
+          } else {
+            message = "Vous ne pouvez pas valider cette OD (déjà validée ou non éligible)";
+          }
+          break;
+        case "DG":
+          if (od.type_collecte !== "CHARGE") {
+            message = "La validation DG n'est requise que pour les charges";
+          } else if (od.etat_validations?.chef_agence === false) {
+            message = "Le Chef d'Agence doit valider avant le DG";
+          } else if (od.etat_validations?.chef_comptable === false) {
+            message = "Le Chef Comptable doit valider avant le DG";
+          } else {
+            message = "Vous ne pouvez pas valider cette OD (déjà validée ou non éligible)";
+          }
+          break;
+        default:
+          message = "Rôle non autorisé pour la validation";
+      }
+      
+      setSnackbar({ 
+        open: true, 
+        message, 
+        severity: "warning" 
+      });
+      return;
+    }
+    
     // Déterminer le type de validation selon le rôle
     let validationType = "";
     
@@ -646,6 +733,14 @@ export default function ODGestionValidation() {
     setSelectedValidation(validationType);
     setSelectedOd(od);
     setOpenValidation(true);
+  };
+
+  // FONCTION MODIFIÉE : Vérifie si une OD peut être rejetée
+  const peutRejeter = (od: OperationDiverse): boolean => {
+    // On peut rejeter à n'importe quel moment du workflow
+    return userRole === "Chef d'Agence (CA)" || 
+           userRole === "Chef Comptable" || 
+           userRole === "DG";
   };
 
   const handleShowDetails = async (od: OperationDiverse) => {
@@ -781,16 +876,15 @@ export default function ODGestionValidation() {
     return "Utilisateur";
   };
 
+  // NOUVELLE FONCTION : Vérifie si une OD est complètement validée
   const isODCompletementValidee = (od: OperationDiverse) => {
-    if (od.etat_validations) {
-      return od.etat_validations.est_complet;
-    }
+    const validationStatuses = analyzeValidationStatus(od);
     
-    const statuses = analyzeValidationStatus(od);
-    const requiredStatuses = statuses.filter(s => s.statut !== 'not_required');
-    const approvedStatuses = requiredStatuses.filter(s => s.statut === 'approved');
+    // Une OD est complètement validée si tous les niveaux requis sont "approved"
+    const niveauxRequis = validationStatuses.filter(status => status.est_requis);
+    const niveauxApprouves = niveauxRequis.filter(status => status.statut === 'approved');
     
-    return requiredStatuses.length === approvedStatuses.length;
+    return niveauxRequis.length === niveauxApprouves.length;
   };
 
   // Types d'opérations pour les filtres
@@ -798,31 +892,73 @@ export default function ODGestionValidation() {
   const typesCollecte = ["MATA_BOOST", "EPARGNE_JOURNALIERE", "CHARGE", "AUTRE"];
   const statuts = ["BROUILLON", "SAISI", "VALIDE_AGENCE", "VALIDE_COMPTABLE", "VALIDE_DG", "VALIDE", "REJETE", "ANNULE"];
 
-  // CORRECTION : Logs pour le débogage
-  useEffect(() => {
-    console.log("🚀 ODGestionValidation - Composant monté");
-    return () => console.log("🧹 ODGestionValidation - Composant démonté");
-  }, []);
+  // useEffect pour appliquer les filtres
+  const applyFilters = useCallback(() => {
+    console.log("🔄 Application des filtres", { odsLength: ods.length, search, filters });
+    
+    if (!Array.isArray(ods)) {
+      console.log("📭 ods n'est pas un tableau");
+      setFilteredOds([]);
+      return;
+    }
 
-  useEffect(() => {
-    console.log("📊 ods mis à jour:", ods.length);
-  }, [ods]);
+    let filtered = [...ods];
 
-  useEffect(() => {
-    console.log("🔍 filteredOds mis à jour:", filteredOds.length);
-  }, [filteredOds]);
+    // Filtre de recherche
+    if (search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      filtered = filtered.filter(od =>
+        (od.numero_od?.toLowerCase() || '').includes(searchLower) ||
+        (od.libelle?.toLowerCase() || '').includes(searchLower) ||
+        (od.numero_piece?.toLowerCase() || '').includes(searchLower) ||
+        (od.agence?.name?.toLowerCase() || '').includes(searchLower) ||
+        (od.agence?.code?.toLowerCase() || '').includes(searchLower)
+      );
+    }
 
-  useEffect(() => {
-    console.log("👤 userRole:", userRole, "isAuthorized:", isAuthorized);
-  }, [userRole, isAuthorized]);
+    // Filtres par statut
+    if (filters.statut) {
+      filtered = filtered.filter(od => od.statut === filters.statut);
+    }
 
-  // CORRECTION : useEffect pour charger le profil utilisateur
+    // Filtre par type de collecte
+    if (filters.type_collecte) {
+      filtered = filtered.filter(od => od.type_collecte === filters.type_collecte);
+    }
+
+    // Filtre par type d'opération
+    if (filters.type_operation) {
+      filtered = filtered.filter(od => od.type_operation === filters.type_operation);
+    }
+
+    // Filtre par dates
+    if (filters.date_debut) {
+      filtered = filtered.filter(od => {
+        if (!od.date_operation) return false;
+        return new Date(od.date_operation) >= new Date(filters.date_debut);
+      });
+    }
+    
+    if (filters.date_fin) {
+      filtered = filtered.filter(od => {
+        if (!od.date_operation) return false;
+        const dateFin = new Date(filters.date_fin);
+        dateFin.setHours(23, 59, 59, 999);
+        return new Date(od.date_operation) <= dateFin;
+      });
+    }
+
+    console.log("✅ Filtrage terminé:", filtered.length, "sur", ods.length, "éléments");
+    setFilteredOds(filtered);
+  }, [ods, search, filters]);
+
+  // useEffect pour charger le profil utilisateur
   useEffect(() => {
     console.log("=== EFFET CHARGEMENT PROFIL ===");
     fetchUserProfile();
-  }, []); // Seulement au montage
+  }, []);
 
-  // CORRECTION : useEffect pour charger les OD quand l'utilisateur est autorisé
+  // useEffect pour charger les OD quand l'utilisateur est autorisé
   useEffect(() => {
     console.log("=== EFFET CHARGEMENT OD ===", { isAuthorized });
     
@@ -830,16 +966,16 @@ export default function ODGestionValidation() {
       console.log("Utilisateur autorisé, chargement des OD...");
       fetchODs();
     }
-  }, [isAuthorized]); // Se déclenche quand isAuthorized change
+  }, [isAuthorized]);
 
-  // CORRECTION : useEffect pour appliquer les filtres
+  // useEffect pour appliquer les filtres
   useEffect(() => {
     console.log("=== EFFET APPLICATION FILTRES ===", { odsLength: ods.length });
     
     if (ods.length > 0) {
       applyFilters();
     }
-  }, [applyFilters, ods]); // Se déclenche quand applyFilters ou ods changent
+  }, [applyFilters, ods]);
 
   // Afficher la page de blocage d'accès si l'utilisateur n'est pas autorisé
   if (isAuthorized === false) {
@@ -1062,17 +1198,17 @@ export default function ODGestionValidation() {
     );
   }
 
-  // Code original pour les utilisateurs autorisés
+  // Code pour les utilisateurs autorisés
   return (
     <Layout>
       <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#F8FAFC', minHeight: '100vh' }}>
         {/* Header avec info utilisateur */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
           <Box>
-              <Button startIcon={<ArrowBack />} onClick={() => navigate('/ChoicePageOd')} sx={{ mb: 2 }}>
-                Retour
-              </Button>            
-              <Typography variant="h4" fontWeight="900" sx={{ color: '#1E293B', display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+            <Button startIcon={<ArrowBack />} onClick={() => navigate('/ChoicePageOd')} sx={{ mb: 2 }}>
+              Retour
+            </Button>            
+            <Typography variant="h4" fontWeight="900" sx={{ color: '#1E293B', display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
               <Assignment sx={{ color: indigo[500] }} />
               Gestion et Validation des OD
             </Typography>
@@ -1234,8 +1370,11 @@ export default function ODGestionValidation() {
                     </TableHead>
                     <TableBody>
                       {filteredOds.map((od) => {
-                        const isCompletementValidee = isODCompletementValidee(od);
                         const validationStatuses = analyzeValidationStatus(od);
+                        const peutValider = peutValiderSelonRole(od);
+                        const peutRejeterOD = peutRejeter(od);
+                        const peutComptabiliserOD = peutComptabiliser(od);
+                        const isCharge = od.type_collecte === "CHARGE";
                         
                         return (
                           <TableRow key={od.id} hover>
@@ -1246,6 +1385,16 @@ export default function ODGestionValidation() {
                               <Typography variant="caption" color="textSecondary">
                                 Pièce: {od.numero_piece || 'N/A'}
                               </Typography>
+                              {isCharge && (
+                                <Chip 
+                                  label="CHARGE" 
+                                  size="small" 
+                                  color="error" 
+                                  variant="outlined"
+                                  icon={<AttachMoney sx={{ fontSize: 12 }} />}
+                                  sx={{ mt: 0.5, fontSize: '0.7rem' }}
+                                />
+                              )}
                             </TableCell>
                             <TableCell>
                               <Typography variant="body2">{od.libelle}</Typography>
@@ -1279,16 +1428,30 @@ export default function ODGestionValidation() {
                                 {validationStatuses.map((status, index) => (
                                   <Tooltip 
                                     key={index} 
-                                    title={`${status.label}: ${status.statut === 'approved' ? 'Validé' : 
-                                           status.statut === 'rejected' ? 'Rejeté' : 
-                                           status.statut === 'pending' ? 'En attente' : 'Non requis'}`}
+                                    title={
+                                      <Box>
+                                        <Typography variant="body2">
+                                          <strong>{status.label}</strong>
+                                        </Typography>
+                                        <Typography variant="caption">
+                                          Statut: {status.statut === 'approved' ? 'Validé' : 
+                                                  status.statut === 'rejected' ? 'Rejeté' : 
+                                                  status.statut === 'pending' ? 'En attente' : 'Non requis'}
+                                        </Typography>
+                                        {!status.est_requis && (
+                                          <Typography variant="caption" display="block">
+                                            (Non requis pour ce type d'OD)
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                    }
                                   >
                                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                       {getStatusIcon(status.statut)}
                                     </Box>
                                   </Tooltip>
                                 ))}
-                                {isCompletementValidee && (
+                                {isODCompletementValidee(od) && (
                                   <Tooltip title="Validation complète">
                                     <DoneAll sx={{ color: green[500], fontSize: 16 }} />
                                   </Tooltip>
@@ -1321,40 +1484,54 @@ export default function ODGestionValidation() {
                                   </IconButton>
                                 </Tooltip>
 
-                                {/* Bouton Valider - TOUJOURS ACTIF */}
-                                <Tooltip title={`Valider cette OD (${getUserRoleLabel()})`}>
-                                  <Button
-                                    size="small"
-                                    variant="contained"
-                                    color="success"
-                                    startIcon={<CheckCircle />}
-                                    onClick={() => handleValidateClick(od)}
-                                    sx={{ minWidth: '100px' }}
-                                  >
-                                    Valider
-                                  </Button>
+                                {/* Bouton Valider - DÉSACTIVÉ SI NON AUTORISÉ */}
+                                <Tooltip title={
+                                  peutValider 
+                                    ? `Valider cette OD (${getUserRoleLabel()})`
+                                    : "Vous ne pouvez pas valider cette OD dans l'état actuel"
+                                }>
+                                  <span>
+                                    <Button
+                                      size="small"
+                                      variant="contained"
+                                      color="success"
+                                      startIcon={<CheckCircle />}
+                                      onClick={() => handleValidateClick(od)}
+                                      disabled={!peutValider}
+                                      sx={{ minWidth: '100px' }}
+                                    >
+                                      Valider
+                                    </Button>
+                                  </span>
                                 </Tooltip>
 
-                                {/* Bouton Rejeter - TOUJOURS ACTIF */}
-                                <Tooltip title="Rejeter cette OD">
-                                  <Button
-                                    size="small"
-                                    variant="contained"
-                                    color="error"
-                                    startIcon={<Cancel />}
-                                    onClick={() => {
-                                      setSelectedOd(od);
-                                      setOpenRejet(true);
-                                    }}
-                                    sx={{ minWidth: '100px' }}
-                                  >
-                                    Rejeter
-                                  </Button>
+                                {/* Bouton Rejeter - DÉSACTIVÉ SI NON AUTORISÉ */}
+                                <Tooltip title={
+                                  peutRejeterOD 
+                                    ? "Rejeter cette OD"
+                                    : "Vous ne pouvez pas rejeter cette OD"
+                                }>
+                                  <span>
+                                    <Button
+                                      size="small"
+                                      variant="contained"
+                                      color="error"
+                                      startIcon={<Cancel />}
+                                      onClick={() => {
+                                        setSelectedOd(od);
+                                        setOpenRejet(true);
+                                      }}
+                                      disabled={!peutRejeterOD}
+                                      sx={{ minWidth: '100px' }}
+                                    >
+                                      Rejeter
+                                    </Button>
+                                  </span>
                                 </Tooltip>
 
-                                {/* Bouton Comptabiliser - Afficher seulement si OD validée */}
-                                {od.statut === 'VALIDE' && !od.est_comptabilise && (
-                                  <Tooltip title="Comptabiliser cette OD">
+                                {/* Bouton Comptabiliser - DÉSACTIVÉ SI NON AUTORISÉ */}
+                                {peutComptabiliserOD && (
+                                  <Tooltip title="Comptabiliser cette OD (Chef Comptable uniquement)">
                                     <Button
                                       size="small"
                                       variant="contained"
@@ -1592,6 +1769,15 @@ export default function ODGestionValidation() {
                     <Grid item xs={6} md={3}>
                       <Typography variant="body2" color="textSecondary">Type collecte:</Typography>
                       <Typography variant="body1">{getTypeCollecteLabel(selectedOd.type_collecte)}</Typography>
+                      {selectedOd.type_collecte === "CHARGE" && (
+                        <Chip 
+                          label="Nécessite validation DG" 
+                          size="small" 
+                          color="warning" 
+                          sx={{ mt: 1 }}
+                          icon={<AttachMoney sx={{ fontSize: 14 }} />}
+                        />
+                      )}
                     </Grid>
                     <Grid item xs={6} md={3}>
                       <Typography variant="body2" color="textSecondary">Montant:</Typography>
@@ -1621,6 +1807,58 @@ export default function ODGestionValidation() {
                       <Typography variant="body2" color="textSecondary">Validé par:</Typography>
                       <Typography variant="body1">{selectedOd.valide_par?.name || 'Non validé'}</Typography>
                     </Grid>
+                    
+              <Grid item xs={12} sx={{ mt: 3 }}>
+                <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+                  Pièce jointe justificative :
+                </Typography>
+                
+                {selectedOd.justificatif_path ? (
+                  <Box sx={{ mt: 1 }}>
+                    {/\.(jpg|jpeg|png|webp|gif)$/i.test(selectedOd.justificatif_path) ? (
+                      <Card variant="outlined" sx={{ maxWidth: 400, overflow: 'hidden' }}>
+                        <Box 
+                          component="img"
+                          src={`${FILE_BASE}/${selectedOd.justificatif_path}`}
+
+                          alt="Justificatif"
+                          sx={{
+                            width: '100%',
+                            height: 'auto',
+                            maxHeight: 300,
+                            objectFit: 'contain',
+                            cursor: 'pointer',
+                            bgcolor: '#f8f9fa'
+                          }}
+                          onClick={() => window.open(`${FILE_BASE}/${selectedOd.justificatif_path}`, '_blank')}
+                        />
+                        <CardContent sx={{ py: 1, '&:last-child': { pb: 1 }, textAlign: 'center' }}>
+                          <Button 
+                            size="small" 
+                            startIcon={<Visibility />} 
+                            onClick={() => window.open(`${FILE_BASE}/${selectedOd.justificatif_path}`, '_blank')}
+                          >
+                            Voir en plein écran
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <Button
+                        variant="outlined"
+                        startIcon={<Download />}
+                        onClick={() => window.open(`${BASE_URL}/${selectedOd.justificatif_path}`, '_blank')}
+                      >
+                        Télécharger le justificatif (Fichier)
+                      </Button>
+                    )}
+                  </Box>
+                ) : (
+                  <Alert severity="info" variant="outlined" sx={{ py: 0 }}>
+                    Aucun justificatif n'a été rattaché à cette opération.
+                  </Alert>
+                )}
+              </Grid>
+
                   </Grid>
                 </Grid>
 
@@ -1669,12 +1907,15 @@ export default function ODGestionValidation() {
                                   </ListItemIcon>
                                   <ListItemText
                                     primary={
-                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                                         <Typography variant="body2" fontWeight="medium">
                                           {status.label}
                                         </Typography>
-                                        {status.statut === 'not_required' && (
+                                        {!status.est_requis && (
                                           <Chip label="Non requis" size="small" variant="outlined" />
+                                        )}
+                                        {status.est_requis && status.statut === 'pending' && selectedOd.type_collecte === "CHARGE" && status.niveau === 3 && (
+                                          <Chip label="Nécessaire (charge)" size="small" color="warning" />
                                         )}
                                       </Box>
                                     }
@@ -1694,6 +1935,11 @@ export default function ODGestionValidation() {
                                         {status.commentaire && (
                                           <Typography variant="caption" display="block">
                                             Commentaire: {status.commentaire}
+                                          </Typography>
+                                        )}
+                                        {!status.est_requis && (
+                                          <Typography variant="caption" display="block" color="text.secondary">
+                                            Non requis pour ce type d'OD
                                           </Typography>
                                         )}
                                       </Box>
@@ -1722,16 +1968,14 @@ export default function ODGestionValidation() {
                         <Grid item xs={12}>
                           <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
                             <Typography variant="body2" gutterBottom>
-                              <strong>Résumé:</strong>
+                              <strong>Résumé des règles de validation:</strong>
                             </Typography>
                             <Typography variant="body2">
-                              • Chef d'Agence: {validationStatus.find(s => s.niveau === 1)?.statut === 'approved' ? '✓ Validé' : '⏳ En attente'}
+                              1. Chef d'Agence: <strong>Toujours requis</strong> - Premier niveau
                               <br />
-                              • Chef Comptable: {validationStatus.find(s => s.niveau === 2)?.statut === 'approved' ? '✓ Validé' : '⏳ En attente'}
+                              2. Chef Comptable: <strong>Toujours requis</strong> - Nécessite validation CA
                               <br />
-                              • Directeur Général: {selectedOd.type_collecte === 'CHARGE' 
-                                ? (validationStatus.find(s => s.niveau === 3)?.statut === 'approved' ? '✓ Validé' : '⏳ En attente')
-                                : 'Non requis pour ce type d\'OD'}
+                              3. Directeur Général: <strong>Uniquement pour les charges</strong> - Nécessite validation CA et Chef Comptable
                             </Typography>
                             {isODCompletementValidee(selectedOd) ? (
                               <Alert severity="success" sx={{ mt: 2 }}>
@@ -1743,6 +1987,15 @@ export default function ODGestionValidation() {
                               <Alert severity="info" sx={{ mt: 2 }}>
                                 <Typography variant="body2">
                                   <strong>⏳ Cette OD nécessite encore des validations.</strong>
+                                  <br />
+                                  {validationStatus.find(s => s.niveau === 1)?.statut !== 'approved' && "• Chef d'Agence doit valider"}
+                                  <br />
+                                  {validationStatus.find(s => s.niveau === 1)?.statut === 'approved' && 
+                                   validationStatus.find(s => s.niveau === 2)?.statut !== 'approved' && "• Chef Comptable peut maintenant valider"}
+                                  <br />
+                                  {selectedOd.type_collecte === "CHARGE" && 
+                                   validationStatus.find(s => s.niveau === 2)?.statut === 'approved' && 
+                                   validationStatus.find(s => s.niveau === 3)?.statut !== 'approved' && "• DG peut maintenant valider (charge)"}
                                 </Typography>
                               </Alert>
                             )}
@@ -1808,27 +2061,48 @@ export default function ODGestionValidation() {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setOpenDetails(false)}>Fermer</Button>
-            {/* TOUJOURS AFFICHER les boutons de validation/rejet */}
-            <Button
-              variant="contained"
-              onClick={() => {
-                setOpenDetails(false);
-                handleValidateClick(selectedOd);
-              }}
-            >
-              Valider cette OD
-            </Button>
-            <Button
-              variant="outlined"
-              color="error"
-              onClick={() => {
-                setOpenDetails(false);
-                setSelectedOd(selectedOd);
-                setOpenRejet(true);
-              }}
-            >
-              Rejeter cette OD
-            </Button>
+            
+            {/* Boutons de validation/rejet conditionnels */}
+            {selectedOd && peutValiderSelonRole(selectedOd) && (
+              <Button
+                variant="contained"
+                onClick={() => {
+                  setOpenDetails(false);
+                  handleValidateClick(selectedOd);
+                }}
+              >
+                Valider cette OD
+              </Button>
+            )}
+            
+            {selectedOd && peutRejeter(selectedOd) && (
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={() => {
+                  setOpenDetails(false);
+                  setSelectedOd(selectedOd);
+                  setOpenRejet(true);
+                }}
+              >
+                Rejeter cette OD
+              </Button>
+            )}
+            
+            {/* Bouton comptabiliser si chef comptable et OD complètement validée */}
+            {selectedOd && userRole === "Chef Comptable" && peutComptabiliser(selectedOd) && (
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={() => {
+                  handleComptabiliser(selectedOd.id);
+                  setOpenDetails(false);
+                }}
+                startIcon={<VerifiedUser />}
+              >
+                Comptabiliser
+              </Button>
+            )}
           </DialogActions>
         </Dialog>
 
@@ -1844,6 +2118,22 @@ export default function ODGestionValidation() {
             <Typography variant="body2" color="textSecondary" gutterBottom>
               Vous êtes en train de valider cette OD en tant que {getUserRoleLabel()}
             </Typography>
+            
+            {selectedOd && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                <Typography variant="body2">
+                  <strong>Type d'OD:</strong> {getTypeCollecteLabel(selectedOd.type_collecte)}
+                  <br />
+                  {selectedOd.type_collecte === "CHARGE" && 
+                   userRole === "DG" && 
+                   "⚠️ Validation DG requise pour les charges"}
+                  {selectedOd.type_collecte !== "CHARGE" && 
+                   userRole === "DG" && 
+                   "ℹ️ Validation DG non requise pour ce type d'OD"}
+                </Typography>
+              </Alert>
+            )}
+            
             <TextField
               fullWidth
               multiline
@@ -1910,7 +2200,7 @@ export default function ODGestionValidation() {
           </DialogActions>
         </Dialog>
 
-        {/* NOUVELLE MODAL: Code pour la caisse (s'affiche après validation DG) */}
+        {/* Modal: Code pour la caisse (s'affiche après validation DG) */}
         <Dialog 
           open={codeCaisseModal.open} 
           onClose={() => setCodeCaisseModal({...codeCaisseModal, open: false})}

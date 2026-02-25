@@ -60,6 +60,12 @@ interface Compte {
     categorie_id?: number;
     nature_solde?: string;
   };
+
+  jourComptable?: {
+    id: number;
+    date_du_jour: string;
+    statut: string;
+  };
   mandataires?: Array<{
     id: number;
     nom: string;

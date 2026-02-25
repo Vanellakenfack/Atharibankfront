@@ -85,7 +85,9 @@ interface Compte {
     prenom?: string;
     nom_complet?: string;
   };
-  created_at: string;
+  jour_comptable: {
+    date_du_jour: string;
+  };
 }
 
 const StyledTableHead = styled(MuiTableHead)({
@@ -126,7 +128,7 @@ const headCells = [
   { id: 'type_compte', label: 'Type de compte' },
   { id: 'solde', label: 'Solde' },
   { id: 'devise', label: 'Devise' },
-  { id: 'created_at', label: 'Date création' },
+  { id: 'jour_comptable', label: 'Date création' },
   { id: 'statut', label: 'Statut' },
   { id: 'actions', label: 'Actions', disableSorting: true },
 ];
@@ -483,7 +485,7 @@ const ListeComptes: React.FC = () => {
                                 />
                               </StyledTableCell>
                               <StyledTableCell sx={{ color: '#64748B' }}>
-                                {formatDate(compte.created_at)}
+                                {formatDate(compte.jour_comptable?.date_du_jour         )}
                               </StyledTableCell>
                               <StyledTableCell>
                                 <Chip 

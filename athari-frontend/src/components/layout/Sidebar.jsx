@@ -30,7 +30,8 @@ import {
   FileSpreadsheet,
   UserPlus,
   UserCog,
-  UserCheck
+  UserCheck,
+  Scale // Icône pour Balance
 } from 'lucide-react';
 import { useAuth } from "../../context/AuthContext";
 
@@ -68,6 +69,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     journalComptable: '/Journal-Comptable',
     journalCaisse: '/Journal-Caisse',
     reporting2: '/reporting-2',
+    balancePage: '/BalancePage', // Nouveau chemin ajouté
     agenceForm: '/agence/form',
     guichetForm: '/guichet/form',
     caisseForm: '/caisse/form',
@@ -101,7 +103,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
     PlanComptable: [menuPaths.planComptable, menuPaths.planComptableCategories],
     Account: [menuPaths.compte, menuPaths.listeComptes, menuPaths.validationComptes],
     Gestionnaire: [menuPaths.addGestionnaire, menuPaths.listGestionnaire],
-    Reporting: [menuPaths.journalComptable, menuPaths.journalCaisse, menuPaths.reporting2],
+    Reporting: [menuPaths.journalComptable, menuPaths.journalCaisse, menuPaths.reporting2, menuPaths.balancePage], // BalancePage ajouté
     TransactionsAdmin: [menuPaths.agenceForm, menuPaths.guichetForm, menuPaths.caisseForm, menuPaths.validerTransaction, menuPaths.tfc, menuPaths.validerRD],
     FrontOffice: [
       menuPaths.dashboardCaissieres,
@@ -189,7 +191,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
         };
       
       case 'reporting':
-        return ['DG', 'Admin', 'Chef Comptable', 'Assistant Comptable (AC)'].includes(role);
+        // Changé pour inclure DG, Chef Comptable, Assistant Comptable (AC) et Chef d'Agence (CA)
+        return ['DG', 'Admin', 'Chef Comptable', 'Assistant Comptable (AC)', 'Chef d\'Agence (CA)'].includes(role);
       
       case 'transactionsAdmin':
         if (role === 'Caissière') return true;
@@ -214,11 +217,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
         };
       
       case 'frontOffice':
-        return role === 'Caissière';
-      
+        return ['DG', 'Admin','Chef Comptable', 'Caissière',].includes(role);
+        
       case 'dashboardCaissieres':
-        // Dashboard caissieres - seulement DG et Admin
-        return ['DG', 'Admin'].includes(role);
+        // Dashboard caissieres - seulement DG , Admin,'Chef Comptable'
+        return ['DG', 'Admin','Chef Comptable'].includes(role);
       
       case 'usersRoles':
         return role === 'DG';
@@ -270,7 +273,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
       
       case 'gestionnaire':
         // Gestionnaire - DG, Admin
-        return ['DG', 'Admin'].includes(role);
+        return ['DG', 'Admin', 'Chef d\'Agence (CA)'].includes(role);
+
+      case 'CaisseEspece':
+        // caissiere
+        return role === 'Caissière';
       
       default:
         return false;
@@ -809,7 +816,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
           </div>
         )}
         
-        {/* MENU reporting */}
+        {/* MENU Gestion des Journaux (anciennement Reporting) */}
         {canSeeMenu('reporting') && (
           <div className="mb-2">
             <div 
@@ -824,11 +831,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               onClick={() => {
                 if (sidebarOpen) setShowReporting(!showReporting);
               }}
-              title={!sidebarOpen ? 'Reporting' : ''}
+              title={!sidebarOpen ? 'Gestion des Journaux' : ''}
             >
               <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
                 <BookOpen size={20} strokeWidth={isGroupActive('Reporting') ? 3 : 2} />
-                {sidebarOpen && <span className="small fw-bold">Reporting</span>}
+                {sidebarOpen && <span className="small fw-bold">Gestion des Journaux</span>}
               </div>
               {sidebarOpen && showReporting && (
                 <ChevronDown 
@@ -839,7 +846,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
               )}
             </div>
             
-            {/* Sous-menu Reporting */}
+            {/* Sous-menu Gestion des Journaux */}
             {showReporting && sidebarOpen && (
               <div className="ms-4 mt-1">
                 <Link
@@ -856,7 +863,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <BookOpen size={16} strokeWidth={isActivePath(menuPaths.journalComptable) ? 3 : 2} />
-                  Journal Comptable
+                  Journal Ouvrture Comptes
                 </Link>
                 
                 {/* Ajout du Journal de caisse */}
@@ -875,6 +882,24 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
                 >
                   <FileText size={16} strokeWidth={isActivePath(menuPaths.journalCaisse) ? 3 : 2} />
                   Journal de caisse
+                </Link>
+
+                {/* Ajout du sous-menu Balance */}
+                <Link
+                  to={menuPaths.balancePage}
+                  className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
+                    isActivePath(menuPaths.balancePage) 
+                      ? 'text-white fw-bold' 
+                      : 'text-secondary hover-bg-light'
+                  }`}
+                  style={{ 
+                    background: isActivePath(menuPaths.balancePage) ? activeGradient : 'transparent',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Scale size={16} strokeWidth={isActivePath(menuPaths.balancePage) ? 3 : 2} />
+                  Balance
                 </Link>
                 
                 {/* Reporting 2 - Menu à commenter */}
@@ -933,7 +958,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
             {showTransactions && sidebarOpen && (
               <div className="ms-4 mt-1">
                 {/* Ouverture/fermeture Agence - seulement pour Caissière et Chef d'Agence */}
-                {(userRole === 'Caissière' || userRole === 'Chef d\'Agence (CA)') && (
+                {(userRole === 'DG' || userRole === 'Chef d\'Agence (CA)') && (
                   <Link
                     to={menuPaths.agenceForm}
                     className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
@@ -953,7 +978,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
                 )}
                 
                 {/* Ouverture/Fermeture du guichet - seulement pour Caissière et Chef d'Agence */}
-                {(userRole === 'Caissière' || userRole === 'Chef d\'Agence (CA)') && (
+                {(userRole === 'DG' || userRole === 'Chef d\'Agence (CA)') && (
                   <Link
                     to={menuPaths.guichetForm}
                     className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${
@@ -973,7 +998,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
                 )}
 
                 {/* Ouverture/Fermeture de la caisse - seulement pour Caissière et Chef d'Agence */}
-                {(userRole === 'Caissière' || userRole === 'Chef d\'Agence (CA)') && (
+                {(userRole === 'Caissière') && (
                   <Link
                     to={menuPaths.caisseForm}
                     className={`d-flex align-items-center gap-2 p-2 text-decoration-none small rounded-3 mb-1 ${

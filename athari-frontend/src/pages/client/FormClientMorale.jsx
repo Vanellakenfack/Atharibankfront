@@ -4,7 +4,7 @@ import {
   ThemeProvider, createTheme, CssBaseline, Container, Box, Grid, TextField,
   Button, Stepper, Step, StepLabel, Select, MenuItem, InputLabel, 
   FormControl, Typography, Divider, Paper, FormHelperText, Snackbar, Alert,
-  Tabs, Tab, Stack, Avatar, IconButton, Chip
+  Tabs, Tab, Stack, Avatar, IconButton, Chip, Autocomplete
 } from "@mui/material";
 import { indigo, blueGrey, cyan } from "@mui/material/colors";
 import { useForm, Controller } from "react-hook-form";
@@ -68,9 +68,9 @@ const createSchemas = (activeStep, formData) => {
     telephone: Yup.string().required("Téléphone requis"),
   });
 
-  // Schéma pour l'étape 2
+  // Schéma pour l'étape 2 - NUI et RCCM ne sont plus requis
   let step2Schema = Yup.object({
-    nui: Yup.string().required("N° NUI requis"),
+    nui: Yup.string().nullable(),
     rccm: Yup.string().nullable(),
   });
 
@@ -125,19 +125,602 @@ const createSchemas = (activeStep, formData) => {
 
 const CITY_DATA = {
   Douala: ["Akwa", "Bonapriso", "Deïdo", "Bali", "Makepe", "Bonanjo", "Logbessou", "Kotto", "Logpom", "Lendi", "Nyalla", "Ndogpassi", "Bepanda", "Bonamoussadi", "Ange Raphaël", "Ndoti", "New Bell", "Bassa", "Nylon", "Cité des Palmiers", "Bonabéri", "Sodiko", "Boanda", "Mabanda", "Yassa", "Japoma"],
-  Yaoundé: ["Bastos", "Essos", "Mokolo", "Biyem-Assi", "Mvog-Ada", "Nkolbisson", "Ekounou", "Ngousso", "Santa Barbara", "Etoudi", "Mballa II", "Emana", "Messassi", "Olembe", "Nlongkak", "Etoa-Meki", "Mvog-Mbi", "Obili", "Ngoa-Ekelle", "Damase", "Mendong", "Simbock", "Efoulan", "Nsam", "Ahala", "Kondengui"],
-  Bafoussam: ["Tamdja", "Banengo", "Djeleng", "Nkong-Zem", "Koptchou", "Famla", "Houkaha", "Kouékong", "Ndiangdam", "Kamkop", "Toungang", "Tocket", "Diadam", "Baleng"],
-  Bamenda: ["Mankon", "Nkwen", "Bali", "Bafut", "Up-Station", "Old Church", "Mile 2", "Mile 3", "Mile 4", "Cow Street", "Abakwa", "Mulang", "Below Fongu"],
-  Garoua: ["Lainde", "Yelwa", "Roumdé Adjia", "Djamboutou", "Nassarao", "Pitoa", "Poumpoumré", "Foulberé", "Louti", "Gashiga"],
-  Maroua: ["Kakataré", "Doursoungo", "Douggoï", "Domayo", "Pitoaré", "Ouro-Tchédé", "Djarengol", "Baouliwol", "Zokok"],
-  Ngaoundéré: ["Baladji I", "Baladji II", "Joli Soir", "Dang", "Bamyanga", "Sabongari", "Mboum", "Yelwa", "Haoussa"],
-  Limbe: ["Down Beach", "Bota", "Middle Farms", "Mile 4", "New Town", "Ngéme", "Cassava Farms", "Man O' War Bay"],
-  Buea: ["Molyko", "Mile 17", "Check Point", "Bonduma", "Great Soppo", "Bokwango", "Buea Town", "Bolifamba"],
-  Bertoua: ["Enia", "Yadémé", "Kpokolota", "Ndokayo", "Monou", "Tigaza", "Bonis"],
-  Ebolowa: ["Mekalat", "Angalé", "Biyébe", "New Bell", "Nko'ovos", "Ebolowa Si II"],
-  Kribi: ["Dôme", "Mboa Manga", "Talla", "Nziou", "Bwanjo", "Mpangou", "Londji"],
-  Nkongsamba: ["Baré", "Quartier 1", "Quartier 2", "Quartier 3", "Ekel-Ko", "Mbaressoumtou"],
-  Dschang: ["Foréké", "Foto", "Keleng", "Tsinfing", "Apouh", "Mingmeto"]
+  
+  Yaoundé: [
+    // ============ YAOUNDÉ 1er ============
+    "Bastos (Résidentiel, Ambassades)",
+    "Bastos - Carrefour Bastos",
+    "Bastos - Quartier Fouda",
+    
+    "Mvog-Mbi (Grand Marché)",
+    "Mvog-Mbi - Carrefour Mvog-Mbi",
+    "Mvog-Mbi - Marché Mvog-Mbi",
+    "Mvog-Mbi - Église",
+    "Mvog-Mbi - Chemin de Fer",
+    
+    "Mvog-Ada",
+    "Mvog-Ada - Carrefour Mvog-Ada",
+    "Mvog-Ada - Poste",
+    
+    "Nlongkak",
+    "Nlongkak - Carrefour Nlongkak",
+    "Nlongkak - Pharmacie",
+    "Nlongkak - Total",
+    
+    "Elig-Essono",
+    "Elig-Essono - Ministères",
+    "Elig-Essono - Carrefour Elig-Essono",
+    
+    "Santa Barbara",
+    "Santa Barbara - Résidentiel",
+    "Santa Barbara - Carrefour",
+    
+    "Etoa-Meki",
+    "Etoa-Meki - Carrefour",
+    "Etoa-Meki - École",
+    
+    "Messa",
+    "Messa - Carrefour Messa",
+    "Messa - Station",
+    
+    "Hippodrome",
+    "Hippodrome - Piste",
+    
+    "Mont-Fébé",
+    "Mont-Fébé - Sommet",
+    "Mont-Fébé - Hôtel",
+    "Mont-Fébé - Résidences",
+    
+    "Djoungolo",
+    "Mfoundi",
+    "Olezoa",
+    "Olezoa - Lac",
+    
+    // ============ YAOUNDÉ 2e ============
+    "Tsinga",
+    "Tsinga - Carrefour Tsinga",
+    "Tsinga - Mairie",
+    "Tsinga - Montée",
+    
+    "Fouda",
+    "Fouda - Résidentiel",
+    "Fouda - Carrefour",
+    
+    "Warda",
+    "Warda - Marché",
+    "Warda - Carrefour",
+    
+    "Ngoa-Ekéllé",
+    "Ngoa-Ekéllé - Université",
+    "Ngoa-Ekéllé - Campus",
+    "Ngoa-Ekéllé - Restaurant Universitaire",
+    "Ngoa-Ekéllé - Bibliothèque",
+    "Ngoa-Ekéllé - Cité U",
+    
+    "Melen",
+    "Melen - Cité Verte",
+    "Melen - Carrefour Melen",
+    "Melen - Université",
+    
+    "Carrière",
+    "Carrière - Avenue Kennedy",
+    "Carrière - Marché Carrière",
+    "Carrière - Chefferie",
+    
+    "Mvog-Betsi",
+    "Mvog-Betsi - Hôpital",
+    "Mvog-Betsi - Carrefour",
+    
+    "Nkomkana",
+    "Nkomkana - Carrefour",
+    
+    "Nkol-Eton",
+    "Nkol-Eton - Résidentiel",
+    
+    "Mballa II",
+    "Mballa II - Grand Marché",
+    "Mballa II - Entrée Marché",
+    "Mballa II - Parking",
+    
+    "Awae",
+    "Awae - Village",
+    "Awae - Carrefour",
+    
+    // ============ YAOUNDÉ 3e ============
+    "Mokolo",
+    "Mokolo - Grand Marché",
+    "Mokolo - Marché Mokolo",
+    "Mokolo - Carrefour Mokolo",
+    "Mokolo - Station Mokolo",
+    "Mokolo - Église Mokolo",
+    "Mokolo - Mosquée",
+    "Mokolo - Entrée Nord",
+    "Mokolo - Entrée Sud",
+    "Mokolo - Entrée Est",
+    "Mokolo - Entrée Ouest",
+    "Mokolo - Pharmacie",
+    "Mokolo - Château",
+    "Mokolo - Dallé",
+    
+    "Mfoundassi",
+    "Mfoundassi - Carrefour",
+    "Mfoundassi - Église",
+    
+    "Nkolndongo",
+    "Nkolndongo - Chefferie",
+    "Nkolndongo - Marché",
+    "Nkolndongo - Carrefour",
+    
+    "Nkoldongo",
+    "Nkoldongo - École",
+    
+    "Biyem-Assi",
+    "Biyem-Assi - District",
+    "Biyem-Assi - Carrefour Biyem-Assi",
+    "Biyem-Assi - Marché Biyem-Assi",
+    "Biyem-Assi - Église Biyem-Assi",
+    "Biyem-Assi - Lycée",
+    "Biyem-Assi - Cité Verte",
+    "Biyem-Assi - Entrée",
+    "Biyem-Assi - Sortie",
+    "Biyem-Assi - Carrefour District",
+    
+    "Oyom-Abang",
+    "Oyom-Abang - Carrefour",
+    "Oyom-Abang - Chefferie",
+    
+    "Abom-Étoudi",
+    "Abom-Étoudi - Palais",
+    
+    "Étoudi",
+    "Étoudi - Palais Présidentiel",
+    "Étoudi - Entrée Palais",
+    "Étoudi - Carrefour Étoudi",
+    
+    "Ekounou",
+    "Ekounou - Carrefour Ekounou",
+    "Ekounou - Terminus",
+    "Ekounou - Marché Ekounou",
+    "Ekounou - Station",
+    "Ekounou - Entrée",
+    "Ekounou - Sortie",
+    "Ekounou - Pharmacie",
+    
+    "Nkomo",
+    "Nkomo - Carrefour",
+    
+    "Ngousso",
+    "Ngousso - Carrefour Ngousso",
+    "Ngousso - Marché Ngousso",
+    "Ngousso - Église",
+    
+    "Essos",
+    "Essos - Carrefour Essos",
+    "Essos - Station Essos",
+    "Essos - Pharmacie",
+    "Essos - Entrée",
+    "Essos - Sortie",
+    "Essos - Centre Commercial",
+    
+    "Nkolbisson",
+    "Nkolbisson - Université",
+    "Nkolbisson - Campus",
+    "Nkolbisson - Carrefour",
+    "Nkolbisson - Marché",
+    "Nkolbisson - Chefferie",
+    
+    "Nsam",
+    "Nsam - Carrefour Nsam",
+    "Nsam - Marché Nsam",
+    "Nsam - Église",
+    "Nsam - Entrée",
+    
+    "Mvan",
+    "Mvan - Gare Routière",
+    "Mvan - Terminus",
+    "Mvan - Carrefour Mvan",
+    "Mvan - Marché Mvan",
+    "Mvan - Station",
+    "Mvan - Entrée",
+    "Mvan - Sortie",
+    
+    "Afanoyoa",
+    "Afanoyoa - Carrefour",
+    
+    "Odza",
+    "Odza - Carrefour Odza",
+    "Odza - Marché Odza",
+    "Odza - Entrée",
+    "Odza - Sortie",
+    "Odza - Station",
+    "Odza - Pharmacie",
+    "Odza - Église",
+    "Odza - Chefferie",
+    
+    "Nsimeyelong",
+    "Nsimeyelong - Carrefour",
+    
+    "Nkolmesseng",
+    "Nkolmesseng - Carrefour",
+    "Nkolmesseng - Église",
+    
+    "Mbankolo",
+    "Mbankolo - Lac",
+    "Mbankolo - Carrefour",
+    "Mbankolo - Chefferie",
+    
+    // ============ YAOUNDÉ 4e ============
+    "Mimboman",
+    "Mimboman - Carrefour Mimboman",
+    "Mimboman - Marché Mimboman",
+    "Mimboman - Église",
+    "Mimboman - Entrée",
+    "Mimboman - Sortie",
+    "Mimboman - Station",
+    "Mimboman - Carrefour 2",
+    "Mimboman - Chefferie",
+    
+    "Nkoul-Éton",
+    "Nkoul-Éton - Carrefour",
+    
+    "Emana",
+    "Emana - Carrefour Emana",
+    "Emana - Marché Emana",
+    "Emana - Entrée",
+    "Emana - Station",
+    
+    "Kondengui",
+    "Kondengui - Prison Centrale",
+    "Kondengui - Carrefour Kondengui",
+    "Kondengui - Entrée Prison",
+    "Kondengui - Zone Industrielle",
+    
+    // ============ YAOUNDÉ 5e ============
+    "Mfandena",
+    "Mfandena - Palais Polyvalent",
+    "Mfandena - Stade",
+    "Mfandena - Carrefour",
+    
+    "Omnisports",
+    "Omnisports - Stade Ahmadou Ahidjo",
+    "Omnisports - Entrée Stade",
+    "Omnisports - Parking",
+    
+    // ============ YAOUNDÉ 6e ============
+    "Mbankomo",
+    "Mbankomo - Camp",
+    "Mbankomo - Carrefour",
+    "Mbankomo - Village",
+    
+    "Okola",
+    "Okola - Centre",
+    
+    "Soa",
+    "Soa - Université",
+    "Soa - Campus",
+    "Soa - Carrefour",
+    "Soa - Village",
+    
+    "Nkolafamba",
+    "Nkolafamba - Village",
+    
+    "Akono",
+    "Akono - Centre",
+    
+    // ============ YAOUNDÉ 7e ============
+    "Mvolyé",
+    "Mvolyé - Basilique",
+    "Mvolyé - Carrefour",
+    "Mvolyé - Colline",
+    "Mvolyé - Entrée",
+    
+    // ============ AUTRES QUARTIERS ============
+    "Obili",
+    "Obili - Carrefour Obili",
+    "Obili - Université",
+    
+    "Damase",
+    "Damase - Carrefour",
+    
+    "Mendong",
+    "Mendong - Carrefour Mendong",
+    "Mendong - Marché Mendong",
+    "Mendong - Entrée",
+    "Mendong - Cité",
+    
+    "Simbock",
+    "Simbock - Carrefour Simbock",
+    "Simbock - Marché",
+    "Simbock - Entrée",
+    
+    "Efoulan",
+    "Efoulan - Carrefour",
+    "Efoulan - Église",
+    
+    "Ahala",
+    "Ahala - Carrefour Ahala",
+    "Ahala - Marché Ahala",
+    "Ahala - Entrée",
+    "Ahala - Sortie",
+    "Ahala - Station",
+    
+    "Nkoabang",
+    "Nkoabang - Carrefour",
+    "Nkoabang - Village",
+    
+    "Nkolbikok",
+    "Nkolbikok - Carrefour",
+    
+    "Nkolndan",
+    "Nkolndan - Village",
+    
+    "Nkolfoulou",
+    "Nkolfoulou - Village",
+    
+    "Nkolbogol",
+    "Nkolbogol - Village",
+    
+    "Ekoudou",
+    "Ekoudou - Village",
+    
+    "Ekabita",
+    "Ekabita - Carrefour",
+    
+    "Ekekam",
+    "Ekekam - Village",
+    
+    "Ngoulmekong",
+    "Ngoulmekong - Village",
+    
+    "Nsimi",
+    "Nsimi - Village",
+    
+    "Mvangan",
+    "Mvangan - Centre",
+    
+    "Nkozoa",
+    "Nkozoa - Village",
+    
+    "Nsimeyong",
+    "Nsimeyong - Carrefour",
+    
+    "Mvog-Betsi",
+    "Mvog-Betsi - Hôpital Gynéco",
+    "Mvog-Betsi - Carrefour",
+    
+    // ============ QUARTIER DEMANDÉ SPÉCIFIQUEMENT ============
+    "Marcher Huitième",
+    "Marcher Huitième - Entrée",
+    "Marcher Huitième - Carrefour",
+    "Marcher Huitième - École",
+    
+    // ============ QUARTIERS HISTORIQUES & TRADITIONNELS ============
+    "Nkol-Nkondengui",
+    "Mvog-Mba",
+    "Mvog-Betsi",
+    "Mvog-Ada",
+    "Mvog-Ebanda",
+    "Mvog-Mbi",
+    "Nkol-Nyada",
+    "Nkol-Ngok",
+    "Nkol-Ewondo",
+    "Nkol-Mbamba",
+    "Nkol-Akono",
+    "Nkol-Nkono",
+    
+    // ============ CITÉS ET ZONES RÉSIDENTIELLES ============
+    "Cité Verte",
+    "Cité Sic",
+    "Cité des Enseignants",
+    "Cité CAPEC",
+    "Cité Mini-Ferme",
+    "Cité Parc",
+    "Cité SOFA",
+    "Cité Fouda",
+    "Cité Tsinga",
+    "Cité Bastos",
+    "Cité Mvan",
+    "Cité Odza",
+    "Cité Ahala",
+    "Cité Mendong",
+    "Cité Nkolbisson",
+    
+    // ============ MARCHÉS (sous-lieux) ============
+    "Marché Mfoundi",
+    "Marché Central",
+    "Marché Mokolo",
+    "Marché Mvog-Mbi",
+    "Marché Mballa II",
+    "Marché Essos",
+    "Marché Ekounou",
+    "Marché Mvan",
+    "Marché Odza",
+    "Marché Ahala",
+    "Marché Mendong",
+    "Marché Nkolbisson",
+    "Marché Biyem-Assi",
+    "Marché Mimboman",
+    "Marché Nsam",
+    "Marché Ngousso",
+    
+    // ============ CARREFOURS CÉLÈBRES ============
+    "Carrefour Bastos",
+    "Carrefour Nlongkak",
+    "Carrefour Mvog-Mbi",
+    "Carrefour Essos",
+    "Carrefour Ekounou",
+    "Carrefour Mvan",
+    "Carrefour Odza",
+    "Carrefour Ahala",
+    "Carrefour Mendong",
+    "Carrefour Biyem-Assi",
+    "Carrefour Nsam",
+    "Carrefour Ngousso",
+    "Carrefour Mimboman",
+    "Carrefour Kondengui",
+    "Carrefour Tsinga",
+    "Carrefour Fouda",
+    "Carrefour Melen",
+    "Carrefour Ngoa-Ekéllé",
+    
+    // ============ TERMINUS BUS ============
+    "Terminus Mvan",
+    "Terminus Ekounou",
+    "Terminus Odza",
+    "Terminus Ahala",
+    "Terminus Mendong",
+    "Terminus Biyem-Assi",
+    "Terminus Nsam",
+    "Terminus Essos",
+    "Terminus Mimboman",
+    "Terminus Nkolbisson",
+    "Terminus Mbankolo",
+    
+    // ============ ZONES INDUSTRIELLES ============
+    "Zone Industrielle Kondengui",
+    "Zone Industrielle Mvan",
+    "Zone Industrielle Nsam",
+    "Zone Industrielle Mfoundi",
+    
+    // ============ UNIVERSITÉS & CAMPUS ============
+    "Université de Yaoundé I - Ngoa-Ekéllé",
+    "Université de Yaoundé II - Soa",
+    "Université Catholique - Mvolyé",
+    "Université Protestante - Nkolbisson",
+    "ENS - Ngoa-Ekéllé",
+    "ENSP - Ngoa-Ekéllé",
+    "FMSB - Mvog-Betsi",
+    "ESSEC - Ngoa-Ekéllé",
+    "IRIC - Ngoa-Ekéllé",
+    
+    // ============ HÔPITAUX ============
+    "Hôpital Central - Nlongkak",
+    "Hôpital Gynéco - Mvog-Betsi",
+    "Hôpital Jamot - Mvog-Mbi",
+    "CMC - Biyem-Assi",
+    "CMC - Mendong",
+    "CMC - Odza",
+    "CMC - Ekounou",
+    "Hôpital Militaire - Tsinga",
+    
+    // ============ STADES ============
+    "Stade Ahmadou Ahidjo - Omnisports",
+    "Palais Polyvalent - Mfandena",
+    "Stade Mvog-Mbi",
+    "Stade Ngoa-Ekéllé",
+    "Stade Tsinga",
+    "Stade Essos",
+    
+    // ============ LACS ============
+    "Lac Municipal - Olezoa",
+    "Lac Mbankolo",
+    "Lac Melen",
+    "Lac Ngoa-Ekéllé",
+    
+    // ============ PALAIS ET INSTITUTIONS ============
+    "Palais Présidentiel - Étoudi",
+    "Palais de l'Unité - Étoudi",
+    "Primature - Nlongkak",
+    "Assemblée Nationale - Ngoa-Ekéllé",
+    "Sénat - Mvog-Mbi",
+    "Conseil Constitutionnel - Nlongkak",
+    "Cour Suprême - Mvog-Mbi",
+    "Sous manguier",
+    "Belle mere",
+    "Carosel",
+    "Nouvelle route Carosel"
+  ],
+  
+  Bafoussam: ["Tamdja", "Banengo", "Djeleng", "Nkong-Zem", "Koptchou", "Famla", "Houkaha", "Kouékong", "Ndiangdam", "Kamkop", "Toungang", "Tocket", "Diadam", "Baleng", "Nsimalen", "Bamendzi", "Ndé", "Ndenkop", "Ndiangsouam", "Ngoueng", "Kamkop", "Banego", "Djeleng II"],
+  
+  Bamenda: ["Mankon", "Nkwen", "Bali", "Bafut", "Up-Station", "Old Church", "Mile 2", "Mile 3", "Mile 4", "Cow Street", "Abakwa", "Mulang", "Below Fongu", "Atuak", "Mendakwe", "Ndamukong", "Chomba", "Mbatu", "Ntenefor", "Mbei", "Bambili"],
+  
+  Garoua: ["Lainde", "Yelwa", "Roumdé Adjia", "Djamboutou", "Nassarao", "Pitoa", "Poumpoumré", "Foulberé", "Louti", "Gashiga", "Douloungou", "Ngong", "Touboro", "Ouro-Djouka", "Ouro-Hesso", "Ouro-Labo", "Ouro-Tchédé", "Lagdo", "Mayo-Kébi", "Benoué"],
+  
+  Maroua: ["Kakataré", "Doursoungo", "Douggoï", "Domayo", "Pitoaré", "Ouro-Tchédé", "Djarengol", "Baouliwol", "Zokok", "Hardé", "Kodek", "Miskine", "Palar", "Ouro-Djama", "Diguirwo", "Gawel", "Gouzda", "Mayel", "Djarengol", "Lougga"],
+  
+  Ngaoundéré: ["Baladji I", "Baladji II", "Joli Soir", "Dang", "Bamyanga", "Sabongari", "Mboum", "Yelwa", "Haoussa", "Mbakaou", "Nganha", "Martap", "Nyambaka", "Beka", "Mbe", "Tibati", "Bankim", "Banyo", "Mayo-Banyo", "Farato"],
+  
+  Limbe: ["Down Beach", "Bota", "Middle Farms", "Mile 4", "New Town", "Ngeme", "Cassava Farms", "Man O' War Bay", "Mile 2", "Mile 1", "Bimbia", "Idenau", "Kombe", "Batoke", "Bakingili", "Debundscha", "Bamusso", "Isanguele", "Bomana", "Boanda"],
+  
+  Buea: ["Molyko", "Mile 17", "Check Point", "Bonduma", "Great Soppo", "Bokwango", "Buea Town", "Bolifamba", "Muea", "Bova", "Likoko", "Wokeka", "Ewonda", "Bokwai", "Bwitingi", "Mile 16", "Small Soppo", "Bokova"],
+  
+  Bertoua: ["Enia", "Yadémé", "Kpokolota", "Ndokayo", "Monou", "Tigaza", "Bonis", "Belinga", "Dimako", "Doumé", "Gado", "Kette", "Mbang", "Ndemba", "Nguelemendouka", "Nguelebok", "Ndélélé", "Yokadouma", "Lomie", "Abong-Mbang"],
+  
+  Ebolowa: ["Mekalat", "Angalé", "Biyébe", "New Bell", "Nko'ovos", "Ebolowa Si II", "Mvangan", "Biwong", "Mengong", "Ngoulemakong", "Akom", "Meyo", "Nkolandom", "Ambam", "Ma'an", "Campo", "Kye-Ossi", "Djoum", "Mintom", "Oveng"],
+  
+  Kribi: ["Dôme", "Mboa Manga", "Talla", "Nziou", "Bwanjo", "Mpangou", "Londji", "Grand Batanga", "Petit Batanga", "Ebodjé", "Campo", "Lokoundjé", "Bipindi", "Lolabe", "Mvini", "Bekoko", "Nkongsamba", "Edea"],
+  
+  Nkongsamba: ["Baré", "Quartier 1", "Quartier 2", "Quartier 3", "Ekel-Ko", "Mbaressoumtou", "Ndogbong", "Manengole", "Melong", "Santchou", "Nlonako", "Ebone", "Moungo", "Loum", "Manjo", "Penja", "Njombe", "Mbanga", "Kekem"],
+  
+  Dschang: ["Foréké", "Foto", "Keleng", "Tsinfing", "Apouh", "Mingmeto", "Bafou", "Fongo-Tongo", "Fongo-Ndeng", "Santchou", "Banka", "Bamendjou", "Baleveng", "Balessing", "Bamesso", "Bamougoum", "Bansoa", "Bandja", "Batcha", "Batseng"]
+};
+
+// Composant Autocomplete pour les quartiers
+const QuartierAutocomplete = ({ 
+  control, 
+  name, 
+  label, 
+  villeWatch, 
+  errors, 
+  required = false,
+  disabled = false
+}) => {
+  const [inputValue, setInputValue] = useState("");
+  const quartiersOptions = CITY_DATA[villeWatch] || [];
+  
+  return (
+    <Controller
+      name={name}
+      control={control}
+      render={({ field }) => (
+        <Autocomplete
+          {...field}
+          fullWidth
+          size="small"
+          disabled={disabled || !villeWatch}
+          options={quartiersOptions}
+          value={field.value || null}
+          onChange={(event, newValue) => {
+            field.onChange(newValue || "");
+          }}
+          inputValue={inputValue}
+          onInputChange={(event, newInputValue) => {
+            setInputValue(newInputValue);
+          }}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label={label}
+              required={required}
+              error={!!errors[name]}
+              helperText={errors[name]?.message}
+              placeholder={villeWatch ? "Rechercher un quartier..." : "Sélectionnez d'abord une ville"}
+              InputProps={{
+                ...params.InputProps,
+                sx: { fontSize: '0.875rem' }
+              }}
+            />
+          )}
+          noOptionsText="Aucun quartier trouvé"
+          loadingText="Chargement..."
+          getOptionLabel={(option) => option}
+          filterOptions={(options, { inputValue }) => {
+            const inputValueLower = inputValue.toLowerCase();
+            return options.filter(option =>
+              option.toLowerCase().includes(inputValueLower)
+            );
+          }}
+          renderOption={(props, option) => (
+            <li {...props}>
+              <Typography variant="body2">{option}</Typography>
+            </li>
+          )}
+          sx={{ width: '100%' }}
+        />
+      )}
+    />
+  );
 };
 
 export default function FormClientMorale() {
@@ -194,6 +777,12 @@ export default function FormClientMorale() {
   // États pour la validation manuelle des fichiers
   const [fileErrors, setFileErrors] = useState({});
   const [requiredFiles, setRequiredFiles] = useState([]);
+
+  // États pour les inputs de recherche des quartiers
+  const [quartierSiegeInput, setQuartierSiegeInput] = useState("");
+  const [quartierSignataire1Input, setQuartierSignataire1Input] = useState("");
+  const [quartierSignataire2Input, setQuartierSignataire2Input] = useState("");
+  const [quartierSignataire3Input, setQuartierSignataire3Input] = useState("");
 
   // Définir les valeurs par défaut du formulaire - CORRIGÉ avec tous les champs manquants
   const defaultValues = {
@@ -369,6 +958,7 @@ export default function FormClientMorale() {
   const watchVilleSignataire = watch("ville_signataire");
   const watchVilleSignataire2 = watch("ville_signataire2");
   const watchVilleSignataire3 = watch("ville_signataire3");
+  const watchVilleActivite = watch("ville_activite");
   
   // Mettre à jour les signataires remplis
   useEffect(() => {
@@ -383,6 +973,7 @@ export default function FormClientMorale() {
   const quartiersSignataire1 = CITY_DATA[watchVilleSignataire] || [];
   const quartiersSignataire2 = CITY_DATA[watchVilleSignataire2] || [];
   const quartiersSignataire3 = CITY_DATA[watchVilleSignataire3] || [];
+  const quartiersActivite = CITY_DATA[watchVilleActivite] || [];
 
   const showSnackbar = (message, severity = "success") => {
     setSnackbar({
@@ -872,7 +1463,7 @@ export default function FormClientMorale() {
       <Box sx={{ p: 2, border: '1px dashed #ccc', borderRadius: 2, bgcolor: '#fafafa' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
           <Typography variant="subtitle2" sx={{ color: indigo[700] }}>
-            {label} {required && <span style={{color: 'red'}}>*</span>}
+            {label}
           </Typography>
           {fileName && !disabled && (
             <IconButton size="small" onClick={() => removeFile(fieldName, setPreview, previewIndex)}>
@@ -966,7 +1557,7 @@ export default function FormClientMorale() {
       <Box sx={{ p: 2, border: '1px dashed #ccc', borderRadius: 2, bgcolor: '#fafafa' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
           <Typography variant="subtitle2" sx={{ color: indigo[700] }}>
-            {label} {required && <span style={{color: 'red'}}>*</span>}
+            {label}
           </Typography>
           {fileName && !disabled && (
             <IconButton size="small" onClick={() => {
@@ -1075,38 +1666,7 @@ export default function FormClientMorale() {
   const validateStep2 = (data) => {
     const errors = {};
     
-    // Validation basée sur le type d'entreprise
-    if (watchTypeEntreprise === "entreprise") {
-      const requiredFields = [
-        'extrait_rccm_image',
-        'titre_patente_image',
-        'niu_image',
-        'statuts_image',
-        'acte_designation_signataires_pdf',
-        'attestation_conformite_pdf'
-      ];
-      
-      requiredFields.forEach(field => {
-        if (!data[field]) {
-          errors[field] = `${getFieldLabel(field)} est obligatoire`;
-        }
-      });
-    } else if (watchTypeEntreprise === "association") {
-      const requiredFields = [
-        'pv_agc_image',
-        'attestation_non_redevance_image',
-        'proces_verbal_image',
-        'registre_coop_gic_image',
-        'recepisse_declaration_association_image',
-        'attestation_conformite_pdf'
-      ];
-      
-      requiredFields.forEach(field => {
-        if (!data[field]) {
-          errors[field] = `${getFieldLabel(field)} est obligatoire`;
-        }
-      });
-    }
+    // SUPPRIMÉ: Plus de validation obligatoire pour les documents
     
     return errors;
   };
@@ -1115,12 +1675,7 @@ export default function FormClientMorale() {
   const validateStep3 = (data) => {
     const errors = {};
     
-    // Validation pour les entreprises
-    if (watchTypeEntreprise === "entreprise") {
-      if (!data.nom_gerant?.trim()) {
-        errors.nom_gerant = "Nom du gérant requis pour les entreprises";
-      }
-    }
+    // SUPPRIMÉ: Plus de validation obligatoire pour les gérants
     
     return errors;
   };
@@ -1129,79 +1684,7 @@ export default function FormClientMorale() {
   const validateStep4 = (data) => {
     const errors = {};
     
-    // Validation pour les entreprises (photos des gérants)
-    if (watchTypeEntreprise === "entreprise") {
-      if (!data.photo_gerant) {
-        errors.photo_gerant = "Photo du gérant principal obligatoire";
-      }
-      if (watchNomGerant2 && !data.photo_gerant2) {
-        errors.photo_gerant2 = "Photo du gérant secondaire obligatoire";
-      }
-    }
-    
-    // Validation pour les signataires
-    if (signatairesRemplis[0]) {
-      const signataire1Fields = [
-        'photo_signataire',
-        'signature_signataire',
-        'lieu_dit_domicile_photo_signataire',
-        'photo_localisation_domicile_signataire',
-        'cni_photo_recto_signataire',
-        'cni_photo_verso_signataire',
-        'nui_image_signataire',
-        'plan_localisation_signataire1_image',
-        'facture_eau_signataire1_image',
-        'facture_electricite_signataire1_image'
-      ];
-      
-      signataire1Fields.forEach(field => {
-        if (!data[field]) {
-          errors[field] = `${getFieldLabel(field)} est obligatoire pour le signataire 1`;
-        }
-      });
-    }
-    
-    if (signatairesRemplis[1]) {
-      const signataire2Fields = [
-        'photo_signataire2',
-        'signature_signataire2',
-        'lieu_dit_domicile_photo_signataire2',
-        'photo_localisation_domicile_signataire2',
-        'cni_photo_recto_signataire2',
-        'cni_photo_verso_signataire2',
-        'nui_image_signataire2',
-        'plan_localisation_signataire2_image',
-        'facture_eau_signataire2_image',
-        'facture_electricite_signataire2_image'
-      ];
-      
-      signataire2Fields.forEach(field => {
-        if (!data[field]) {
-          errors[field] = `${getFieldLabel(field)} est obligatoire pour le signataire 2`;
-        }
-      });
-    }
-    
-    if (signatairesRemplis[2]) {
-      const signataire3Fields = [
-        'photo_signataire3',
-        'signature_signataire3',
-        'lieu_dit_domicile_photo_signataire3',
-        'photo_localisation_domicile_signataire3',
-        'cni_photo_recto_signataire3',
-        'cni_photo_verso_signataire3',
-        'nui_image_signataire3',
-        'plan_localisation_signataire3_image',
-        'facture_eau_signataire3_image',
-        'facture_electricite_signataire3_image'
-      ];
-      
-      signataire3Fields.forEach(field => {
-        if (!data[field]) {
-          errors[field] = `${getFieldLabel(field)} est obligatoire pour le signataire 3`;
-        }
-      });
-    }
+    // SUPPRIMÉ: Plus de validation obligatoire pour les fichiers
     
     return errors;
   };
@@ -1243,7 +1726,7 @@ export default function FormClientMorale() {
       formData.append("forme_juridique", data.forme_juridique);
       formData.append("type_entreprise", data.type_entreprise);
       formData.append("rccm", data.rccm || "");
-      formData.append("nui", data.nui);
+      formData.append("nui", data.nui || "");
       
       // Gérants seulement pour les entreprises
       if (data.type_entreprise === "entreprise") {
@@ -1411,7 +1894,8 @@ export default function FormClientMorale() {
       const data = getValues();
       const step2Errors = validateStep2(data);
       
-      const baseFieldsValid = await trigger(['nui', 'rccm']);
+      // SUPPRIMÉ: Plus besoin de valider nui et rccm
+      const baseFieldsValid = await trigger();
       
       if (!baseFieldsValid) {
         const firstError = Object.values(errors).find(e => e?.message)?.message;
@@ -1443,11 +1927,7 @@ export default function FormClientMorale() {
         return;
       }
       
-      if (watchTypeEntreprise === "entreprise" && !data.nom_gerant?.trim()) {
-        showSnackbar("Nom du gérant requis pour les entreprises", "error");
-        return;
-      }
-      
+      // SUPPRIMÉ: Plus de validation obligatoire pour les gérants
       setActiveStep(s => s + 1);
       return;
     }
@@ -1663,20 +2143,13 @@ export default function FormClientMorale() {
                     </Grid>
                     
                     <Grid item xs={12} md={6}>
-                      <Controller 
-                        name="adresse_quartier" 
-                        control={control} 
-                        render={({ field }) => (
-                          <FormControl fullWidth size="small" error={!!errors.adresse_quartier} sx={{ minWidth: 200 }}>
-                            <InputLabel>Quartier *</InputLabel>
-                            <Select {...field} label="Quartier *" value={field.value || ""}>
-                              {quartiersOptions.map(quartier => (
-                                <MenuItem key={quartier} value={quartier}>{quartier}</MenuItem>
-                              ))}
-                            </Select>
-                            {errors.adresse_quartier && <FormHelperText>{errors.adresse_quartier.message}</FormHelperText>}
-                          </FormControl>
-                        )} 
+                      <QuartierAutocomplete
+                        control={control}
+                        name="adresse_quartier"
+                        label="Quartier *"
+                        villeWatch={selectedVille}
+                        errors={errors}
+                        required={true}
                       />
                     </Grid>
                     
@@ -1706,28 +2179,27 @@ export default function FormClientMorale() {
                         name="ville_activite" 
                         control={control} 
                         render={({ field }) => (
-                          <TextField 
-                            {...field} 
-                            fullWidth 
-                            size="small" 
-                            label="Ville de l'activité" 
-                          />
+                          <FormControl fullWidth size="small" sx={{ minWidth: 200 }}>
+                            <InputLabel>Ville de l'activité</InputLabel>
+                            <Select {...field} label="Ville de l'activité" value={field.value || ""}>
+                              {Object.keys(CITY_DATA).map(ville => (
+                                <MenuItem key={ville} value={ville}>{ville}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
                         )} 
                       />
                     </Grid>
                     
                     <Grid item xs={12} md={4}>
-                      <Controller 
-                        name="quartier_activite" 
-                        control={control} 
-                        render={({ field }) => (
-                          <TextField 
-                            {...field} 
-                            fullWidth 
-                            size="small" 
-                            label="Quartier de l'activité" 
-                          />
-                        )} 
+                      <QuartierAutocomplete
+                        control={control}
+                        name="quartier_activite"
+                        label="Quartier de l'activité"
+                        villeWatch={watchVilleActivite}
+                        errors={errors}
+                        required={false}
+                        disabled={!watchVilleActivite}
                       />
                     </Grid>
                     
@@ -1832,7 +2304,7 @@ export default function FormClientMorale() {
                             {...field} 
                             fullWidth 
                             size="small" 
-                            label="Numéro NUI *" 
+                            label="Numéro NUI (Optionnel)" 
                             error={!!errors.nui}
                             helperText={errors.nui?.message}
                             placeholder="Ex: M1234567890"
@@ -1859,21 +2331,19 @@ export default function FormClientMorale() {
 
                     <Grid item xs={12} md={6}>
                       <FileUploadField
-                        label="Photocopie des Statuts (image) *"
+                        label="Photocopie des Statuts (image)"
                         fieldName="statuts_image"
                         preview={statutsPreview}
                         setPreview={setStatutsPreview}
-                        required={true}
                         description="Statuts de l'entreprise - max 2MB"
-                          />
+                      />
                     </Grid>                      
-                    <Grid item xs={12} md={4}>
+                    <Grid item xs={12} md={6}>
                       <FileUploadField
-                        label="Photocopie NUI (image) *"
+                        label="Photocopie NUI (image)"
                         fieldName="niu_image"
                         preview={niuPreview}
                         setPreview={setNiuPreview}
-                        required={true}
                         description="Photocopie du document NUI - max 2MB"
                       />
                     </Grid> 
@@ -1887,49 +2357,45 @@ export default function FormClientMorale() {
                       <>
                         <Grid item xs={12}>
                           <Typography variant="subtitle1" fontWeight="bold" color="primary">
-                            Documents Obligatoires - Entreprise
+                            Documents Entreprise
                           </Typography>
                           <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                            Les documents suivants sont obligatoires pour les entreprises
+                            Les documents suivants sont facultatifs
                           </Typography>
                         </Grid>
                         
-                        <Grid item xs={12} md={4}>
+                        <Grid item xs={12} md={6}>
                           <FileUploadField
-                            label="Extrait RCCM (image) *"
+                            label="Extrait RCCM (image)"
                             fieldName="extrait_rccm_image"
                             preview={extraitRccmPreview}
                             setPreview={setExtraitRccmPreview}
-                            required={true}
                             description="Format: JPEG, PNG (max 2MB)"
                           />
                         </Grid>
                         
-                        <Grid item xs={12} md={4}>
+                        <Grid item xs={12} md={6}>
                           <FileUploadField
-                            label="Titre de Patente (image) *"
+                            label="Titre de Patente (image)"
                             fieldName="titre_patente_image"
                             preview={titrePatentePreview}
                             setPreview={setTitrePatentePreview}
-                            required={true}
                             description="Patente de l'exercice en cours"
                           />
                         </Grid>
                         
                         <Grid item xs={12} md={6}>
                           <PDFUploadField
-                            label="Acte de Désignation des Signataires (PDF) *"
+                            label="Acte de Désignation des Signataires (PDF)"
                             fieldName="acte_designation_signataires_pdf"
-                            required={true}
                             description="Document PDF - max 5MB"
                           />
                         </Grid>
                         
                         <Grid item xs={12} md={6}>
                           <PDFUploadField
-                            label="Attestation de Conformité (PDF) *"
+                            label="Attestation de Conformité (PDF)"
                             fieldName="attestation_conformite_pdf"
-                            required={true}
                             description="Document PDF attestant de la conformité - max 5MB"
                           />
                         </Grid>
@@ -1941,70 +2407,64 @@ export default function FormClientMorale() {
                       <>
                         <Grid item xs={12}>
                           <Typography variant="subtitle1" fontWeight="bold" color="primary">
-                            Documents Obligatoires - Association
+                            Documents Association
                           </Typography>
                           <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                            Les documents suivants sont obligatoires pour les associations
+                            Les documents suivants sont facultatifs
                           </Typography>
                         </Grid>
                         
                         <Grid item xs={12} md={6}>
                           <FileUploadField
-                            label="PV de l'AGC (image) *"
+                            label="PV de l'AGC (image)"
                             fieldName="pv_agc_image"
                             preview={pvAgcPreview}
                             setPreview={setPvAgcPreview}
-                            required={true}
                             description="Procès-Verbal de l'Assemblée Générale Constitutive"
                           />
                         </Grid>
                         
                         <Grid item xs={12} md={6}>
                           <FileUploadField
-                            label="Attestation de non redevance (image) *"
+                            label="Attestation de non redevance (image)"
                             fieldName="attestation_non_redevance_image"
                             preview={attestationPreview}
                             setPreview={setAttestationPreview}
-                            required={true}
                           />
                         </Grid>
                         
                         <Grid item xs={12} md={6}>
                           <FileUploadField
-                            label="Procès Verbal (image) *"
+                            label="Procès Verbal (image)"
                             fieldName="proces_verbal_image"
                             preview={procesVerbalPreview}
                             setPreview={setProcesVerbalPreview}
-                            required={true}
                           />
                         </Grid>
                         
                         <Grid item xs={12} md={6}>
                           <FileUploadField
-                            label="Registre COOP-GIC (image) *"
+                            label="Registre COOP-GIC (image)"
                             fieldName="registre_coop_gic_image"
                             preview={registreCoopPreview}
                             setPreview={setRegistreCoopPreview}
-                            required={true}
                           />
                         </Grid>
                         
                         <Grid item xs={12} md={6}>
                           <FileUploadField
-                            label="Récépissé de déclaration (image) *"
+                            label="Récépissé de déclaration (image)"
                             fieldName="recepisse_declaration_association_image"
                             preview={recepissePreview}
                             setPreview={setRecepissePreview}
-                            required={true}
                             description="Récépissé de déclaration compétente"
                           />
                         </Grid>
                         
                         <Grid item xs={12} md={6}>
                           <PDFUploadField
-                            label="Attestation de Conformité (PDF) *"
+                            label="Attestation de Conformité (PDF)"
                             fieldName="attestation_conformite_pdf"
-                            required={true}
                             description="Document PDF attestant de la conformité - max 5MB"
                           />
                         </Grid>
@@ -2044,9 +2504,9 @@ export default function FormClientMorale() {
                                     {...field} 
                                     fullWidth 
                                     size="small" 
-                                    label="Nom du Gérant Principal *" 
+                                    label="Nom du Gérant Principal" 
                                     error={!!errors.nom_gerant} 
-                                    helperText={errors.nom_gerant?.message || (watchTypeEntreprise === "entreprise" ? "Obligatoire pour les entreprises" : "")}
+                                    helperText={errors.nom_gerant?.message}
                                     placeholder="Nom et prénoms du gérant"
                                   />
                                 )} 
@@ -2255,19 +2715,14 @@ export default function FormClientMorale() {
                         </Grid>
                         
                         <Grid item xs={12} md={6}>
-                          <Controller 
-                            name="quartier_signataire" 
-                            control={control} 
-                            render={({ field }) => (
-                              <FormControl fullWidth size="small" sx={{ minWidth: 200 }}>
-                                <InputLabel>Quartier</InputLabel>
-                                <Select {...field} label="Quartier" value={field.value || ""}>
-                                  {quartiersSignataire1.map(quartier => (
-                                    <MenuItem key={quartier} value={quartier}>{quartier}</MenuItem>
-                                  ))}
-                                </Select>
-                              </FormControl>
-                            )} 
+                          <QuartierAutocomplete
+                            control={control}
+                            name="quartier_signataire"
+                            label="Quartier"
+                            villeWatch={watchVilleSignataire}
+                            errors={errors}
+                            required={false}
+                            disabled={!watchVilleSignataire}
                           />
                         </Grid>
                         
@@ -2427,19 +2882,14 @@ export default function FormClientMorale() {
                         </Grid>
                         
                         <Grid item xs={12} md={6}>
-                          <Controller 
-                            name="quartier_signataire2" 
-                            control={control} 
-                            render={({ field }) => (
-                              <FormControl fullWidth size="small" sx={{ minWidth: 200 }}>
-                                <InputLabel>Quartier</InputLabel>
-                                <Select {...field} label="Quartier" value={field.value || ""}>
-                                  {quartiersSignataire2.map(quartier => (
-                                    <MenuItem key={quartier} value={quartier}>{quartier}</MenuItem>
-                                  ))}
-                                </Select>
-                              </FormControl>
-                            )} 
+                          <QuartierAutocomplete
+                            control={control}
+                            name="quartier_signataire2"
+                            label="Quartier"
+                            villeWatch={watchVilleSignataire2}
+                            errors={errors}
+                            required={false}
+                            disabled={!watchVilleSignataire2}
                           />
                         </Grid>
                         
@@ -2599,19 +3049,14 @@ export default function FormClientMorale() {
                         </Grid>
                         
                         <Grid item xs={12} md={6}>
-                          <Controller 
-                            name="quartier_signataire3" 
-                            control={control} 
-                            render={({ field }) => (
-                              <FormControl fullWidth size="small" sx={{ minWidth: 200 }}>
-                                <InputLabel>Quartier</InputLabel>
-                                <Select {...field} label="Quartier" value={field.value || ""}>
-                                  {quartiersSignataire3.map(quartier => (
-                                    <MenuItem key={quartier} value={quartier}>{quartier}</MenuItem>
-                                  ))}
-                                </Select>
-                              </FormControl>
-                            )} 
+                          <QuartierAutocomplete
+                            control={control}
+                            name="quartier_signataire3"
+                            label="Quartier"
+                            villeWatch={watchVilleSignataire3}
+                            errors={errors}
+                            required={false}
+                            disabled={!watchVilleSignataire3}
                           />
                         </Grid>
                         
@@ -2724,7 +3169,7 @@ export default function FormClientMorale() {
                         Fichiers et Photos
                       </Typography>
                       <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                        Tous les champs marqués d'un * sont obligatoires pour les signataires renseignés
+                        Tous les champs sont facultatifs
                       </Typography>
                     </Grid>
                     
@@ -2739,12 +3184,11 @@ export default function FormClientMorale() {
                         
                         <Grid item xs={12} md={6}>
                           <FileUploadField
-                            label="Photo Gérant Principal *"
+                            label="Photo Gérant Principal"
                             fieldName="photo_gerant"
                             preview={gerantPreview[0]}
                             setPreview={setGerantPreview}
                             previewIndex={0}
-                            required={true}
                             description="Format: JPEG, PNG (max 2MB)"
                           />
                         </Grid>
@@ -2756,7 +3200,6 @@ export default function FormClientMorale() {
                             preview={gerantPreview[1]}
                             setPreview={setGerantPreview}
                             previewIndex={1}
-                            required={!!watchNomGerant2}
                             description="Format: JPEG, PNG (max 2MB)"
                             disabled={!watchNomGerant2}
                           />
@@ -2769,7 +3212,7 @@ export default function FormClientMorale() {
                         Photos et Signatures des Signataires
                       </Typography>
                       <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                        Les documents sont requis uniquement pour les signataires renseignés
+                        Les documents sont facultatifs
                       </Typography>
                     </Grid>
                     
@@ -2789,7 +3232,6 @@ export default function FormClientMorale() {
                         preview={signatairePreviews[0]}
                         setPreview={setSignatairePreviews}
                         previewIndex={0}
-                        required={signatairesRemplis[0]}
                         description="Format: JPEG, PNG (max 2MB)"
                         disabled={!signatairesRemplis[0]}
                       />
@@ -2802,7 +3244,6 @@ export default function FormClientMorale() {
                         preview={signaturePreviews[0]}
                         setPreview={setSignaturePreviews}
                         previewIndex={0}
-                        required={signatairesRemplis[0]}
                         description="Format: JPEG, PNG (max 2MB)"
                         disabled={!signatairesRemplis[0]}
                       />
@@ -2815,7 +3256,6 @@ export default function FormClientMorale() {
                         preview={lieuDitDomicilePhotoPreviews[0]}
                         setPreview={setLieuDitDomicilePhotoPreviews}
                         previewIndex={0}
-                        required={signatairesRemplis[0]}
                         description="Photo du lieu-dit du domicile"
                         disabled={!signatairesRemplis[0]}
                       />
@@ -2828,7 +3268,6 @@ export default function FormClientMorale() {
                         preview={photoLocalisationDomicilePreviews[0]}
                         setPreview={setPhotoLocalisationDomicilePreviews}
                         previewIndex={0}
-                        required={signatairesRemplis[0]}
                         description="Photo de localisation du domicile"
                         disabled={!signatairesRemplis[0]}
                       />
@@ -2841,7 +3280,6 @@ export default function FormClientMorale() {
                         preview={cniRectoPreviews[0]}
                         setPreview={setCniRectoPreviews}
                         previewIndex={0}
-                        required={signatairesRemplis[0]}
                         description="Recto de la CNI"
                         disabled={!signatairesRemplis[0]}
                       />
@@ -2854,7 +3292,6 @@ export default function FormClientMorale() {
                         preview={cniVersoPreviews[0]}
                         setPreview={setCniVersoPreviews}
                         previewIndex={0}
-                        required={signatairesRemplis[0]}
                         description="Verso de la CNI"
                         disabled={!signatairesRemplis[0]}
                       />
@@ -2867,7 +3304,6 @@ export default function FormClientMorale() {
                         preview={nuiSignatairePreviews[0]}
                         setPreview={setNuiSignatairePreviews}
                         previewIndex={0}
-                        required={signatairesRemplis[0]}
                         description="Photocopie NUI du signataire - max 2MB"
                         disabled={!signatairesRemplis[0]}
                       />
@@ -2880,9 +3316,8 @@ export default function FormClientMorale() {
                         preview={planSignatairePreviews[0]}
                         setPreview={setPlanSignatairePreviews}
                         previewIndex={0}
-                        required={signatairesRemplis[0]}
                         disabled={!signatairesRemplis[0]}
-                        description={signatairesRemplis[0] ? "Plan de localisation du domicile" : "Non requis"}
+                        description="Plan de localisation du domicile"
                       />
                     </Grid>
                     
@@ -2893,9 +3328,8 @@ export default function FormClientMorale() {
                         preview={factureEauSignatairePreviews[0]}
                         setPreview={setFactureEauSignatairePreviews}
                         previewIndex={0}
-                        required={signatairesRemplis[0]}
                         disabled={!signatairesRemplis[0]}
-                        description={signatairesRemplis[0] ? "Photocopie facture d'eau" : "Non requis"}
+                        description="Photocopie facture d'eau"
                       />
                     </Grid>
                     
@@ -2906,9 +3340,8 @@ export default function FormClientMorale() {
                         preview={factureElecSignatairePreviews[0]}
                         setPreview={setFactureElecSignatairePreviews}
                         previewIndex={0}
-                        required={signatairesRemplis[0]}
                         disabled={!signatairesRemplis[0]}
-                        description={signatairesRemplis[0] ? "Photocopie facture d'électricité" : "Non requis"}
+                        description="Photocopie facture d'électricité"
                       />
                     </Grid>
                     
@@ -2928,7 +3361,6 @@ export default function FormClientMorale() {
                         preview={signatairePreviews[1]}
                         setPreview={setSignatairePreviews}
                         previewIndex={1}
-                        required={signatairesRemplis[1]}
                         description="Format: JPEG, PNG (max 2MB)"
                         disabled={!signatairesRemplis[1]}
                       />
@@ -2941,7 +3373,6 @@ export default function FormClientMorale() {
                         preview={signaturePreviews[1]}
                         setPreview={setSignaturePreviews}
                         previewIndex={1}
-                        required={signatairesRemplis[1]}
                         description="Format: JPEG, PNG (max 2MB)"
                         disabled={!signatairesRemplis[1]}
                       />
@@ -2954,7 +3385,6 @@ export default function FormClientMorale() {
                         preview={lieuDitDomicilePhotoPreviews[1]}
                         setPreview={setLieuDitDomicilePhotoPreviews}
                         previewIndex={1}
-                        required={signatairesRemplis[1]}
                         description="Photo du lieu-dit du domicile"
                         disabled={!signatairesRemplis[1]}
                       />
@@ -2967,7 +3397,6 @@ export default function FormClientMorale() {
                         preview={photoLocalisationDomicilePreviews[1]}
                         setPreview={setPhotoLocalisationDomicilePreviews}
                         previewIndex={1}
-                        required={signatairesRemplis[1]}
                         description="Photo de localisation du domicile"
                         disabled={!signatairesRemplis[1]}
                       />
@@ -2980,7 +3409,6 @@ export default function FormClientMorale() {
                         preview={cniRectoPreviews[1]}
                         setPreview={setCniRectoPreviews}
                         previewIndex={1}
-                        required={signatairesRemplis[1]}
                         description="Recto de la CNI"
                         disabled={!signatairesRemplis[1]}
                       />
@@ -2993,7 +3421,6 @@ export default function FormClientMorale() {
                         preview={cniVersoPreviews[1]}
                         setPreview={setCniVersoPreviews}
                         previewIndex={1}
-                        required={signatairesRemplis[1]}
                         description="Verso de la CNI"
                         disabled={!signatairesRemplis[1]}
                       />
@@ -3006,7 +3433,6 @@ export default function FormClientMorale() {
                         preview={nuiSignatairePreviews[1]}
                         setPreview={setNuiSignatairePreviews}
                         previewIndex={1}
-                        required={signatairesRemplis[1]}
                         description="Photocopie NUI du signataire - max 2MB"
                         disabled={!signatairesRemplis[1]}
                       />
@@ -3019,9 +3445,8 @@ export default function FormClientMorale() {
                         preview={planSignatairePreviews[1]}
                         setPreview={setPlanSignatairePreviews}
                         previewIndex={1}
-                        required={signatairesRemplis[1]}
                         disabled={!signatairesRemplis[1]}
-                        description={signatairesRemplis[1] ? "Plan de localisation du domicile" : "Non requis"}
+                        description="Plan de localisation du domicile"
                       />
                     </Grid>
                     
@@ -3032,9 +3457,8 @@ export default function FormClientMorale() {
                         preview={factureEauSignatairePreviews[1]}
                         setPreview={setFactureEauSignatairePreviews}
                         previewIndex={1}
-                        required={signatairesRemplis[1]}
                         disabled={!signatairesRemplis[1]}
-                        description={signatairesRemplis[1] ? "Photocopie facture d'eau" : "Non requis"}
+                        description="Photocopie facture d'eau"
                       />
                     </Grid>
                     
@@ -3045,9 +3469,8 @@ export default function FormClientMorale() {
                         preview={factureElecSignatairePreviews[1]}
                         setPreview={setFactureElecSignatairePreviews}
                         previewIndex={1}
-                        required={signatairesRemplis[1]}
                         disabled={!signatairesRemplis[1]}
-                        description={signatairesRemplis[1] ? "Photocopie facture d'électricité" : "Non requis"}
+                        description="Photocopie facture d'électricité"
                       />
                     </Grid>
                     
@@ -3067,7 +3490,6 @@ export default function FormClientMorale() {
                         preview={signatairePreviews[2]}
                         setPreview={setSignatairePreviews}
                         previewIndex={2}
-                        required={signatairesRemplis[2]}
                         description="Format: JPEG, PNG (max 2MB)"
                         disabled={!signatairesRemplis[2]}
                       />
@@ -3080,7 +3502,6 @@ export default function FormClientMorale() {
                         preview={signaturePreviews[2]}
                         setPreview={setSignaturePreviews}
                         previewIndex={2}
-                        required={signatairesRemplis[2]}
                         description="Format: JPEG, PNG (max 2MB)"
                         disabled={!signatairesRemplis[2]}
                       />
@@ -3093,7 +3514,6 @@ export default function FormClientMorale() {
                         preview={lieuDitDomicilePhotoPreviews[2]}
                         setPreview={setLieuDitDomicilePhotoPreviews}
                         previewIndex={2}
-                        required={signatairesRemplis[2]}
                         description="Photo du lieu-dit du domicile"
                         disabled={!signatairesRemplis[2]}
                       />
@@ -3106,7 +3526,6 @@ export default function FormClientMorale() {
                         preview={photoLocalisationDomicilePreviews[2]}
                         setPreview={setPhotoLocalisationDomicilePreviews}
                         previewIndex={2}
-                        required={signatairesRemplis[2]}
                         description="Photo de localisation du domicile"
                         disabled={!signatairesRemplis[2]}
                       />
@@ -3119,7 +3538,6 @@ export default function FormClientMorale() {
                         preview={cniRectoPreviews[2]}
                         setPreview={setCniRectoPreviews}
                         previewIndex={2}
-                        required={signatairesRemplis[2]}
                         description="Recto de la CNI"
                         disabled={!signatairesRemplis[2]}
                       />
@@ -3132,7 +3550,6 @@ export default function FormClientMorale() {
                         preview={cniVersoPreviews[2]}
                         setPreview={setCniVersoPreviews}
                         previewIndex={2}
-                        required={signatairesRemplis[2]}
                         description="Verso de la CNI"
                         disabled={!signatairesRemplis[2]}
                       />
@@ -3145,7 +3562,6 @@ export default function FormClientMorale() {
                         preview={nuiSignatairePreviews[2]}
                         setPreview={setNuiSignatairePreviews}
                         previewIndex={2}
-                        required={signatairesRemplis[2]}
                         description="Photocopie NUI du signataire - max 2MB"
                         disabled={!signatairesRemplis[2]}
                       />
@@ -3158,9 +3574,8 @@ export default function FormClientMorale() {
                         preview={planSignatairePreviews[2]}
                         setPreview={setPlanSignatairePreviews}
                         previewIndex={2}
-                        required={signatairesRemplis[2]}
                         disabled={!signatairesRemplis[2]}
-                        description={signatairesRemplis[2] ? "Plan de localisation du domicile" : "Non requis"}
+                        description="Plan de localisation du domicile"
                       />
                     </Grid>
                     
@@ -3171,9 +3586,8 @@ export default function FormClientMorale() {
                         preview={factureEauSignatairePreviews[2]}
                         setPreview={setFactureEauSignatairePreviews}
                         previewIndex={2}
-                        required={signatairesRemplis[2]}
                         disabled={!signatairesRemplis[2]}
-                        description={signatairesRemplis[2] ? "Photocopie facture d'eau" : "Non requis"}
+                        description="Photocopie facture d'eau"
                       />
                     </Grid>
                     
@@ -3184,9 +3598,8 @@ export default function FormClientMorale() {
                         preview={factureElecSignatairePreviews[2]}
                         setPreview={setFactureElecSignatairePreviews}
                         previewIndex={2}
-                        required={signatairesRemplis[2]}
                         disabled={!signatairesRemplis[2]}
-                        description={signatairesRemplis[2] ? "Photocopie facture d'électricité" : "Non requis"}
+                        description="Photocopie facture d'électricité"
                       />
                     </Grid>
                     
@@ -3267,7 +3680,7 @@ export default function FormClientMorale() {
                     
                     <Grid item xs={12} md={6}>
                       <FileUploadField
-                        label="Photo localisation activité"
+                        label="Géolocalisation activité"
                         fieldName="photo_localisation_activite"
                         preview={photoActivitePreview}
                         setPreview={setPhotoActivitePreview}
@@ -3283,27 +3696,25 @@ export default function FormClientMorale() {
 
                     <Grid item xs={12} md={6}>
                       <FileUploadField
-                        label="Photocopie des Statuts (image) *"
+                        label="Photocopie des Statuts (image)"
                         fieldName="statuts_image"
                         preview={statutsPreview}
                         setPreview={setStatutsPreview}
-                        required={true}
                         description="Statuts de l'entreprise - max 2MB"
-                          />
+                      />
                     </Grid>  
 
-                    <Grid item xs={12} md={4}>
+                    <Grid item xs={12} md={6}>
                       <FileUploadField
-                        label="Photocopie NUI (image) *"
+                        label="Photocopie NUI (image)"
                         fieldName="niu_image"
                         preview={niuPreview}
                         setPreview={setNiuPreview}
-                        required={true}
                         description="Photocopie du document NUI - max 2MB"
                       />
                     </Grid> 
                     
-                    <Grid item xs={12} md={4}>
+                    <Grid item xs={12} md={6}>
                       <PDFUploadField
                         label="Acte de Désignation des Signataires (PDF)"
                         fieldName="acte_designation_signataires_pdf"

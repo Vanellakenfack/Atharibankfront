@@ -55,6 +55,8 @@ import CreatePageMataboost from '../pages/od/CreatePageMataboost';
 import CreatePageEpargneJournaliere from '../pages/od/CreatePageEpargneJournaliere';
 import CreerOdModelesPage from '../pages/od/CreerOdModelesPage'
 import NewModel from '../pages/od/NewModel'
+import BalancePage from '../pages/journal/BalancePage'
+
 
 const AppRoutes = () => {
   return (
@@ -167,6 +169,7 @@ const AppRoutes = () => {
       <Route path='/CreatePageEpargneJournaliere' element={<CreatePageEpargneJournaliere/>} />
       <Route path='/CreerOdModelesPage' element={<CreerOdModelesPage />} />
       <Route path='/Nouveau-Model' element={<NewModel />} />
+      <Route path='/BalancePage' element={<BalancePage />} />
 
 
       {/* ==========================================

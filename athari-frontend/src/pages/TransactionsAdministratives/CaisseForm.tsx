@@ -128,96 +128,145 @@ const CaisseForm = () => {
   const [validationMessage, setValidationMessage] = useState<string>('');
 
   // Initialisation
-  useEffect(() => {
-    const init = async () => {
-      try {
-        // 1. Vérifier si on a une session guichet active
-        const responseGuichet = await sessionService.getGuichetActive();
+useEffect(() => {
+  const init = async () => {
+    try {
+      // 1. Vérifier si on a une session guichet active
+      const responseGuichet = await sessionService.getGuichetActive();
+      
+      if (responseGuichet.statut === 'success' && responseGuichet.session) {
+        const guichetSession = responseGuichet.session;
         
-        if (responseGuichet.statut === 'success' && responseGuichet.session) {
-          const guichetSession = responseGuichet.session;
+        setGuichetSessionId(guichetSession.id);
+        setGuichetId(guichetSession.guichet_id);
+        setCodeGuichet(guichetSession.code);
+        
+        // 2. Vérifier si on a une session caisse active
+        const responseCaisse = await sessionService.getCaisseActive();
+        
+        if (responseCaisse.statut === 'success' && responseCaisse.session) {
+          const caisseSession = responseCaisse.session;
           
-          setGuichetSessionId(guichetSession.id);
-          setGuichetId(guichetSession.guichet_id);
-          setCodeGuichet(guichetSession.code);
+          setCaisseState({
+            isOpen: true,
+            sessionId: caisseSession.id,
+            caisseId: caisseSession.caisse_id,
+            codeCaisse: caisseSession.code,
+            soldeOuverture: caisseSession.solde_ouverture
+          });
           
-          // 2. Vérifier si on a une session caisse active
-          const responseCaisse = await sessionService.getCaisseActive();
+          setFormDataFermeture({
+            caisse_session_id: caisseSession.id.toString(),
+            caisse_id: caisseSession.caisse_id.toString(),
+            code_caisse: caisseSession.code,
+            solde_fermeture: caisseSession.solde_ouverture,
+            solde_ouverture: caisseSession.solde_ouverture
+          });
           
-          if (responseCaisse.statut === 'success' && responseCaisse.session) {
-            const caisseSession = responseCaisse.session;
-            
-            setCaisseState({
-              isOpen: true,
-              sessionId: caisseSession.id,
-              caisseId: caisseSession.caisse_id,
-              codeCaisse: caisseSession.code,
-              soldeOuverture: caisseSession.solde_ouverture
-            });
-            
-            setFormDataFermeture({
-              caisse_session_id: caisseSession.id.toString(),
-              caisse_id: caisseSession.caisse_id.toString(),
-              code_caisse: caisseSession.code,
-              solde_fermeture: caisseSession.solde_ouverture,
-              solde_ouverture: caisseSession.solde_ouverture
-            });
-            
-            setOperation('FE');
-            
-          } else {
-            setOperation('OU');
-          }
-          
-          // 3. Charger les caisses disponibles
-          await loadCaisses(guichetSession.guichet_id);
+          setOperation('FE');
           
         } else {
-          showSnackbar('Aucun guichet ouvert. Ouvrez d\'abord un guichet.', 'warning');
+          setOperation('OU');
         }
         
-      } catch (error) {
-        console.error('❌ Erreur initialisation:', error);
-      } finally {
-        setLoadingCaisses(false);
+        // 3. Charger les caisses disponibles pour CE guichet spécifique
+        // Ici on utilise le guichetSessionId pour récupérer les caisses disponibles
+        await loadCaisses(guichetSession.guichet_id, guichetSession.id);
+        
+      } else {
+        showSnackbar('Aucun guichet ouvert. Ouvrez d\'abord un guichet.', 'warning');
       }
-    };
+      
+    } catch (error) {
+      console.error('❌ Erreur initialisation:', error);
+    } finally {
+      setLoadingCaisses(false);
+    }
+  };
 
-    init();
-  }, []);
+  init();
+}, []);
 
   // Charger les caisses du guichet
-  const loadCaisses = async (guichetId: number) => {
+  const loadCaisses = async (guichetId: number, guichetSessionId?: string) => {
     try {
       setLoadingCaisses(true);
-      console.log(`🔄 Chargement des caisses pour guichet ID: ${guichetId}`);
+      console.log(`🔄 Chargement des caisses pour guichet ID: ${guichetId}, Session ID: ${guichetSessionId}`);
       
-      const data = await caisseService.getCaisses();
-      console.log('📦 Réponse API caisses:', data);
-      
-      // Gestion des différents formats de réponse
-      let caissesArray: Caisse[] = [];
-      
-      if (Array.isArray(data)) {
-        caissesArray = data;
-      } else if (data && typeof data === 'object') {
-        if (data.statut === 'success' && Array.isArray(data.data)) {
-          caissesArray = data.data;
-        } else if (Array.isArray(data)) {
-          caissesArray = data;
-        } else if (data.id) { // Si c'est un objet unique
-          caissesArray = [data];
-        } else if (data.data && Array.isArray(data.data)) {
-          caissesArray = data.data;
+      // Utiliser la nouvelle méthode qui prend en compte la session guichet
+      if (guichetSessionId) {
+        const response = await caisseService.getCaissesDisponiblesParGuichet(parseInt(guichetSessionId));
+        console.log('📦 Réponse API caisses disponibles:', response);
+        
+        // Gestion des différents formats de réponse
+        let caissesArray: Caisse[] = [];
+        
+        if (response) {
+          if (response.statut === 'success' && Array.isArray(response.caisses)) {
+            caissesArray = response.caisses;
+            console.log(`✅ ${caissesArray.length} caisses disponibles trouvées dans response.caisses`);
+          } 
+          // Fallback pour d'autres formats possibles
+          else if (response.statut === 'success' && Array.isArray(response.data)) {
+            caissesArray = response.data;
+            console.log(`✅ ${caissesArray.length} caisses disponibles trouvées dans response.data`);
+          } 
+          else if (response.statut === 'error') {
+            console.warn('⚠️ Erreur API caisses:', response.message);
+            showSnackbar(response.message || 'Erreur chargement caisses', 'warning');
+            caissesArray = [];
+          }
         }
+        
+        console.log('✅ Caisses chargées:', caissesArray);
+        setCaisses(caissesArray);
+        
+        // Afficher un message si aucune caisse n'est disponible
+        if (caissesArray.length === 0) {
+          console.warn('⚠️ Aucune caisse disponible pour ce guichet');
+          showSnackbar('Aucune caisse disponible pour ce guichet', 'info');
+        }
+        
+      } else {
+        // Fallback à l'ancienne méthode si pas de session ID
+        console.warn('⚠️ Pas de session guichet ID, utilisation méthode ancienne');
+        const data = await caisseService.getCaisses();
+        
+        let caissesArray: Caisse[] = [];
+        
+        if (Array.isArray(data)) {
+          caissesArray = data;
+        } else if (data && typeof data === 'object') {
+          // Essayer différents formats
+          if (data.statut === 'success' && Array.isArray(data.data)) {
+            caissesArray = data.data;
+          } else if (Array.isArray(data.caisses)) {
+            caissesArray = data.caisses;
+          } else if (Array.isArray(data)) {
+            caissesArray = data;
+          } else if (data.id) {
+            caissesArray = [data];
+          } else if (data.data && Array.isArray(data.data)) {
+            caissesArray = data.data;
+          }
+        }
+        
+        console.log('✅ Caisses chargées (fallback):', caissesArray);
+        setCaisses(caissesArray);
       }
-      
-      console.log('✅ Caisses chargées:', caissesArray);
-      setCaisses(caissesArray);
       
     } catch (error: any) {
       console.error('❌ Erreur chargement caisses:', error);
-      showSnackbar('Erreur lors du chargement des caisses', 'error');
+      
+      // Message d'erreur spécifique
+      let errorMessage = 'Erreur lors du chargement des caisses';
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      showSnackbar(errorMessage, 'error');
       setCaisses([]);
     } finally {
       setLoadingCaisses(false);

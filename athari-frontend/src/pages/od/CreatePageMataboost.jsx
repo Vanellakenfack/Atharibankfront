@@ -23,7 +23,16 @@ import {
   DialogContent,
   DialogActions,
   Snackbar,
-  Autocomplete
+  Autocomplete,
+  IconButton,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  FormHelperText
 } from "@mui/material";
 import {
   TrendingUp,
@@ -32,7 +41,12 @@ import {
   AttachMoney,
   Person,
   Upload,
-  Close
+  Close,
+  AddCircle,
+  Delete,
+  AccountBalance,
+  Group,
+  Receipt
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useFormik } from "formik";
@@ -43,6 +57,15 @@ import ApiClient from "../../services/api/ApiClient";
 import agenceService from "../../services/agenceService";
 import gestionnaireService from "../../services/gestionnaireService/gestionnaireApi";
 
+const convertFileToBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+  });
+};
+
 export default function MataBoostCreatePage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -50,10 +73,12 @@ export default function MataBoostCreatePage() {
   const [loadingGestionnaires, setLoadingGestionnaires] = useState(false);
   const [loadingCollecteurs, setLoadingCollecteurs] = useState(false);
   const [loadingMataBoost, setLoadingMataBoost] = useState(false);
+  const [loadingClients, setLoadingClients] = useState(false);
   
   const [agences, setAgences] = useState([]);
   const [comptesCollecteurs, setComptesCollecteurs] = useState([]);
   const [comptesMataBoost, setComptesMataBoost] = useState([]);
+  const [comptesClients, setComptesClients] = useState([]);
   const [gestionnaires, setGestionnaires] = useState([]);
   
   const [uploadDialog, setUploadDialog] = useState(false);
@@ -63,6 +88,7 @@ export default function MataBoostCreatePage() {
   const [searchGestionnaire, setSearchGestionnaire] = useState('');
   const [searchCollecteur, setSearchCollecteur] = useState('');
   const [searchMataBoost, setSearchMataBoost] = useState('');
+  const [searchClient, setSearchClient] = useState('');
   
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -70,10 +96,92 @@ export default function MataBoostCreatePage() {
     severity: 'info'
   });
 
-  // Nouveau state pour stocker l'agent sélectionné
+  // États pour la gestion dynamique des comptes
+  const [comptesCollecteursList, setComptesCollecteursList] = useState([{ compte_id: "", montant: "" }]);
+  const [comptesClientsList, setComptesClientsList] = useState([{ compte_client_id: "", montant: "" }]);
+  const [montantTotal, setMontantTotal] = useState(0);
+  const [selectedCompteMataBoost, setSelectedCompteMataBoost] = useState(null);
+
   const [selectedAgent, setSelectedAgent] = useState(null);
 
-  const steps = ['Informations de base', 'Comptes & montant', 'Validation'];
+  const steps = ['Informations de base', 'Comptes collecteurs', 'Répartition clients', 'Validation'];
+
+  // Fonctions pour gérer les comptes collecteurs
+  const handleAddCompteCollecteur = () => {
+    setComptesCollecteursList([...comptesCollecteursList, { compte_id: "", montant: "" }]);
+  };
+
+  const handleRemoveCompteCollecteur = (index) => {
+    if (comptesCollecteursList.length > 1) {
+      setComptesCollecteursList(comptesCollecteursList.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleCompteCollecteurChange = (index, field, value) => {
+    const newComptesCollecteurs = [...comptesCollecteursList];
+    newComptesCollecteurs[index][field] = value;
+    setComptesCollecteursList(newComptesCollecteurs);
+  };
+
+  // Fonctions pour gérer les comptes clients
+  const handleAddCompteClient = () => {
+    setComptesClientsList([...comptesClientsList, { compte_client_id: "", montant: "" }]);
+  };
+
+  const handleRemoveCompteClient = (index) => {
+    if (comptesClientsList.length > 1) {
+      setComptesClientsList(comptesClientsList.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleCompteClientChange = (index, field, value) => {
+    const newComptesClients = [...comptesClientsList];
+    newComptesClients[index][field] = value;
+    setComptesClientsList(newComptesClients);
+  };
+
+  // Calculer le montant total
+  useEffect(() => {
+    const totalCollecteurs = comptesCollecteursList.reduce((sum, item) => {
+      return sum + (Number(item.montant) || 0);
+    }, 0);
+    
+    const totalClients = comptesClientsList.reduce((sum, item) => {
+      return sum + (Number(item.montant) || 0);
+    }, 0);
+    
+    setMontantTotal(totalCollecteurs);
+    formik.setFieldValue('montant', totalCollecteurs);
+  }, [comptesCollecteursList, comptesClientsList]);
+
+  // Charger les clients quand un compte MATA BOOST est sélectionné
+  useEffect(() => {
+    if (selectedCompteMataBoost) {
+      loadClientsParCompteMataBoost(selectedCompteMataBoost.id);
+    } else {
+      setComptesClients([]);
+    }
+  }, [selectedCompteMataBoost]);
+
+  const loadClientsParCompteMataBoost = async (compteMataBoostId) => {
+    try {
+      setLoadingClients(true);
+      const response = await ApiClient.get(`/operation-diverses/comptes/mata-boost/${compteMataBoostId}/clients`);
+      
+      if (response.data.success) {
+        setComptesClients(response.data.data.map(c => ({
+          ...c,
+          label: `${c.client_nom} - ${c.numero_compte} - ${c.libelle}`,
+          value: c.id
+        })));
+      }
+    } catch (error) {
+      console.error('Erreur chargement clients:', error);
+      showSnackbar('Erreur lors du chargement des comptes clients', 'error');
+    } finally {
+      setLoadingClients(false);
+    }
+  };
 
   // Formik configuration
   const formik = useFormik({
@@ -83,7 +191,6 @@ export default function MataBoostCreatePage() {
       date_valeur: new Date().toISOString().split('T')[0],
       date_comptable: new Date().toISOString().split('T')[0],
       montant: '',
-      compte_collecteur_id: '',
       compte_mata_boost_id: '',
       est_bloque: false,
       numero_guichet: '',
@@ -92,7 +199,7 @@ export default function MataBoostCreatePage() {
       reference_client: '',
       description: '',
       devise: 'FCFA',
-      libelle: 'Collecte MATA BOOST'
+      libelle: 'Collecte MATA BOOST - Répartition clients'
     },
     validationSchema: Yup.object({
       agence_id: Yup.string().required("L'agence est requise"),
@@ -100,155 +207,106 @@ export default function MataBoostCreatePage() {
       montant: Yup.number()
         .required("Le montant est requis")
         .min(0.01, "Le montant doit être supérieur à 0"),
-      compte_collecteur_id: Yup.string().required("Le compte collecteur est requis"),
       compte_mata_boost_id: Yup.string().required("Le compte MATA BOOST est requis"),
       numero_guichet: Yup.string().required("Le numéro de guichet est requis"),
       numero_bordereau: Yup.string().required("Le numéro de bordereau est requis"),
       nom_agent: Yup.string().required("Le nom de l'agent est requis")
     }),
-// MODIFIER la fonction onSubmit dans formik
-onSubmit: async (values) => {
-  setLoading(true);
-  try {
-    const requestData = {
-      agence_id: values.agence_id,
-      date_operation: values.date_operation,
-      montant: parseFloat(values.montant),
-      compte_collecteur_id: values.compte_collecteur_id,
-      compte_mata_boost_id: values.compte_mata_boost_id,
-      est_bloque: values.est_bloque ? 1 : 0, // CHANGER ICI: Convertir en 1 ou 0
-      numero_guichet: values.numero_guichet,
-      numero_bordereau: values.numero_bordereau,
-      nom_agent: values.nom_agent,
-      reference_client: values.reference_client || '',
-      description: values.description || '',
-      devise: values.devise,
-      date_valeur: values.date_valeur,
-      date_comptable: values.date_comptable,
-      libelle: values.libelle
-    };
+    onSubmit: async (values) => {
+      setLoading(true);
+      try {
+        // Vérifier l'équilibre
+        const totalCollecteurs = comptesCollecteursList.reduce((sum, item) => sum + (Number(item.montant) || 0), 0);
+        const totalClients = comptesClientsList.reduce((sum, item) => sum + (Number(item.montant) || 0), 0);
 
-    if (justificatif) {
-      const formData = new FormData();
-      Object.keys(requestData).forEach(key => {
-        // Pour FormData, convertir les valeurs
-        let value = requestData[key];
-        if (key === 'est_bloque') {
-          value = value ? '1' : '0'; // Format pour FormData
+        if (Math.abs(totalCollecteurs - totalClients) > 0.01) {
+          showSnackbar('Les totaux collecteurs et crédits clients ne sont pas équilibrés', 'error');
+          setLoading(false);
+          return;
         }
-        formData.append(key, value);
-      });
-      formData.append('justificatif', justificatif);
 
-      const response = await ApiClient.post('/operation-diverses/mata-boost', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+        // Préparer les données
+        const comptesCollecteursFormatted = comptesCollecteursList
+          .filter(item => item.compte_id && item.montant)
+          .map(item => ({
+            compte_id: item.compte_id,
+            montant: parseFloat(item.montant)
+          }));
 
-      if (response.data.success) {
-        showSnackbar('OD MATA BOOST créée avec succès !', 'success');
-        setTimeout(() => navigate('/ChoicePageOd'), 1500);
-      } else {
-        showSnackbar(response.data.message, 'error');
-      }
-    } else {
-      // Pour JSON, envoyer comme boolean ou string selon ce que le backend attend
-      const jsonData = {
-        ...requestData,
-        est_bloque: values.est_bloque // Envoyer comme boolean
-        // OU selon les besoins du backend:
-        // est_bloque: values.est_bloque ? '1' : '0'
-        // est_bloque: values.est_bloque ? 'true' : 'false'
-      };
-      
-      const response = await ApiClient.post('/operation-diverses/mata-boost', jsonData);
-      
-      if (response.data.success) {
-        showSnackbar('OD MATA BOOST créée avec succès !', 'success');
-        setTimeout(() => navigate('/ChoicePageOd'), 1500);
-      } else {
-        showSnackbar(response.data.message, 'error');
+        const comptesClientsFormatted = comptesClientsList
+          .filter(item => item.compte_client_id && item.montant)
+          .map(item => ({
+            compte_client_id: item.compte_client_id,
+            montant: parseFloat(item.montant)
+          }));
+
+        const requestData = {
+          agence_id: values.agence_id,
+          date_operation: values.date_operation,
+          date_valeur: values.date_valeur,
+          date_comptable: values.date_comptable,
+          montant: parseFloat(values.montant),
+          comptes_collecteurs: comptesCollecteursFormatted,
+          compte_mata_boost_id: values.compte_mata_boost_id,
+          comptes_clients: comptesClientsFormatted,
+          est_bloque: values.est_bloque,
+          numero_guichet: values.numero_guichet,
+          numero_bordereau: values.numero_bordereau,
+          nom_agent: values.nom_agent,
+          reference_client: values.reference_client || '',
+          description: values.description || '',
+          devise: values.devise,
+          libelle: values.libelle
+        };
+
+        // Convertir le fichier en base64 si présent
+        if (justificatif) {
+          const base64File = await convertFileToBase64(justificatif);
+          requestData.justificatif_base64 = base64File;
+          requestData.justificatif_filename = justificatif.name;
+          requestData.justificatif_mime_type = justificatif.type;
+        }
+
+        const response = await ApiClient.post('/operation-diverses/mata-boost-avec-clients', requestData, {
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.data.success) {
+          showSnackbar('OD MATA BOOST avec répartition clients créée avec succès !', 'success');
+          setTimeout(() => navigate('/ChoicePageOd'), 1500);
+        } else {
+          showSnackbar(response.data.message, 'error');
+        }
+        
+      } catch (error) {
+        console.error('Erreur:', error.response?.data || error);
+        showSnackbar(
+          error.response?.data?.message || 'Erreur lors de la création', 
+          'error'
+        );
+      } finally {
+        setLoading(false);
       }
     }
-  } catch (error) {
-    console.error('Erreur:', error.response?.data || error);
-    showSnackbar(
-      error.response?.data?.message || 'Erreur lors de la création', 
-      'error'
-    );
-  } finally {
-    setLoading(false);
-  }
-}  });
+  });
 
-  // Fonction pour trouver l'agent sélectionné dans la liste
-  const getSelectedAgent = () => {
-    if (!formik.values.nom_agent) return null;
-    
-    // Si on a déjà stocké l'agent sélectionné, on le retourne
-    if (selectedAgent && selectedAgent.nom_complet === formik.values.nom_agent) {
-      return selectedAgent;
-    }
-    
-    // Sinon, chercher dans la liste des gestionnaires
-    const found = gestionnaires.find(g => {
-      const nomComplet = g.nom_complet || `${g.gestionnaire_prenom} ${g.gestionnaire_nom}`;
-      return nomComplet === formik.values.nom_agent || g.nom === formik.values.nom_agent;
-    });
-    
-    return found || null;
-  };
-
-  // Fonction de recherche débourrée pour les gestionnaires
+  // Recherches debounced
   const searchGestionnairesDebounced = useCallback(
     debounce(async (searchTerm) => {
       try {
         setLoadingGestionnaires(true);
-        
-        // Si pas de terme de recherche et une agence est sélectionnée, charger les gestionnaires de cette agence
         if (!searchTerm || searchTerm.length < 2) {
           if (formik.values.agence_id) {
             await loadGestionnairesByAgence(formik.values.agence_id);
-          } else {
-            // Charger tous les gestionnaires si pas d'agence sélectionnée
-            const response = await gestionnaireService.getAllGestionnaires(1, 50);
-            if (response.success) {
-              const formattedGestionnaires = response.data.map(g => ({
-                id: g.id,
-                nom: `${g.gestionnaire_prenom} ${g.gestionnaire_nom}`.trim(),
-                code: g.gestionnaire_code,
-                nom_complet: g.nom_complet || `${g.gestionnaire_prenom} ${g.gestionnaire_nom}`,
-                agence: g.agence?.name || g.agence?.agency_name,
-                label: `${g.gestionnaire_code} - ${g.gestionnaire_prenom} ${g.gestionnaire_nom}`,
-                value: g.id,
-                gestionnaire_prenom: g.gestionnaire_prenom,
-                gestionnaire_nom: g.gestionnaire_nom
-              }));
-              setGestionnaires(formattedGestionnaires);
-            }
           }
           return;
         }
-
-        // Recherche avec filtre
         const response = await gestionnaireService.getAllGestionnaires(1, 20, searchTerm);
-        
         if (response.success) {
-          const formattedGestionnaires = response.data.map(g => ({
-            id: g.id,
-            nom: `${g.gestionnaire_prenom} ${g.gestionnaire_nom}`.trim(),
-            code: g.gestionnaire_code,
-            nom_complet: g.nom_complet || `${g.gestionnaire_prenom} ${g.gestionnaire_nom}`,
-            agence: g.agence?.name || g.agence?.agency_name,
-            label: `${g.gestionnaire_code} - ${g.gestionnaire_prenom} ${g.gestionnaire_nom}`,
-            value: g.id,
-            gestionnaire_prenom: g.gestionnaire_prenom,
-            gestionnaire_nom: g.gestionnaire_nom
-          }));
-          setGestionnaires(formattedGestionnaires);
+          setGestionnaires(formatGestionnaires(response.data));
         }
       } catch (error) {
         console.error('Erreur recherche gestionnaires:', error);
-        showSnackbar('Erreur lors de la recherche des gestionnaires', 'error');
       } finally {
         setLoadingGestionnaires(false);
       }
@@ -256,7 +314,6 @@ onSubmit: async (values) => {
     [formik.values.agence_id]
   );
 
-  // Fonction de recherche pour les comptes collecteurs
   const searchCollecteursDebounced = useCallback(
     debounce(async (searchTerm) => {
       try {
@@ -264,13 +321,8 @@ onSubmit: async (values) => {
         const response = await ApiClient.get('/operation-diverses/comptes/collecteurs', {
           params: { search: searchTerm }
         });
-        
         if (response.data.success) {
-          setComptesCollecteurs(response.data.data.map(c => ({
-            ...c,
-            label: `${c.code} - ${c.libelle}`,
-            value: c.id
-          })));
+          setComptesCollecteurs(formatComptes(response.data.data));
         }
       } catch (error) {
         console.error('Erreur recherche collecteurs:', error);
@@ -281,7 +333,6 @@ onSubmit: async (values) => {
     []
   );
 
-  // Fonction de recherche pour les comptes Mata Boost
   const searchMataBoostDebounced = useCallback(
     debounce(async (searchTerm) => {
       try {
@@ -289,13 +340,8 @@ onSubmit: async (values) => {
         const response = await ApiClient.get('/operation-diverses/comptes/mata-boost', {
           params: { search: searchTerm }
         });
-        
         if (response.data.success) {
-          setComptesMataBoost(response.data.data.map(c => ({
-            ...c,
-            label: `${c.code} - ${c.libelle}`,
-            value: c.id
-          })));
+          setComptesMataBoost(formatComptes(response.data.data));
         }
       } catch (error) {
         console.error('Erreur recherche mata boost:', error);
@@ -306,114 +352,87 @@ onSubmit: async (values) => {
     []
   );
 
-  // Charger les données initiales
+  const searchClientsDebounced = useCallback(
+    debounce(async (searchTerm) => {
+      if (selectedCompteMataBoost) {
+        await loadClientsParCompteMataBoost(selectedCompteMataBoost.id);
+      }
+    }, 500),
+    [selectedCompteMataBoost]
+  );
+
+  // Formateurs
+  const formatGestionnaires = (data) => {
+    return data.map(g => ({
+      id: g.id,
+      nom: `${g.gestionnaire_prenom} ${g.gestionnaire_nom}`.trim(),
+      code: g.gestionnaire_code,
+      nom_complet: g.nom_complet || `${g.gestionnaire_prenom} ${g.gestionnaire_nom}`,
+      agence: g.agence?.name || g.agence?.agency_name,
+      label: `${g.gestionnaire_code} - ${g.gestionnaire_prenom} ${g.gestionnaire_nom}`,
+      value: g.id,
+      gestionnaire_prenom: g.gestionnaire_prenom,
+      gestionnaire_nom: g.gestionnaire_nom
+    }));
+  };
+
+  const formatComptes = (data) => {
+    return data.map(c => ({
+      ...c,
+      label: `${c.code} - ${c.libelle}`,
+      value: c.id
+    }));
+  };
+
+  // Chargement initial
   useEffect(() => {
     fetchInitialData();
   }, []);
 
   const fetchInitialData = async () => {
     try {
-      // Charger les agences
       setLoadingAgences(true);
       const agencesData = await agenceService.getAgences();
-      
-      const formattedAgences = agencesData.map(agence => ({
-        id: agence.id,
-        nom: agence.name,
-        code: agence.code,
-        label: `${agence.code} - ${agence.name}`,
-        value: agence.id
-      }));
-      
-      setAgences(formattedAgences);
-      
-      // Charger les gestionnaires initiaux (première page)
-      setLoadingGestionnaires(true);
-      const gestionnairesResponse = await gestionnaireService.getAllGestionnaires(1, 50);
-      if (gestionnairesResponse.success) {
-        const formattedGestionnaires = gestionnairesResponse.data.map(g => ({
-          id: g.id,
-          nom: `${g.gestionnaire_prenom} ${g.gestionnaire_nom}`.trim(),
-          code: g.gestionnaire_code,
-          nom_complet: g.nom_complet || `${g.gestionnaire_prenom} ${g.gestionnaire_nom}`,
-          agence: g.agence?.name || g.agence?.agency_name,
-          label: `${g.gestionnaire_code} - ${g.gestionnaire_prenom} ${g.gestionnaire_nom}`,
-          value: g.id,
-          gestionnaire_prenom: g.gestionnaire_prenom,
-          gestionnaire_nom: g.gestionnaire_nom
-        }));
-        setGestionnaires(formattedGestionnaires);
-      }
-      
-      // Charger les autres données
+      setAgences(agencesData.map(a => ({
+        id: a.id,
+        nom: a.name,
+        code: a.code,
+        label: `${a.code} - ${a.name}`,
+        value: a.id
+      })));
+
       const [collecteursRes, mataBoostRes] = await Promise.all([
         ApiClient.get('/operation-diverses/comptes/collecteurs'),
         ApiClient.get('/operation-diverses/comptes/mata-boost')
       ]);
 
       if (collecteursRes.data.success) {
-        setComptesCollecteurs(collecteursRes.data.data.map(c => ({
-          ...c,
-          label: `${c.code} - ${c.libelle}`,
-          value: c.id
-        })));
+        setComptesCollecteurs(formatComptes(collecteursRes.data.data));
       }
       
       if (mataBoostRes.data.success) {
-        setComptesMataBoost(mataBoostRes.data.data.map(c => ({
-          ...c,
-          label: `${c.code} - ${c.libelle}`,
-          value: c.id
-        })));
+        setComptesMataBoost(formatComptes(mataBoostRes.data.data));
       }
       
-      showSnackbar('Données chargées avec succès', 'success');
+      await loadAllGestionnaires();
+      
     } catch (error) {
-      console.error('❌ Erreur lors du chargement des données:', error);
-      showSnackbar(
-        error.message || 'Erreur lors du chargement des données', 
-        'error'
-      );
+      console.error('❌ Erreur chargement données:', error);
+      showSnackbar('Erreur lors du chargement des données', 'error');
     } finally {
       setLoadingAgences(false);
-      setLoadingGestionnaires(false);
-      setLoadingCollecteurs(false);
-      setLoadingMataBoost(false);
     }
   };
-
-  // Charger les gestionnaires quand l'agence change
-  useEffect(() => {
-    if (formik.values.agence_id) {
-      loadGestionnairesByAgence(formik.values.agence_id);
-    } else {
-      // Si pas d'agence sélectionnée, charger tous les gestionnaires
-      loadAllGestionnaires();
-    }
-  }, [formik.values.agence_id]);
 
   const loadGestionnairesByAgence = async (agenceId) => {
     try {
       setLoadingGestionnaires(true);
       const response = await gestionnaireService.getGestionnairesByAgence(agenceId);
-      
       if (response.success) {
-        const formattedGestionnaires = response.data.map(g => ({
-          id: g.id,
-          nom: `${g.gestionnaire_prenom} ${g.gestionnaire_nom}`.trim(),
-          code: g.gestionnaire_code,
-          nom_complet: g.nom_complet || `${g.gestionnaire_prenom} ${g.gestionnaire_nom}`,
-          agence: g.agence?.name || g.agence?.agency_name,
-          label: `${g.gestionnaire_code} - ${g.gestionnaire_prenom} ${g.gestionnaire_nom}`,
-          value: g.id,
-          gestionnaire_prenom: g.gestionnaire_prenom,
-          gestionnaire_nom: g.gestionnaire_nom
-        }));
-        setGestionnaires(formattedGestionnaires);
+        setGestionnaires(formatGestionnaires(response.data));
       }
     } catch (error) {
-      console.error('Erreur chargement gestionnaires par agence:', error);
-      // En cas d'erreur, charger tous les gestionnaires
+      console.error('Erreur:', error);
       await loadAllGestionnaires();
     } finally {
       setLoadingGestionnaires(false);
@@ -424,39 +443,34 @@ onSubmit: async (values) => {
     try {
       setLoadingGestionnaires(true);
       const response = await gestionnaireService.getAllGestionnaires(1, 50);
-      
       if (response.success) {
-        const formattedGestionnaires = response.data.map(g => ({
-          id: g.id,
-          nom: `${g.gestionnaire_prenom} ${g.gestionnaire_nom}`.trim(),
-          code: g.gestionnaire_code,
-          nom_complet: g.nom_complet || `${g.gestionnaire_prenom} ${g.gestionnaire_nom}`,
-          agence: g.agence?.name || g.agence?.agency_name,
-          label: `${g.gestionnaire_code} - ${g.gestionnaire_prenom} ${g.gestionnaire_nom}`,
-          value: g.id,
-          gestionnaire_prenom: g.gestionnaire_prenom,
-          gestionnaire_nom: g.gestionnaire_nom
-        }));
-        setGestionnaires(formattedGestionnaires);
+        setGestionnaires(formatGestionnaires(response.data));
       }
     } catch (error) {
-      console.error('Erreur chargement de tous les gestionnaires:', error);
+      console.error('Erreur:', error);
     } finally {
       setLoadingGestionnaires(false);
     }
   };
 
   const showSnackbar = (message, severity = 'info') => {
-    setSnackbar({
-      open: true,
-      message,
-      severity
-    });
+    setSnackbar({ open: true, message, severity });
   };
 
   const handleCloseSnackbar = (event, reason) => {
     if (reason === 'clickaway') return;
     setSnackbar({ ...snackbar, open: false });
+  };
+
+  const getSelectedAgent = () => {
+    if (!formik.values.nom_agent) return null;
+    if (selectedAgent && selectedAgent.nom_complet === formik.values.nom_agent) {
+      return selectedAgent;
+    }
+    return gestionnaires.find(g => 
+      g.nom_complet === formik.values.nom_agent || 
+      g.nom === formik.values.nom_agent
+    ) || null;
   };
 
   const handleNext = () => {
@@ -467,19 +481,47 @@ onSubmit: async (values) => {
       if (!formik.values.numero_guichet) errors.numero_guichet = 'Requis';
       if (!formik.values.numero_bordereau) errors.numero_bordereau = 'Requis';
       if (!formik.values.nom_agent) errors.nom_agent = 'Requis';
+      if (!formik.values.compte_mata_boost_id) errors.compte_mata_boost_id = 'Requis';
       
       if (Object.keys(errors).length > 0) {
         formik.setErrors(errors);
         return;
       }
     } else if (activeStep === 1) {
-      const errors = {};
-      if (!formik.values.montant || formik.values.montant <= 0) errors.montant = 'Requis';
-      if (!formik.values.compte_collecteur_id) errors.compte_collecteur_id = 'Requis';
-      if (!formik.values.compte_mata_boost_id) errors.compte_mata_boost_id = 'Requis';
+      // Validation des comptes collecteurs
+      let hasError = false;
+      comptesCollecteursList.forEach((item, index) => {
+        if (!item.compte_id) {
+          showSnackbar(`Compte collecteur ${index + 1} requis`, 'error');
+          hasError = true;
+        }
+        if (!item.montant || Number(item.montant) <= 0) {
+          showSnackbar(`Montant collecteur ${index + 1} invalide`, 'error');
+          hasError = true;
+        }
+      });
+      if (hasError) return;
+    } else if (activeStep === 2) {
+      // Validation des comptes clients
+      let hasError = false;
+      let totalClients = 0;
       
-      if (Object.keys(errors).length > 0) {
-        formik.setErrors(errors);
+      comptesClientsList.forEach((item, index) => {
+        if (!item.compte_client_id) {
+          showSnackbar(`Compte client ${index + 1} requis`, 'error');
+          hasError = true;
+        }
+        if (!item.montant || Number(item.montant) <= 0) {
+          showSnackbar(`Montant client ${index + 1} invalide`, 'error');
+          hasError = true;
+        }
+        totalClients += Number(item.montant) || 0;
+      });
+      
+      if (hasError) return;
+      
+      if (Math.abs(montantTotal - totalClients) > 0.01) {
+        showSnackbar(`Le total des crédits clients (${totalClients.toLocaleString()} FCFA) doit être égal au total collecteurs (${montantTotal.toLocaleString()} FCFA)`, 'error');
         return;
       }
     }
@@ -507,6 +549,22 @@ onSubmit: async (values) => {
     }
   };
 
+  const getCompteIntitule = (compteId, type) => {
+    if (!compteId) return "...";
+    
+    if (type === 'collecteur') {
+      const collecteur = comptesCollecteurs.find(c => c.id === compteId);
+      return collecteur ? `${collecteur.code} - ${collecteur.libelle}` : "...";
+    }
+    return "...";
+  };
+
+  const getClientInfo = (compteClientId) => {
+    if (!compteClientId) return null;
+    const client = comptesClients.find(c => c.id === compteClientId);
+    return client || null;
+  };
+
   return (
     <Layout>
       <Box sx={{ minHeight: '100vh', bgcolor: '#F8FAFC', py: { xs: 3, md: 5 } }}>
@@ -516,11 +574,11 @@ onSubmit: async (values) => {
               Retour
             </Button>
             <Typography variant="h4" fontWeight="700" sx={{ display: 'flex', alignItems: 'center' }}>
-              <TrendingUp sx={{ mr: 2, color: '#4caf50' }} />
-              Nouvelle OD - MATA BOOST
+              <Group sx={{ mr: 2, color: '#4caf50' }} />
+              Nouvelle OD - MATA BOOST avec répartition clients
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Saisie des collectes MATA BOOST (journalières ou bloquées)
+              Collecte multi-comptes avec crédit direct sur comptes clients
             </Typography>
           </Box>
 
@@ -535,10 +593,8 @@ onSubmit: async (values) => {
 
             {activeStep === 0 && (
               <Grid container spacing={3}>
-                {/* Agence - Autocomplete */}
                 <Grid item xs={12} md={6}>
                   <Autocomplete
-                    sx={{minWidth:250}} 
                     options={agences}
                     value={agences.find(a => a.id === formik.values.agence_id) || null}
                     onChange={(event, newValue) => {
@@ -547,11 +603,10 @@ onSubmit: async (values) => {
                     onBlur={formik.handleBlur}
                     loading={loadingAgences}
                     getOptionLabel={(option) => option.label || ''}
-                    isOptionEqualToValue={(option, value) => option.id === value.id}
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        sx={{minWidth:250}}  
+                        sx={{minWidth:250}}
                         label="Agence *"
                         error={formik.touched.agence_id && Boolean(formik.errors.agence_id)}
                         helperText={formik.touched.agence_id && formik.errors.agence_id}
@@ -559,18 +614,16 @@ onSubmit: async (values) => {
                           ...params.InputProps,
                           endAdornment: (
                             <>
-                              {loadingAgences ? <CircularProgress color="inherit" size={20} /> : null}
+                              {loadingAgences ? <CircularProgress size={20} /> : null}
                               {params.InputProps.endAdornment}
                             </>
                           ),
                         }}
                       />
                     )}
-                    sx={{ minWidth: 250 }}
                   />
                 </Grid>
 
-                {/* Numéro de guichet */}
                 <Grid item xs={12} md={6}>
                   <TextField
                     fullWidth
@@ -581,11 +634,9 @@ onSubmit: async (values) => {
                     onBlur={formik.handleBlur}
                     error={formik.touched.numero_guichet && Boolean(formik.errors.numero_guichet)}
                     helperText={formik.touched.numero_guichet && formik.errors.numero_guichet}
-                    sx={{ minWidth: 250 }}
                   />
                 </Grid>
 
-                {/* Date d'opération */}
                 <Grid item xs={12} md={6}>
                   <TextField
                     fullWidth
@@ -596,13 +647,12 @@ onSubmit: async (values) => {
                     onChange={formik.handleChange}
                     onBlur={formik.handleBlur}
                     InputLabelProps={{ shrink: true }}
+                    disabled
                     error={formik.touched.date_operation && Boolean(formik.errors.date_operation)}
                     helperText={formik.touched.date_operation && formik.errors.date_operation}
-                    sx={{ minWidth: 250 }}
                   />
                 </Grid>
 
-                {/* Numéro de bordereau */}
                 <Grid item xs={12} md={6}>
                   <TextField
                     fullWidth
@@ -613,52 +663,27 @@ onSubmit: async (values) => {
                     onBlur={formik.handleBlur}
                     error={formik.touched.numero_bordereau && Boolean(formik.errors.numero_bordereau)}
                     helperText={formik.touched.numero_bordereau && formik.errors.numero_bordereau}
-                    sx={{ minWidth: 250 }}
                   />
                 </Grid>
 
-                {/* Agent (Gestionnaire) - Autocomplete avec recherche CORRIGÉ */}
                 <Grid item xs={12}>
                   <Autocomplete
-                    sx={{minWidth:250}} 
                     options={gestionnaires}
                     value={getSelectedAgent()}
                     onChange={(event, newValue) => {
-                      if (newValue) {
-                        // Stocker l'objet agent complet dans un state séparé
-                        setSelectedAgent(newValue);
-                        // Stocker le nom complet dans formik
-                        const nomComplet = newValue.nom_complet || 
-                                         `${newValue.gestionnaire_prenom} ${newValue.gestionnaire_nom}`;
-                        formik.setFieldValue('nom_agent', nomComplet);
-                      } else {
-                        setSelectedAgent(null);
-                        formik.setFieldValue('nom_agent', '');
-                      }
+                      setSelectedAgent(newValue);
+                      formik.setFieldValue('nom_agent', newValue?.nom_complet || '');
                     }}
                     onInputChange={(event, newInputValue) => {
                       setSearchGestionnaire(newInputValue);
                       searchGestionnairesDebounced(newInputValue);
                     }}
-                    onBlur={formik.handleBlur}
                     loading={loadingGestionnaires}
-                    getOptionLabel={(option) => {
-                      if (!option) return '';
-                      return option.nom_complet || 
-                             `${option.gestionnaire_prenom} ${option.gestionnaire_nom}` || 
-                             option.nom || 
-                             option.label || 
-                             '';
-                    }}
-                    isOptionEqualToValue={(option, value) => {
-                      if (!option || !value) return false;
-                      return option.id === value.id;
-                    }}
-                    filterOptions={(x) => x}
+                    getOptionLabel={(option) => option?.nom_complet || ''}
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        sx={{minWidth:250}} 
+                        sx={{minWidth:250}}
                         label="Nom de l'agent *"
                         error={formik.touched.nom_agent && Boolean(formik.errors.nom_agent)}
                         helperText={formik.touched.nom_agent && formik.errors.nom_agent}
@@ -667,61 +692,17 @@ onSubmit: async (values) => {
                           startAdornment: <InputAdornment position="start"><Person /></InputAdornment>,
                           endAdornment: (
                             <>
-                              {loadingGestionnaires ? <CircularProgress color="inherit" size={20} /> : null}
+                              {loadingGestionnaires ? <CircularProgress size={20} /> : null}
                               {params.InputProps.endAdornment}
                             </>
                           ),
                         }}
                       />
                     )}
-                    renderOption={(props, option) => (
-                      <li {...props} key={option.id}>
-                        <Box>
-                          <Typography variant="body2">
-                            {option.nom_complet || `${option.gestionnaire_prenom} ${option.gestionnaire_nom}`}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Code: {option.code || option.gestionnaire_code} | 
-                            Agence: {option.agence || 'Non assigné'}
-                          </Typography>
-                        </Box>
-                      </li>
-                    )}
-                    sx={{ minWidth: 250 }}
-                  />
-                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                    {formik.values.agence_id 
-                      ? 'Gestionnaires de l\'agence sélectionnée' 
-                      : 'Tous les gestionnaires (sélectionnez une agence pour filtrer)'}
-                  </Typography>
-                </Grid>
-              </Grid>
-            )}
-
-            {activeStep === 1 && (
-              <Grid container spacing={3}>
-                {/* Montant */}
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Montant *"
-                    name="montant"
-                    type="number"
-                    value={formik.values.montant}
-                    onChange={formik.handleChange}
-                    onBlur={formik.handleBlur}
-                    error={formik.touched.montant && Boolean(formik.errors.montant)}
-                    helperText={formik.touched.montant && formik.errors.montant}
-                    InputProps={{
-                      startAdornment: <InputAdornment position="start"><AttachMoney /></InputAdornment>,
-                      endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
-                    }}
-                    sx={{ minWidth: 250 }}
                   />
                 </Grid>
 
-                {/* Collecte bloquée */}
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12}>
                   <FormControlLabel
                     control={
                       <Switch
@@ -732,235 +713,409 @@ onSubmit: async (values) => {
                       />
                     }
                     label="Collecte bloquée"
-                    sx={{ minWidth: 250 }}
                   />
-                  <Typography variant="caption" color="text.secondary">
-                    {formik.values.est_bloque ? "Compte 37226000" : "Compte 37225000 (à vue)"}
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    {formik.values.est_bloque ? "Compte 37226000 (compte bloqué)" : "Compte 37225000 (à vue)"}
                   </Typography>
                 </Grid>
 
-                {/* Compte collecteur - Autocomplete avec recherche */}
-                <Grid item xs={12} md={6}>
-                  <Autocomplete
-                    options={comptesCollecteurs}
-                    value={comptesCollecteurs.find(c => c.id === formik.values.compte_collecteur_id) || null}
-                    onChange={(event, newValue) => {
-                      formik.setFieldValue('compte_collecteur_id', newValue?.id || '');
-                    }}
-                    onInputChange={(event, newInputValue) => {
-                      setSearchCollecteur(newInputValue);
-                      searchCollecteursDebounced(newInputValue);
-                    }}
-                    onBlur={formik.handleBlur}
-                    loading={loadingCollecteurs}
-                    getOptionLabel={(option) => option.label || `${option.code} - ${option.libelle}`}
-                    isOptionEqualToValue={(option, value) => option.id === value.id}
-                    filterOptions={(x) => x}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Compte collecteur (468) *"
-                        error={formik.touched.compte_collecteur_id && Boolean(formik.errors.compte_collecteur_id)}
-                        helperText={formik.touched.compte_collecteur_id && formik.errors.compte_collecteur_id}
-                        InputProps={{
-                          ...params.InputProps,
-                          endAdornment: (
-                            <>
-                              {loadingCollecteurs ? <CircularProgress color="inherit" size={20} /> : null}
-                              {params.InputProps.endAdornment}
-                            </>
-                          ),
-                        }}
-                      />
-                    )}
-                    renderOption={(props, option) => (
-                      <li {...props} key={option.id}>
-                        <Box>
-                          <Typography variant="body2">
-                            {option.code} - {option.libelle}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Solde: {option.solde || 'N/A'} {option.devise || 'FCFA'}
-                          </Typography>
-                        </Box>
-                      </li>
-                    )}
-                    sx={{ minWidth: 250 }}
-                  />
-                </Grid>
-
-                {/* Compte MATA BOOST - Autocomplete avec recherche */}
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12}>
                   <Autocomplete
                     options={comptesMataBoost}
                     value={comptesMataBoost.find(c => c.id === formik.values.compte_mata_boost_id) || null}
                     onChange={(event, newValue) => {
                       formik.setFieldValue('compte_mata_boost_id', newValue?.id || '');
+                      setSelectedCompteMataBoost(newValue);
                     }}
                     onInputChange={(event, newInputValue) => {
                       setSearchMataBoost(newInputValue);
                       searchMataBoostDebounced(newInputValue);
                     }}
-                    onBlur={formik.handleBlur}
                     loading={loadingMataBoost}
-                    getOptionLabel={(option) => option.label || `${option.code} - ${option.libelle}`}
-                    isOptionEqualToValue={(option, value) => option.id === value.id}
-                    filterOptions={(x) => x}
+                    getOptionLabel={(option) => option?.label || ''}
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        label="Compte MATA BOOST *"
+                        sx={{minWidth:500}}
+                        label="Compte MATA BOOST générique *"
                         error={formik.touched.compte_mata_boost_id && Boolean(formik.errors.compte_mata_boost_id)}
                         helperText={formik.touched.compte_mata_boost_id && formik.errors.compte_mata_boost_id}
                         InputProps={{
                           ...params.InputProps,
+                          startAdornment: <InputAdornment position="start"><AccountBalance /></InputAdornment>,
                           endAdornment: (
                             <>
-                              {loadingMataBoost ? <CircularProgress color="inherit" size={20} /> : null}
+                              {loadingMataBoost ? <CircularProgress size={20} /> : null}
                               {params.InputProps.endAdornment}
                             </>
                           ),
                         }}
                       />
                     )}
-                    renderOption={(props, option) => (
-                      <li {...props} key={option.id}>
-                        <Box>
-                          <Typography variant="body2">
-                            {option.code} - {option.libelle}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Type: {option.type || 'Standard'} | Devise: {option.devise || 'FCFA'}
-                          </Typography>
-                        </Box>
-                      </li>
-                    )}
-                    sx={{ minWidth: 250 }}
-                  />
-                </Grid>
-
-                {/* Référence client */}
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Référence client"
-                    name="reference_client"
-                    value={formik.values.reference_client}
-                    onChange={formik.handleChange}
-                    sx={{ minWidth: 250 }}
-                  />
-                </Grid>
-
-                {/* Description */}
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Description"
-                    name="description"
-                    value={formik.values.description}
-                    onChange={formik.handleChange}
-                    multiline
-                    rows={2}
-                    sx={{ minWidth: 250 }}
                   />
                 </Grid>
               </Grid>
             )}
 
+            {activeStep === 1 && (
+              <Grid container spacing={3}>
+                <Grid item xs={12}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      Comptes Collecteurs (468) - Débit
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      startIcon={<AddCircle />}
+                      onClick={handleAddCompteCollecteur}
+                      size="small"
+                    >
+                      Ajouter un collecteur
+                    </Button>
+                  </Box>
+                  
+                  {comptesCollecteursList.map((compteCollecteur, index) => (
+                    <Grid container spacing={2} key={index} sx={{ mb: 2 }}>
+                      <Grid item xs={7}>
+                        <Autocomplete
+                          options={comptesCollecteurs}
+                          getOptionLabel={(option) => option?.label || ''}
+                          value={comptesCollecteurs.find(c => c.id === compteCollecteur.compte_id) || null}
+                          onChange={(e, newValue) => {
+                            handleCompteCollecteurChange(index, "compte_id", newValue?.id || "");
+                          }}
+                          onInputChange={(event, newInputValue) => {
+                            setSearchCollecteur(newInputValue);
+                            searchCollecteursDebounced(newInputValue);
+                          }}
+                          loading={loadingCollecteurs}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              sx={{minWidth:350}}
+                              label={`Compte collecteur ${index + 1}`}
+                              error={formik.errors[`collecteur_${index}`]}
+                              helperText={formik.errors[`collecteur_${index}`]}
+                              InputProps={{
+                                ...params.InputProps,
+                                endAdornment: (
+                                  <>
+                                    {loadingCollecteurs ? <CircularProgress size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                  </>
+                                ),
+                              }}
+                            />
+                          )}
+                        />
+                      </Grid>
+                      <Grid item xs={3}>
+                        <TextField
+                          fullWidth
+                          label="Montant"
+                          type="number"
+                          value={compteCollecteur.montant}
+                          onChange={(e) => handleCompteCollecteurChange(index, "montant", e.target.value)}
+                          error={formik.errors[`collecteur_montant_${index}`]}
+                          helperText={formik.errors[`collecteur_montant_${index}`]}
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                          }}
+                        />
+                      </Grid>
+                      <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                        {comptesCollecteursList.length > 1 && (
+                          <IconButton 
+                            color="error" 
+                            onClick={() => handleRemoveCompteCollecteur(index)}
+                            size="small"
+                          >
+                            <Delete />
+                          </IconButton>
+                        )}
+                      </Grid>
+                    </Grid>
+                  ))}
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Box sx={{ mt: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      Total collecteurs
+                    </Typography>
+                    <Typography variant="h5" color="primary">
+                      {montantTotal.toLocaleString()} FCFA
+                    </Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+            )}
+
             {activeStep === 2 && (
+              <Grid container spacing={3}>
+                <Grid item xs={12}>
+                  <Alert severity="info" sx={{ mb: 3 }}>
+                    <Typography variant="body2">
+                      <strong>Crédits clients :</strong> Le montant total des crédits clients 
+                      <strong> ({montantTotal.toLocaleString()} FCFA)</strong> doit être réparti entre les comptes clients.
+                    </Typography>
+                  </Alert>
+
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      Répartition par comptes clients - Crédit
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      startIcon={<AddCircle />}
+                      onClick={handleAddCompteClient}
+                      size="small"
+                      disabled={!selectedCompteMataBoost}
+                    >
+                      Ajouter un client
+                    </Button>
+                  </Box>
+                  
+                  {!selectedCompteMataBoost && (
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                      Veuillez d'abord sélectionner un compte MATA BOOST générique à l'étape 1.
+                    </Alert>
+                  )}
+                  
+                  {comptesClientsList.map((compteClient, index) => {
+                    const clientInfo = getClientInfo(compteClient.compte_client_id);
+                    
+                    return (
+                      <Grid container spacing={2} key={index} sx={{ mb: 2 }}>
+                        <Grid item xs={7}>
+                          <Autocomplete
+                            options={comptesClients}
+                            getOptionLabel={(option) => option?.label || ''}
+                            value={comptesClients.find(c => c.id === compteClient.compte_client_id) || null}
+                            onChange={(e, newValue) => {
+                              handleCompteClientChange(index, "compte_client_id", newValue?.id || "");
+                            }}
+                            onInputChange={(event, newInputValue) => {
+                              setSearchClient(newInputValue);
+                              searchClientsDebounced(newInputValue);
+                            }}
+                            loading={loadingClients}
+                            disabled={!selectedCompteMataBoost}
+                            renderInput={(params) => (
+                              <TextField
+                                {...params}
+                                sx={{minWidth:350}}
+                                label={`Compte client ${index + 1}`}
+                                error={formik.errors[`client_${index}`]}
+                                helperText={formik.errors[`client_${index}`]}
+                                InputProps={{
+                                  ...params.InputProps,
+                                  startAdornment: <InputAdornment position="start"><Receipt /></InputAdornment>,
+                                  endAdornment: (
+                                    <>
+                                      {loadingClients ? <CircularProgress size={20} /> : null}
+                                      {params.InputProps.endAdornment}
+                                    </>
+                                  ),
+                                }}
+                              />
+                            )}
+                            renderOption={(props, option) => (
+                              <li {...props} key={option.id}>
+                                <Box>
+                                  <Typography variant="body2" fontWeight="bold">
+                                    {option.client_nom}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Compte: {option.numero_compte} | Solde: {option.solde?.toLocaleString()} {option.devise}
+                                  </Typography>
+                                </Box>
+                              </li>
+                            )}
+                          />
+                        </Grid>
+                        <Grid item xs={3}>
+                          <TextField
+                            fullWidth
+                            label="Montant à créditer"
+                            type="number"
+                            value={compteClient.montant}
+                            onChange={(e) => handleCompteClientChange(index, "montant", e.target.value)}
+                            error={formik.errors[`client_montant_${index}`]}
+                            helperText={formik.errors[`client_montant_${index}`]}
+                            InputProps={{
+                              endAdornment: <InputAdornment position="end">FCFA</InputAdornment>,
+                            }}
+                          />
+                        </Grid>
+                        <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                          {comptesClientsList.length > 1 && (
+                            <IconButton 
+                              color="error" 
+                              onClick={() => handleRemoveCompteClient(index)}
+                              size="small"
+                            >
+                              <Delete />
+                            </IconButton>
+                          )}
+                        </Grid>
+                        {clientInfo && (
+                          <Grid item xs={12}>
+                            <FormHelperText sx={{ ml: 2 }}>
+                              Client: {clientInfo.client_nom} | 
+                              Code: {clientInfo.client_code} | 
+                              Compte: {clientInfo.numero_compte}
+                            </FormHelperText>
+                          </Grid>
+                        )}
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Box sx={{ mt: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      Équilibre
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          Total collecteurs (débit)
+                        </Typography>
+                        <Typography variant="h6" color="error">
+                          {montantTotal.toLocaleString()} FCFA
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="text.secondary">
+                          Total crédits clients
+                        </Typography>
+                        <Typography variant="h6" color="success.main">
+                          {comptesClientsList.reduce((sum, item) => sum + (Number(item.montant) || 0), 0).toLocaleString()} FCFA
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                    {Math.abs(montantTotal - comptesClientsList.reduce((sum, item) => sum + (Number(item.montant) || 0), 0)) > 0.01 && (
+                      <Alert severity="warning" sx={{ mt: 2 }}>
+                        Écart de {(montantTotal - comptesClientsList.reduce((sum, item) => sum + (Number(item.montant) || 0), 0)).toLocaleString()} FCFA
+                      </Alert>
+                    )}
+                  </Box>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Description (optionnel)"
+                    name="description"
+                    value={formik.values.description}
+                    onChange={formik.handleChange}
+                    multiline
+                    rows={2}
+                  />
+                </Grid>
+              </Grid>
+            )}
+
+            {activeStep === 3 && (
               <Box>
-                <Alert severity="info" sx={{ mb: 3 }}>
+                <Alert severity="success" sx={{ mb: 3 }}>
                   <Typography variant="body2">
-                    <strong>Important :</strong> Après saisie, validation requise du chef d'agence et du chef comptable.
+                    <strong>OD prête à être créée :</strong> Vérifiez les informations ci-dessous avant validation.
                   </Typography>
                 </Alert>
 
                 <Card sx={{ mb: 3 }}>
                   <CardContent>
-                    <Typography variant="h6" gutterBottom>Aperçu de l'écriture comptable</Typography>
+                    <Typography variant="h6" gutterBottom>Écriture comptable détaillée</Typography>
                     
-                    {/* Header du tableau d'écriture comptable */}
-                    <Box sx={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: '1fr 2fr 1fr 1fr',
-                      gap: 1,
-                      mb: 2,
-                      p: 1,
-                      bgcolor: 'grey.100',
-                      borderRadius: 1
-                    }}>
-                      <Typography variant="subtitle2" fontWeight="bold">N° Compte</Typography>
-                      <Typography variant="subtitle2" fontWeight="bold">Libellé</Typography>
-                      <Typography variant="subtitle2" fontWeight="bold" align="right">Débit</Typography>
-                      <Typography variant="subtitle2" fontWeight="bold" align="right">Crédit</Typography>
-                    </Box>
+                    <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
+                      <Table size="small">
+                        <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                          <TableRow>
+                            <TableCell><strong>Compte</strong></TableCell>
+                            <TableCell><strong>Libellé</strong></TableCell>
+                            <TableCell><strong>Détail</strong></TableCell>
+                            <TableCell align="right"><strong>Débit (FCFA)</strong></TableCell>
+                            <TableCell align="right"><strong>Crédit (FCFA)</strong></TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {/* Comptes Collecteurs (Débits) */}
+                          {comptesCollecteursList.map((compteCollecteur, index) => {
+                            if (!compteCollecteur.compte_id || !compteCollecteur.montant) return null;
+                            return (
+                              <TableRow key={`collecteur-${index}`} sx={{ bgcolor: '#fff5f5' }}>
+                                <TableCell>
+                                  <strong>{getCompteIntitule(compteCollecteur.compte_id, 'collecteur').split(' - ')[0]}</strong>
+                                </TableCell>
+                                <TableCell>{formik.values.libelle}</TableCell>
+                                <TableCell>Collecte agent {formik.values.nom_agent}</TableCell>
+                                <TableCell align="right">
+                                  {Number(compteCollecteur.montant).toLocaleString()}
+                                </TableCell>
+                                <TableCell align="right">-</TableCell>
+                              </TableRow>
+                            );
+                          })}
 
-                    {/* Ligne 1: Compte collecteur (débit) */}
-                    <Box sx={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: '1fr 2fr 1fr 1fr',
-                      gap: 1,
-                      p: 1,
-                      borderBottom: '1px solid',
-                      borderColor: 'divider'
-                    }}>
-                      <Typography variant="body2" fontWeight="medium">
-                        {comptesCollecteurs.find(c => c.id === formik.values.compte_collecteur_id)?.code || '468XXX'}
-                      </Typography>
-                      <Typography variant="body2">
-                        {comptesCollecteurs.find(c => c.id === formik.values.compte_collecteur_id)?.libelle || 'Compte collecteur'}
-                      </Typography>
-                      <Typography variant="body2" align="right" color="error.main" fontWeight="bold">
-                        {formik.values.montant ? Number(formik.values.montant).toLocaleString('fr-FR') : '0'} FCFA
-                      </Typography>
-                      <Typography variant="body2" align="right">-</Typography>
-                    </Box>
+                          {/* Compte MATA BOOST générique (Crédit) */}
+                          {selectedCompteMataBoost && (
+                            <TableRow sx={{ bgcolor: '#f8fff5' }}>
+                              <TableCell>
+                                <strong>{selectedCompteMataBoost.code}</strong>
+                              </TableCell>
+                              <TableCell>{formik.values.libelle}</TableCell>
+                              <TableCell>Crédit MATA BOOST générique</TableCell>
+                              <TableCell align="right">-</TableCell>
+                              <TableCell align="right">
+                                {montantTotal.toLocaleString()}
+                              </TableCell>
+                            </TableRow>
+                          )}
 
-                    {/* Ligne 2: Compte MATA BOOST (crédit) */}
-                    <Box sx={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: '1fr 2fr 1fr 1fr',
-                      gap: 1,
-                      p: 1,
-                      borderBottom: '1px solid',
-                      borderColor: 'divider'
-                    }}>
-                      <Typography variant="body2" fontWeight="medium">
-                        {comptesMataBoost.find(c => c.id === formik.values.compte_mata_boost_id)?.code || 
-                        (formik.values.est_bloque ? '37226000' : '37225000')}
-                      </Typography>
-                      <Typography variant="body2">
-                        {comptesMataBoost.find(c => c.id === formik.values.compte_mata_boost_id)?.libelle || 
-                        (formik.values.est_bloque ? 'MATA BOOST bloqué' : 'MATA BOOST à vue')}
-                      </Typography>
-                      <Typography variant="body2" align="right">-</Typography>
-                      <Typography variant="body2" align="right" color="success.main" fontWeight="bold">
-                        {formik.values.montant ? Number(formik.values.montant).toLocaleString('fr-FR') : '0'} FCFA
-                      </Typography>
-                    </Box>
+                          {/* Comptes clients (Crédits - Détail) */}
+                          {comptesClientsList.map((compteClient, index) => {
+                            const clientInfo = getClientInfo(compteClient.compte_client_id);
+                            if (!clientInfo || !compteClient.montant) return null;
+                            
+                            return (
+                              <TableRow key={`client-${index}`} sx={{ bgcolor: '#f0f7fa', fontStyle: 'italic' }}>
+                                <TableCell>
+                                  {clientInfo.numero_compte}
+                                </TableCell>
+                                <TableCell colSpan={1}>
+                                  Crédit compte client
+                                </TableCell>
+                                <TableCell>
+                                  {clientInfo.client_nom}
+                                </TableCell>
+                                <TableCell align="right">-</TableCell>
+                                <TableCell align="right">
+                                  {Number(compteClient.montant).toLocaleString()}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
 
-                    {/* Totaux */}
-                    <Box sx={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: '1fr 2fr 1fr 1fr',
-                      gap: 1,
-                      p: 1,
-                      mt: 2,
-                      bgcolor: 'grey.50',
-                      borderRadius: 1
-                    }}>
-                      <Typography variant="body2" fontWeight="bold">TOTAUX</Typography>
-                      <Typography variant="body2"></Typography>
-                      <Typography variant="body2" align="right" fontWeight="bold" color="error.main">
-                        {formik.values.montant ? Number(formik.values.montant).toLocaleString('fr-FR') : '0'} FCFA
-                      </Typography>
-                      <Typography variant="body2" align="right" fontWeight="bold" color="success.main">
-                        {formik.values.montant ? Number(formik.values.montant).toLocaleString('fr-FR') : '0'} FCFA
-                      </Typography>
-                    </Box>
+                          {/* Ligne de total */}
+                          <TableRow sx={{ bgcolor: '#e0e0e0', fontWeight: 'bold' }}>
+                            <TableCell colSpan={3} align="right">
+                              <strong>TOTAL</strong>
+                            </TableCell>
+                            <TableCell align="right">
+                              <strong>{montantTotal.toLocaleString()}</strong>
+                            </TableCell>
+                            <TableCell align="right">
+                              <strong>{montantTotal.toLocaleString()}</strong>
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
 
-                    {/* Informations supplémentaires */}
-                    <Grid container spacing={2} sx={{ mt: 3 }}>
+                    <Grid container spacing={2}>
                       <Grid item xs={12} md={6}>
                         <Typography variant="body2" color="text.secondary">Référence</Typography>
                         <Typography variant="body1" fontWeight="medium">
@@ -983,24 +1138,26 @@ onSubmit: async (values) => {
                         <Typography variant="body2" color="text.secondary">Agent</Typography>
                         <Typography variant="body1">{formik.values.nom_agent}</Typography>
                       </Grid>
-                      <Grid item xs={12} md={6}>
-                        <Typography variant="body2" color="text.secondary">Type de collecte</Typography>
-                        <Typography variant="body1" fontWeight="medium">
-                          {formik.values.est_bloque ? 'Collecte bloquée' : 'Collecte à vue'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <Typography variant="body2" color="text.secondary">Bordereau</Typography>
-                        <Typography variant="body1">{formik.values.numero_bordereau || '-'}</Typography>
+                      <Grid item xs={12}>
+                        <Typography variant="body2" color="text.secondary">Clients crédités</Typography>
+                        <Box sx={{ mt: 1 }}>
+                          {comptesClientsList.map((item, index) => {
+                            const clientInfo = getClientInfo(item.compte_client_id);
+                            if (!clientInfo) return null;
+                            return (
+                              <Chip
+                                key={index}
+                                label={`${clientInfo.client_nom}: ${Number(item.montant).toLocaleString()} FCFA`}
+                                size="small"
+                                sx={{ mr: 1, mb: 1 }}
+                                color="success"
+                                variant="outlined"
+                              />
+                            );
+                          })}
+                        </Box>
                       </Grid>
                     </Grid>
-
-                    {/* Explication de l'écriture */}
-                    <Alert severity="info" sx={{ mt: 3 }}>
-                      <Typography variant="body2">
-                        <strong>Écriture comptable :</strong> Débit du compte collecteur (468) et crédit du compte MATA BOOST client ({formik.values.est_bloque ? '37226000' : '37225000'})
-                      </Typography>
-                    </Alert>
                   </CardContent>
                 </Card>
 
@@ -1010,7 +1167,7 @@ onSubmit: async (values) => {
                     variant="outlined"
                     startIcon={<Upload />}
                     onClick={() => setUploadDialog(true)}
-                    sx={{ mr: 2, minWidth: 250 }}
+                    sx={{ mr: 2 }}
                   >
                     {justificatif ? 'Changer le fichier' : 'Ajouter un justificatif'}
                   </Button>
@@ -1054,15 +1211,23 @@ onSubmit: async (values) => {
             </Box>
           </Paper>
 
-          {/* Information processus */}
           <Paper elevation={0} sx={{ p: 3, mt: 4, borderRadius: 4, bgcolor: '#e8f5e9' }}>
-            <Typography variant="h6" gutterBottom>📝 Processus MATA BOOST</Typography>
+            <Typography variant="h6" gutterBottom>📝 Processus MATA BOOST avec répartition clients</Typography>
             <Typography variant="body2" paragraph>
-              <strong>À la caisse :</strong> Débit caisse (57) → Crédit compte collecteur agent (468)
+              <strong>Étape 1 :</strong> Débit des comptes collecteurs (468) → Crédit du compte MATA BOOST générique (37225xxx)
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>À la comptabilité :</strong> Débit compte collecteur (468) → Crédit compte MATA BOOST client (37225000/37226000)
+              <strong>Étape 2 (détail) :</strong> Les montants sont automatiquement affectés aux comptes clients individuels
             </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Avantage :</strong> Traçabilité complète - On sait exactement quel montant a été crédité sur quel compte client
+            </Typography>
+            <Box sx={{ mt: 2 }}>
+              <Chip label="Multi-collecteurs → Multi-clients" size="small" sx={{ mr: 1, mb: 1 }} color="primary" />
+              <Chip label="Compte MATA BOOST générique en crédit" size="small" sx={{ mr: 1, mb: 1 }} />
+              <Chip label="Détail par client" size="small" sx={{ mr: 1, mb: 1 }} color="success" />
+              <Chip label="Équilibre automatique" size="small" sx={{ mb: 1 }} />
+            </Box>
           </Paper>
         </Container>
       </Box>
@@ -1097,7 +1262,7 @@ onSubmit: async (values) => {
             component="label"
             fullWidth
             startIcon={<Upload />}
-            sx={{ mt: 2, minWidth: 250 }}
+            sx={{ mt: 2 }}
           >
             Choisir un fichier
             <input
@@ -1107,10 +1272,20 @@ onSubmit: async (values) => {
               onChange={handleJustificatifChange}
             />
           </Button>
+          {justificatif && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2">
+                Fichier sélectionné : <strong>{justificatif.name}</strong>
+              </Typography>
+              <Typography variant="caption">
+                Taille : {(justificatif.size / 1024 / 1024).toFixed(2)} MB
+              </Typography>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setUploadDialog(false)} sx={{ minWidth: 100 }}>Annuler</Button>
-          <Button onClick={() => setUploadDialog(false)} variant="contained" sx={{ minWidth: 100 }}>
+          <Button onClick={() => setUploadDialog(false)}>Annuler</Button>
+          <Button onClick={() => setUploadDialog(false)} variant="contained">
             Valider
           </Button>
         </DialogActions>

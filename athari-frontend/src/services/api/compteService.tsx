@@ -1,7 +1,6 @@
 import axios from 'axios';
 import type { Account } from '../../types/comptes';
-
-const API_URL = 'http://192.168.1.165:8000/api'; // Remplacez par votre URL API
+const API_URL = 'http://127.0.0.1:8000/api'; // Remplacez par votre URL API
 
 const AccountService = {
   async getAccounts(): Promise<Account[]> {
